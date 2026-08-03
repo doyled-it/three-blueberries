@@ -127,3 +127,51 @@ test("every gate explains itself and what to do about it", () => {
     assert.ok(g.fix.length > 3, `${g.key} needs a fix line`);
   }
 });
+
+test("REGRESSION: no phantom PMI credit when the lender already requires 20%", () => {
+  // Crediting "avoided" mortgage insurance to every option, including the
+  // baseline, invented a saving on a loan that never owed any.
+  const options = compareDownPayments({
+    price: 1_000_000,
+    interestRate: 0.0666,
+    investmentReturn: 0.07,
+    minimumPercent: 0.2,
+    options: [0.2, 0.3, 0.5],
+  });
+  const baseline = options[0]!;
+  assert.equal(baseline.afterTaxInterestSaved, 0, "the baseline cannot save anything relative to itself");
+  assert.equal(baseline.advantage, 0);
+  for (const o of options) {
+    assert.equal(o.requiresPmi, false, "20% or more never owes PMI");
+  }
+});
+
+test("the baseline option always has zero advantage, by definition", () => {
+  for (const minimumPercent of [0, 0.035, 0.05, 0.2]) {
+    const options = compareDownPayments({
+      price: 800_000,
+      interestRate: 0.0666,
+      investmentReturn: 0.07,
+      minimumPercent,
+      options: [minimumPercent, 0.5],
+    });
+    assert.equal(options[0]!.advantage, 0, `baseline at ${minimumPercent} must be the reference point`);
+  }
+});
+
+test("crossing the 20% threshold from a low deposit does credit avoided PMI", () => {
+  const options = compareDownPayments({
+    price: 1_000_000,
+    interestRate: 0.0666,
+    investmentReturn: 0.07,
+    minimumPercent: 0,
+    options: [0, 0.1, 0.2],
+  });
+  const low = options[1]!;
+  const crossed = options[2]!;
+  assert.equal(low.requiresPmi, true);
+  assert.equal(crossed.requiresPmi, false);
+  // The 20% option should get credit for the insurance a 0%-down loan would owe.
+  const interestOnly = 200_000 * 0.0666 * 0.6;
+  assert.ok(crossed.afterTaxInterestSaved > interestOnly, "PMI avoided must be counted on top of interest saved");
+});

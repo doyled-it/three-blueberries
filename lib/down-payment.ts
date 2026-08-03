@@ -230,9 +230,15 @@ export function compareDownPayments(args: {
       const interestSaved = extraDown * interestRate;
       const afterTaxInterestSaved = interestSaved * (1 - marginalTaxRate);
 
-      // Plus any mortgage insurance avoided by crossing the threshold.
-      const requiresPmi = percent < pmiThreshold && minimumPercent < pmiThreshold;
-      const pmiAvoided = requiresPmi ? 0 : (price - baseline) * pmiAnnualRate;
+      // Mortgage insurance avoided is the difference between what the BASELINE
+      // deposit would owe and what this one owes. Computing it as "anything at
+      // or above the threshold avoids it" credited a phantom saving to every
+      // option whenever the lender's minimum was already at the threshold, and
+      // credited the baseline for avoiding something relative to itself.
+      const requiresPmi = percent < pmiThreshold;
+      const pmiAtBaseline = minimumPercent < pmiThreshold ? (price - baseline) * pmiAnnualRate : 0;
+      const pmiHere = requiresPmi ? loanAmount * pmiAnnualRate : 0;
+      const pmiAvoided = Math.max(pmiAtBaseline - pmiHere, 0);
 
       const investmentForgone = extraDown * investmentReturn;
 
