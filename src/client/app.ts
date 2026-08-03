@@ -5,7 +5,7 @@
  * call is for the current mortgage rate.
  */
 
-import { evaluateScenario } from "../../lib/mortgage.ts";
+import { computeMortgageInsurance, evaluateScenario } from "../../lib/mortgage.ts";
 import { maxAffordablePrice } from "../../lib/affordability.ts";
 import { CA_COUNTIES } from "../../lib/data/ca-loan-limits.ts";
 import {
@@ -29,6 +29,8 @@ import { crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signa
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
+import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
+import { countyTaxRate, estimateInsuranceAnnual } from "../../lib/data/ca-property.ts";
 import {
   ASSUMPTION_SETS,
   DEFAULT_MARGINAL_TAX_RATE,
@@ -260,7 +262,10 @@ function render(): void {
   $("warnings").innerHTML = result.warnings.map((w) => `<li>${w}</li>`).join("");
 
   renderRentVsBuy(input);
-  renderBuyingPower(input.purchasePrice);
+  // The thesis panel is a claim about the median San Diego home, so it must use
+  // the project's own anchor. Passing the form's price made it a market-level
+  // claim derived from a demo default, and the one-shot guard froze it there.
+  renderBuyingPower();
   renderCohort(input);
   renderHistory(input.purchasePrice);
   renderSignals(input.purchasePrice);
@@ -399,11 +404,13 @@ function renderCohort(input: ScenarioInput): void {
 // "Should you wait for the crash?"
 // ---------------------------------------------------------------------------
 
-let historyRendered = false;
+let lastHistoryAnchor: number | null = null;
 
 function renderHistory(anchorPrice: number): void {
-  if (historyRendered) return;
-  historyRendered = true;
+  // Keyed on the anchor rather than a one-shot flag, so editing the price
+  // actually redraws instead of leaving a stale chart on screen.
+  if (lastHistoryAnchor === anchorPrice) return;
+  lastHistoryAnchor = anchorPrice;
 
   const series = buildSeries(anchorPrice, 0.2);
   const drops = findDrawdowns(10);
@@ -490,11 +497,25 @@ function renderHistory(anchorPrice: number): void {
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/**
+ * When conventional mortgage insurance stops, in months. FHA under 10% down runs
+ * for the life of the loan, so it returns null.
+ */
+function mortgageInsuranceEnds(input: ScenarioInput, result: ReturnType<typeof evaluateScenario>): number | null {
+  if (input.loanType === "va") return 0;
+  const mi = computeMortgageInsurance(input, result.loan);
+  return mi ? mi.endsAfterMonths : 0;
+}
+
 const CARRYING_KEYS = ["propertyTax", "homeownersInsurance", "mortgageInsurance", "hoa", "melloRoos"];
 
 function renderRentVsBuy(input: ScenarioInput): void {
   const result = evaluateScenario(input);
-  const carrying = result.lines.filter((l) => CARRYING_KEYS.includes(l.key)).reduce((sum, l) => sum + l.monthly, 0);
+  // Mortgage insurance is handled separately now, because it terminates and does
+  // not escalate with property values.
+  const carrying = result.lines
+    .filter((l) => CARRYING_KEYS.includes(l.key) && l.key !== "mortgageInsurance")
+    .reduce((sum, l) => sum + l.monthly, 0);
   const maintenance = result.lines.find((l) => l.key === "maintenanceReserve")?.monthly ?? 0;
 
   const rent = num("currentRent", 2750);
@@ -541,6 +562,13 @@ function renderRentVsBuy(input: ScenarioInput): void {
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
     marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
+    // State income tax plus property tax, the deductions already in play before
+    // any mortgage interest is counted.
+    otherItemizedDeductions: Math.min(
+      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
+        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
+      40_400
+    ),
   });
 
   const f = r.firstYear;
@@ -548,7 +576,10 @@ function renderRentVsBuy(input: ScenarioInput): void {
     <div class="stat stat--fail">
       <span class="stat__label">Owning, money that buys nothing</span>
       <span class="stat__value">${money(f.burned)}</span>
-      <span class="stat__note">${money(f.interestPaid)} interest, ${money(f.carryingAndMaintenance)} tax, insurance and upkeep. None of it is equity.</span>
+      <span class="stat__note">
+        ${money(f.interestPaid)} interest, ${money(f.carryingAndMaintenance)} tax, insurance and upkeep, less
+        ${money(f.taxRelief)} of mortgage interest relief. None of the rest is equity.
+      </span>
     </div>
     <div class="stat">
       <span class="stat__label">Renting, money that buys nothing</span>
@@ -652,16 +683,32 @@ function renderRentVsBuy(input: ScenarioInput): void {
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
     marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
+    // State income tax plus property tax, the deductions already in play before
+    // any mortgage interest is counted.
+    otherItemizedDeductions: Math.min(
+      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
+        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
+      40_400
+    ),
   };
   // Costs that scale with price have to be recomputed per price, or a cheap
   // house gets charged an expensive house's taxes.
+  const miLine = result.lines.find((l) => l.key === "mortgageInsurance");
+  const miMonthly = miLine?.monthly ?? 0;
   const scaling = {
-    carryingRate: input.propertyTaxRate ?? 0.0115,
+    carryingRate: input.propertyTaxRate ?? countyTaxRate(input.county),
     maintenanceRate: input.maintenanceRate ?? 0.01,
-    fixedMonthly: (input.insuranceAnnual ?? 2000) / 12 + input.hoaMonthly + input.melloRoosAnnual / 12,
+    fixedMonthly:
+      (input.insuranceAnnual ?? estimateInsuranceAnnual(input.purchasePrice)) / 12 +
+      input.hoaMonthly +
+      input.melloRoosAnnual / 12,
+    // The sweeps used to omit mortgage insurance entirely while the itemised
+    // panel included it, so the same house could pass one and fail the other.
+    mortgageInsuranceRate: result.loan.totalLoanAmount > 0 ? (miMonthly * 12) / result.loan.totalLoanAmount : 0,
+    mortgageInsuranceEndsMonth: mortgageInsuranceEnds(input, result),
   };
 
-  const maxPrice = maxPriceForHoldPeriod(sweepBase, scaling, holdYears, Math.max(downPercent, 0.05));
+  const maxPrice = maxPriceForHoldPeriod(sweepBase, scaling, holdYears, downPercent);
   const thisHouse = compareRentVsBuy({
     purchasePrice: input.purchasePrice,
     downPaymentAmount: result.loan.downPaymentAmount,
@@ -678,6 +725,13 @@ function renderRentVsBuy(input: ScenarioInput): void {
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
     marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
+    // State income tax plus property tax, the deductions already in play before
+    // any mortgage interest is counted.
+    otherItemizedDeductions: Math.min(
+      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
+        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
+      40_400
+    ),
   });
   const worksForYou = thisHouse.breakevenYear !== null && thisHouse.breakevenYear <= holdYears;
 
@@ -704,13 +758,13 @@ function renderRentVsBuy(input: ScenarioInput): void {
     </div>
     <div class="stat">
       <span class="stat__label">Rate is the biggest lever</span>
-      <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, Math.max(downPercent, 0.05)) ?? 0)}</span>
+      <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent) ?? 0)}</span>
       <span class="stat__note">What you could pay at 4.5% instead of ${pct(input.interestRate)}, same horizon. Rates move your budget more than anything else here.</span>
     </div>`;
 
   const prices: number[] = [];
   for (let p = 300_000; p <= 1_600_000; p += 50_000) prices.push(p);
-  const curve = breakevenByPrice(sweepBase, scaling, prices, Math.max(downPercent, 0.05));
+  const curve = breakevenByPrice(sweepBase, scaling, prices, downPercent);
   const CAP_YEARS = 31;
 
   $("breakevenChart").innerHTML = renderMultiLine({
@@ -737,8 +791,8 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // --- the buy zone: what the rate actually decides ---
   const rates: number[] = [];
   for (let rate = 0.03; rate <= 0.1001; rate += 0.0025) rates.push(rate);
-  const zone = buyZone(sweepBase, scaling, rates, holdYears, Math.max(downPercent, 0.05));
-  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, Math.max(downPercent, 0.05));
+  const zone = buyZone(sweepBase, scaling, rates, holdYears, downPercent);
+  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, downPercent);
 
   // Use the exact ceiling at the actual rate. Reading it off the nearest sampled
   // point on the curve produced a figure that disagreed with the stat card above.
@@ -795,13 +849,8 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // returned the cheapest rate on the axis and reported it as the requirement.
   // Read the threshold from the exact solver, not off the 0.25% sampling grid.
   // The grid version disagreed with the lever card by up to a tenth of a point.
-  const exactThreshold = requiredRate(sweepBase, scaling, input.purchasePrice, holdYears, Math.max(downPercent, 0.05));
-  const at45 = maxPriceForHoldPeriod(
-    { ...sweepBase, interestRate: 0.045 },
-    scaling,
-    holdYears,
-    Math.max(downPercent, 0.05)
-  );
+  const exactThreshold = requiredRate(sweepBase, scaling, input.purchasePrice, holdYears, downPercent);
+  const at45 = maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent);
   $("buyZoneNote").textContent =
     `Below the blue line, buying beats renting over ${holdYears} years. Above it, renting wins. ` +
     (exactThreshold !== null && exactThreshold < 0.1
@@ -818,7 +867,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     costs: scaling,
     price: input.purchasePrice,
     holdYears,
-    downPercent: Math.max(downPercent, 0.05),
+    downPercent: downPercent,
     excludeRentalIncome: $<HTMLInputElement>("excludeRental").checked,
   });
 
@@ -884,7 +933,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
 
 let buyingPowerRendered = false;
 
-function renderBuyingPower(anchorPrice: number): void {
+function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
   if (buyingPowerRendered) return;
   buyingPowerRendered = true;
 

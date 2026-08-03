@@ -436,16 +436,51 @@ test("the deduction is modelled and materially favours owning", () => {
 });
 
 test("only interest on the first $750,000 of debt is deductible", () => {
-  const small = scenario({ loanAmount: 700_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
-  const large = scenario({ loanAmount: 1_400_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
-
-  const reliefShare = (r: ReturnType<typeof compareRentVsBuy>, loan: number) => {
+  // With realistic SALT the standard deduction is already cleared, so the
+  // interest is fully marginal and the debt limit is the only thing biting.
+  const other = { marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE, otherItemizedDeductions: 25_000 };
+  const reliefShare = (loan: number) => {
     const gross = scenario({ loanAmount: loan, marginalTaxRate: 0 });
-    return (gross.firstYear.burned - r.firstYear.burned) / gross.firstYear.interestPaid;
+    const net = scenario({ loanAmount: loan, ...other });
+    return (gross.firstYear.burned - net.firstYear.burned) / gross.firstYear.interestPaid;
   };
-  // A $700k loan is fully deductible; a $1.4M loan only about half.
-  assert.ok(reliefShare(small, 700_000) > reliefShare(large, 1_400_000));
-  assert.ok(Math.abs(reliefShare(small, 700_000) - DEFAULT_MARGINAL_TAX_RATE) < 0.02);
+  assert.ok(reliefShare(700_000) > reliefShare(1_400_000), "the $750k cap must bite on the larger loan");
+  assert.ok(Math.abs(reliefShare(700_000) - DEFAULT_MARGINAL_TAX_RATE) < 0.02);
+});
+
+test("REGRESSION: the deduction only counts above the standard deduction", () => {
+  // Granting full marginal relief on every interest dollar overstated the
+  // subsidy for anyone whose deductions do not clear the threshold.
+  const noOther = scenario({ loanAmount: 200_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+  const withSalt = scenario({
+    loanAmount: 200_000,
+    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
+    otherItemizedDeductions: 25_000,
+  });
+  assert.ok(
+    withSalt.firstYear.taxRelief > noOther.firstYear.taxRelief,
+    "a household that already itemises gets more from the same interest"
+  );
+
+  // A small loan with no other deductions should get little or nothing.
+  const tiny = scenario({ loanAmount: 100_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+  assert.ok(tiny.firstYear.taxRelief < 1_000, `expected almost no relief, got ${tiny.firstYear.taxRelief}`);
+});
+
+test("REGRESSION: tax relief is reported separately, not netted into the carrying bucket", () => {
+  // It used to be subtracted from a figure the UI labelled "tax, insurance and
+  // upkeep", which made that line disagree with the itemised payment panel by
+  // an order of magnitude.
+  const r = scenario({ marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE, otherItemizedDeductions: 25_000 });
+  assert.ok(r.firstYear.taxRelief > 0, "relief must be reported");
+  const gross = (r.firstYear.carryingAndMaintenance / 12) * 12;
+  assert.ok(gross > 20_000, "the carrying bucket must be gross of relief");
+  assert.ok(
+    Math.abs(
+      r.firstYear.burned - (r.firstYear.interestPaid + r.firstYear.carryingAndMaintenance - r.firstYear.taxRelief)
+    ) < 1,
+    "burned must reconcile as interest plus carrying minus relief"
+  );
 });
 
 test("REGRESSION: the deduction moves the buy ceiling by hundreds of thousands", () => {
@@ -468,4 +503,58 @@ test("the relief shrinks over the life of the loan as interest does", () => {
 test("the caveat no longer claims to ignore the deduction", () => {
   assert.match(RENT_VS_BUY_CAVEAT, /includes the mortgage interest deduction/i);
   assert.match(RENT_VS_BUY_CAVEAT, /750,000/);
+});
+
+// --- audit regressions -----------------------------------------------------
+
+test("REGRESSION: ruling out rental income changes the numbers, not just the label", () => {
+  // The checkbox used to be decorative. It greyed out the lever while every
+  // figure behind the verdict still counted income the user said they would
+  // never collect.
+  const base = { ...SWEEP, monthlyRentalIncome: 3_000 };
+  const counted = decide({ base, costs: COSTS, price: 1_600_000, holdYears: 10, downPercent: 0.2 });
+  const excluded = decide({
+    base,
+    costs: COSTS,
+    price: 1_600_000,
+    holdYears: 10,
+    downPercent: 0.2,
+    excludeRentalIncome: true,
+  });
+
+  assert.ok(
+    (excluded.priceNeeded ?? 0) < (counted.priceNeeded ?? 0),
+    "removing the income must lower the price you can justify"
+  );
+});
+
+test("REGRESSION: the price sweep charges mortgage insurance, like the itemised panel does", () => {
+  // The sweep had no mortgage-insurance term at all, so a low-deposit or FHA
+  // buyer could be passed by one panel and failed by another on the same screen.
+  const noMi = { ...COSTS };
+  const withMi = { ...COSTS, mortgageInsuranceRate: 0.006, mortgageInsuranceEndsMonth: 111 };
+  const a = maxPriceForHoldPeriod(SWEEP, noMi, 10, 0.1)!;
+  const b = maxPriceForHoldPeriod(SWEEP, withMi, 10, 0.1)!;
+  assert.ok(b < a, "charging mortgage insurance must lower the ceiling");
+});
+
+test("REGRESSION: mortgage insurance terminates and does not escalate", () => {
+  const forever = scenario({
+    monthlyMortgageInsurance: 400,
+    mortgageInsuranceEndsMonth: null,
+    marginalTaxRate: 0,
+  });
+  const ends = scenario({
+    monthlyMortgageInsurance: 400,
+    mortgageInsuranceEndsMonth: 111,
+    marginalTaxRate: 0,
+  });
+  // buyNetWorth is value minus balance, so mortgage insurance cannot touch it.
+  // It shows up in the GAP, because it changes what the renter has left to invest.
+  const gap = (r: ReturnType<typeof compareRentVsBuy>) => r.years[29]!.buyNetWorth - r.years[29]!.rentNetWorth;
+  assert.ok(gap(ends) > gap(forever), "terminating MI must close the gap against renting");
+  // Once it has ended the owner's monthly cost must not include it.
+  const before = ends.years[8]!.monthlyOwnCost;
+  const after = ends.years[10]!.monthlyOwnCost;
+  assert.ok(after < before + 200, "cost should drop, or at least not carry MI, after termination");
 });

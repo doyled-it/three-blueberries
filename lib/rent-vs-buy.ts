@@ -33,6 +33,18 @@ export interface RentVsBuyInput {
   /** Monthly maintenance reserve. */
   monthlyMaintenance: number;
 
+  /**
+   * Monthly mortgage insurance, kept separate because it behaves differently
+   * from every other carrying cost: it does not grow with property values, and
+   * on a conventional loan it stops entirely once the balance reaches 78% of the
+   * original price. Folding it into the carrying scalar charged it for thirty
+   * years and escalated it 2% a year, which on a 10%-down loan overcharged by
+   * about $85,000 and drew a chart crossing that does not exist.
+   */
+  monthlyMortgageInsurance?: number;
+  /** Month at which mortgage insurance stops. Null or undefined means never (FHA). */
+  mortgageInsuranceEndsMonth?: number | null;
+
   /** What you pay in rent today. */
   monthlyRent: number;
 
@@ -68,6 +80,15 @@ export interface RentVsBuyInput {
    */
   marginalTaxRate?: number;
 
+  /**
+   * Other itemisable deductions, chiefly state income tax and property tax under
+   * the SALT cap. Only the amount by which interest plus these exceeds the
+   * standard deduction produces any benefit.
+   */
+  otherItemizedDeductions?: number;
+  /** Standard deduction to clear. Defaults to the 2026 single-filer figure. */
+  standardDeduction?: number;
+
   years?: number;
 }
 
@@ -98,6 +119,8 @@ export interface RentVsBuyResult {
     interestPaid: number;
     principalPaid: number;
     carryingAndMaintenance: number;
+    /** Mortgage interest relief, reported separately rather than netted into a bucket. */
+    taxRelief: number;
     /** Owner money that built no equity. */
     burned: number;
     rentPaid: number;
@@ -115,6 +138,17 @@ export const DEDUCTIBLE_DEBT_LIMIT = 750_000;
  * federal on income above roughly $200k, plus about 9.3% California.
  */
 export const DEFAULT_MARGINAL_TAX_RATE = 0.4;
+
+/**
+ * 2026 federal standard deduction, single filer.
+ *
+ * Itemising only pays for the amount ABOVE this. Granting full marginal relief on
+ * every interest dollar overstated the subsidy for anyone whose deductions do not
+ * clear the threshold, which is most households at moderate loan sizes. High
+ * earners in California usually clear it on state and property tax alone, but the
+ * model must not assume that.
+ */
+export const STANDARD_DEDUCTION_SINGLE = 16_100;
 
 const DEFAULTS = {
   homeAppreciation: 0.035,
@@ -136,6 +170,8 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   let portfolio = input.downPaymentAmount + input.closingCosts;
   let rent = input.monthlyRent;
   let carrying = input.monthlyCarryingCosts;
+  const mi = input.monthlyMortgageInsurance ?? 0;
+  const miEnds = input.mortgageInsuranceEndsMonth;
   const maintenanceRate = input.monthlyMaintenance / input.purchasePrice;
 
   let buyBurned = input.closingCosts;
@@ -143,6 +179,8 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
 
   const monthlyReturn = Math.pow(1 + input.investmentReturn, 1 / 12) - 1;
   const taxRate = input.marginalTaxRate ?? 0;
+  const otherItemized = input.otherItemizedDeductions ?? 0;
+  const standardDeduction = input.standardDeduction ?? STANDARD_DEDUCTION_SINGLE;
   // Only interest on the first $750,000 of acquisition debt is deductible.
   const deductibleShare =
     input.loanAmount > 0 ? Math.min(input.loanAmount, DEDUCTIBLE_DEBT_LIMIT) / input.loanAmount : 0;
@@ -159,12 +197,19 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
     const maintenance = homeValue * maintenanceRate * 12;
     const carryingAnnual = carrying * 12;
 
-    // The deduction shrinks every year as the interest portion of the payment does.
-    const taxRelief = interestPaid * deductibleShare * taxRate;
+    // Only the portion of itemised deductions ABOVE the standard deduction is
+    // worth anything, and the interest is the marginal piece.
+    const deductibleInterest = interestPaid * deductibleShare;
+    const itemizedTotal = deductibleInterest + otherItemized;
+    const benefitBase = Math.max(0, Math.min(deductibleInterest, itemizedTotal - standardDeduction));
+    const taxRelief = benefitBase * taxRate;
     const monthlyRelief = taxRelief / 12;
 
     for (let m = 0; m < 12; m++) {
-      const ownMonthly = pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0) - monthlyRelief;
+      const monthIndex = (year - 1) * 12 + m + 1;
+      const miThisMonth = miEnds === null || miEnds === undefined ? mi : monthIndex <= miEnds ? mi : 0;
+      const ownMonthly =
+        pi + carrying + miThisMonth + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0) - monthlyRelief;
       const difference = ownMonthly - rent;
       // If owning costs more, the renter banks the difference. If renting costs
       // more, the renter has to draw the difference out of the portfolio.
@@ -172,12 +217,15 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       rentBurned += rent;
     }
 
-    buyBurned += interestPaid + carryingAnnual + maintenance - taxRelief;
+    const miAnnual =
+      mi * (miEnds === null || miEnds === undefined ? 12 : Math.max(0, Math.min(12, miEnds - (year - 1) * 12)));
+    buyBurned += interestPaid + carryingAnnual + miAnnual + maintenance - taxRelief;
 
     homeValue *= 1 + input.homeAppreciation;
     rent *= 1 + input.rentGrowth;
-    // Only the tax portion of carrying costs is capped by Prop 13; treating all
-    // of it that way is generous to owning, and stated as such in the UI.
+    // Property tax is Prop 13 capped and insurance broadly tracks it. Mortgage
+    // insurance is deliberately NOT escalated: it is a fixed percentage of the
+    // original balance and it terminates.
     carrying *= 1 + input.propertyTaxGrowth;
 
     const equity = homeValue - endBalance;
@@ -192,7 +240,13 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       rentNetWorth: portfolio,
       buyMoneyBurned: buyBurned,
       rentMoneyBurned: rentBurned,
-      monthlyOwnCost: pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0) - monthlyRelief,
+      monthlyOwnCost:
+        pi +
+        carrying +
+        (miEnds === null || miEnds === undefined || year * 12 <= miEnds ? mi : 0) +
+        homeValue * maintenanceRate -
+        (input.monthlyRentalIncome ?? 0) -
+        monthlyRelief,
       monthlyRentCost: rent,
     });
   }
@@ -203,10 +257,14 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   const firstYearBalance = balanceAfter(input.loanAmount, input.interestRate, input.termYears, 12);
   const principal1 = Math.max(input.loanAmount - firstYearBalance, 0);
   const interest1 = Math.max(pi * 12 - principal1, 0);
-  const relief1 = interest1 * deductibleShare * taxRate;
-  const carry1 =
-    (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12 - relief1;
-  const burned1 = interest1 + carry1;
+  const deductibleInterest1 = interest1 * deductibleShare;
+  const relief1 =
+    Math.max(0, Math.min(deductibleInterest1, deductibleInterest1 + otherItemized - standardDeduction)) * taxRate;
+  // Carrying stays GROSS of relief. Netting it here made the figure the UI
+  // labels "tax, insurance and upkeep" disagree with the itemised payment panel
+  // by an order of magnitude, and double-counted the relief in `burned`.
+  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12;
+  const burned1 = interest1 + carry1 - relief1;
   const rent1 = input.monthlyRent * 12;
 
   let verdict: string;
@@ -231,6 +289,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       interestPaid: interest1,
       principalPaid: principal1,
       carryingAndMaintenance: carry1,
+      taxRelief: relief1,
       burned: burned1,
       rentPaid: rent1,
       burnedMoreThanRent: burned1 - rent1,
@@ -409,6 +468,16 @@ export interface ScalingCosts {
   maintenanceRate: number;
   /** Costs that do NOT scale, such as an insurance floor or HOA, monthly. */
   fixedMonthly: number;
+  /**
+   * Annual mortgage insurance as a share of the loan, and when it stops.
+   *
+   * The price sweeps used to omit mortgage insurance entirely while the itemised
+   * panel included it, so the same house could be declared a pass by one and a
+   * fail by the other on the same screen. Worst at low deposits and on FHA,
+   * where it is life-of-loan.
+   */
+  mortgageInsuranceRate?: number;
+  mortgageInsuranceEndsMonth?: number | null;
 }
 
 type SweepBase = Omit<
@@ -425,14 +494,19 @@ function atPrice(
   years?: number
 ) {
   const down = price * downPercent;
+  const loan = price - down;
   return compareRentVsBuy({
     ...base,
     purchasePrice: price,
     downPaymentAmount: down,
-    loanAmount: price - down,
+    loanAmount: loan,
     closingCosts: price * closingCostRate,
     monthlyCarryingCosts: (price * costs.carryingRate) / 12 + costs.fixedMonthly,
     monthlyMaintenance: (price * costs.maintenanceRate) / 12,
+    // Mortgage insurance has to be charged here too. Omitting it let the price
+    // sweep pass a house that the itemised panel failed, on the same screen.
+    monthlyMortgageInsurance: ((costs.mortgageInsuranceRate ?? 0) * loan) / 12,
+    mortgageInsuranceEndsMonth: costs.mortgageInsuranceEndsMonth ?? null,
     ...(years ? { years } : {}),
   });
 }
@@ -531,15 +605,18 @@ function breakevenAt(
   extra: Partial<RentVsBuyInput> = {}
 ) {
   const down = price * downPercent;
+  const loan = price - down;
   return compareRentVsBuy({
     ...base,
     ...extra,
     purchasePrice: price,
     downPaymentAmount: down,
-    loanAmount: price - down,
+    loanAmount: loan,
     closingCosts: price * closingCostRate,
     monthlyCarryingCosts: (price * costs.carryingRate) / 12 + costs.fixedMonthly,
     monthlyMaintenance: (price * costs.maintenanceRate) / 12,
+    monthlyMortgageInsurance: ((costs.mortgageInsuranceRate ?? 0) * loan) / 12,
+    mortgageInsuranceEndsMonth: costs.mortgageInsuranceEndsMonth ?? null,
   }).breakevenYear;
 }
 
@@ -615,8 +692,13 @@ export function decide(args: {
    */
   excludeRentalIncome?: boolean;
 }): DecisionThresholds {
-  const { base, costs, price, holdYears, downPercent, excludeRentalIncome = false } = args;
+  const { costs, price, holdYears, downPercent, excludeRentalIncome = false } = args;
   const closingCostRate = args.closingCostRate ?? 0.025;
+
+  // The flag has to reach the arithmetic, not merely the label. Previously it
+  // only greyed out the lever while every number behind the verdict still
+  // counted income the user had just said they would never collect.
+  const base: SweepBase = excludeRentalIncome ? { ...args.base, monthlyRentalIncome: 0 } : args.base;
 
   const breakevenYear = breakevenAt(base, costs, price, downPercent, closingCostRate);
   const worthIt = breakevenYear !== null && breakevenYear <= holdYears;
@@ -861,6 +943,7 @@ export const RENT_VS_BUY_DEFAULTS = DEFAULTS;
 export const RENT_VS_BUY_CAVEAT =
   "This is the most assumption-heavy thing on the page, and small changes to appreciation or investment return swing " +
   "the answer by years. It now includes the mortgage interest deduction, on the first $750,000 of debt at a 40% " +
-  "combined marginal rate, which is worth around $20,000 a year on a large loan and several hundred thousand of " +
-  "purchase price. It still ignores tax on investment gains, which helps owning further, though less if your savings " +
-  "sit in retirement accounts. It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";
+  "combined marginal rate, counting only the part that clears the standard deduction, which for a high California " +
+  "earner is most of it. It still ignores tax on investment gains, which helps owning further, though less if your " +
+  "savings sit in retirement accounts, and it models California and federal tax as one blended rate rather than " +
+  "separately. It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";
