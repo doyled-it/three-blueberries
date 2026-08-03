@@ -44,6 +44,25 @@ const PAD = { top: 18, right: 16, bottom: 26, left: 62 };
 
 const monthIndex = (points: ChartPoint[], month: string) => points.findIndex((p) => p.month === month);
 
+/**
+ * The vertical scale for a set of values.
+ *
+ * This exists as one function on purpose. Rendering and hover-testing used to
+ * compute the scale separately, and they disagreed: the renderer floored the
+ * axis at zero while the hover handler did not, so the dot tracked a different
+ * scale than the line was drawn on and sat visibly below it.
+ */
+export function verticalScale(values: number[]): { yMin: number; yMax: number } {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  return {
+    // Money charts read better anchored at zero when nothing is negative.
+    yMin: min > 0 ? 0 : min - span * 0.05,
+    yMax: max + span * 0.08,
+  };
+}
+
 /** Nice round tick values across a range. */
 function ticks(min: number, max: number, count = 4): number[] {
   const span = max - min;
@@ -61,12 +80,7 @@ export function renderChart(opts: ChartOptions): string {
   const H = opts.height ?? 200;
   if (points.length === 0) return "";
 
-  const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  // Pad the top so the peak isn't flush against the frame.
-  const yMin = Math.min(min, 0) === 0 && min > 0 ? 0 : min - (max - min) * 0.05;
-  const yMax = max + (max - min) * 0.08;
+  const { yMin, yMax } = verticalScale(points.map((p) => p.value));
 
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -166,11 +180,7 @@ export function renderMultiLine(opts: {
   const H = opts.height ?? 240;
   if (!series.length || !series[0]!.points.length) return "";
 
-  const all = series.flatMap((s) => s.points.map((p) => p.value));
-  const min = Math.min(...all);
-  const max = Math.max(...all);
-  const yMin = Math.max(0, min - (max - min) * 0.05);
-  const yMax = max + (max - min) * 0.1;
+  const { yMin, yMax } = verticalScale(series.flatMap((s) => s.points.map((p) => p.value)));
 
   const n = series[0]!.points.length;
   const plotW = W - PAD.left - PAD.right;
@@ -237,6 +247,10 @@ export function renderMultiLine(opts: {
     .map((s) => `<span class="c-key"><i style="background:${s.color}"></i>${s.label}</span>`)
     .join("");
 
+  const dots = series
+    .map((s) => `<circle class="c-dot" data-series="${s.key}" r="5" style="display:none;stroke:${s.color}"/>`)
+    .join("");
+
   return `
 <figure class="chart" data-multi>
   <div class="c-legend">${legend}</div>
@@ -244,10 +258,78 @@ export function renderMultiLine(opts: {
     ${gapFill}
     ${grid}
     ${xAxis}
+    <line class="c-cross" x1="0" x2="0" y1="${PAD.top}" y2="${PAD.top + plotH}" style="display:none"/>
     ${lines}
     ${markerEls}
+    <rect class="c-hit" x="${PAD.left}" y="${PAD.top}" width="${plotW}" height="${plotH}" fill="transparent"/>
+    ${dots}
   </svg>
+  <div class="c-tip" hidden></div>
 </figure>`;
+}
+
+/**
+ * Crosshair and one dot per series, all reading the same shared scale so the
+ * dots sit exactly on their lines.
+ */
+export function attachMultiHover(
+  figure: HTMLElement,
+  series: LineSeries[],
+  format: (n: number) => string,
+  labelFor: (month: string) => string
+): void {
+  const svg = figure.querySelector("svg")!;
+  const hit = figure.querySelector<SVGRectElement>(".c-hit")!;
+  const cross = figure.querySelector<SVGLineElement>(".c-cross")!;
+  const tip = figure.querySelector<HTMLElement>(".c-tip")!;
+  const dots = new Map(
+    series.map((s) => [s.key, figure.querySelector<SVGCircleElement>(`.c-dot[data-series="${s.key}"]`)!])
+  );
+
+  const { yMin, yMax } = verticalScale(series.flatMap((s) => s.points.map((p) => p.value)));
+  const H = Number(svg.getAttribute("viewBox")!.split(" ")[3]);
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const n = series[0]?.points.length ?? 0;
+
+  const show = (clientX: number) => {
+    const box = svg.getBoundingClientRect();
+    const relative = ((clientX - box.left) / box.width) * W;
+    const ratio = Math.min(Math.max((relative - PAD.left) / plotW, 0), 1);
+    const i = Math.round(ratio * (n - 1));
+    if (!series[0]?.points[i]) return;
+
+    const px = PAD.left + (i / Math.max(n - 1, 1)) * plotW;
+    cross.setAttribute("x1", String(px));
+    cross.setAttribute("x2", String(px));
+    cross.style.display = "";
+
+    const rows: string[] = [];
+    for (const s of series) {
+      const point = s.points[i];
+      const dot = dots.get(s.key);
+      if (!point || !dot) continue;
+      const py = PAD.top + plotH - ((point.value - yMin) / (yMax - yMin)) * plotH;
+      dot.setAttribute("cx", String(px));
+      dot.setAttribute("cy", String(py));
+      dot.style.display = "";
+      rows.push(`<span><i style="background:${s.color}"></i>${s.label}: ${format(point.value)}</span>`);
+    }
+
+    tip.hidden = false;
+    tip.innerHTML = `<strong>${labelFor(series[0]!.points[i]!.month)}</strong>${rows.join("")}`;
+    tip.style.left = `${(px / W) * 100}%`;
+  };
+
+  const hide = () => {
+    cross.style.display = "none";
+    for (const dot of dots.values()) dot.style.display = "none";
+    tip.hidden = true;
+  };
+
+  hit.addEventListener("pointermove", (e) => show((e as PointerEvent).clientX));
+  hit.addEventListener("pointerleave", hide);
+  figure.addEventListener("pointerleave", hide);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,11 +486,7 @@ export function attachChartHover(
   const tip = figure.querySelector<HTMLElement>(".c-tip")!;
 
   const plotW = W - PAD.left - PAD.right;
-  const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const yMin = min - (max - min) * 0.05;
-  const yMax = max + (max - min) * 0.08;
+  const { yMin, yMax } = verticalScale(points.map((p) => p.value));
   const H = Number(svg.getAttribute("viewBox")!.split(" ")[3]);
   const plotH = H - PAD.top - PAD.bottom;
 

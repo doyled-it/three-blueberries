@@ -34,6 +34,7 @@ import {
   attachChartHover,
   attachStackHover,
   renderChart,
+  attachMultiHover,
   renderMultiLine,
   renderStackedColumns,
   type ChartPoint,
@@ -467,6 +468,8 @@ function renderHistory(anchorPrice: number): void {
   $("waitingCaveats").innerHTML = ctx.caveats.map((c) => `<li>${c}</li>`).join("");
 }
 
+const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 const CARRYING_KEYS = ["propertyTax", "homeownersInsurance", "mortgageInsurance", "hoa", "melloRoos"];
 
 function renderRentVsBuy(input: ScenarioInput): void {
@@ -560,6 +563,29 @@ function renderRentVsBuy(input: ScenarioInput): void {
     description: "Net worth over 30 years if you buy, against renting and investing the difference.",
   });
 
+  const rvbFig = $("rentBuyChart").querySelector<HTMLElement>("[data-multi]");
+  if (rvbFig) {
+    attachMultiHover(
+      rvbFig,
+      [
+        {
+          key: "buy",
+          label: "Buy",
+          color: SERIES_PRICE,
+          points: r.years.map((y) => ({ month: `${2026 + y.year}-01`, value: y.buyNetWorth })),
+        },
+        {
+          key: "rent",
+          label: "Rent and invest",
+          color: SERIES_PAYMENT,
+          points: r.years.map((y) => ({ month: `${2026 + y.year}-01`, value: y.rentNetWorth })),
+        },
+      ],
+      money,
+      (m) => `Year ${Number(m.split("-")[0]) - 2026}`
+    );
+  }
+
   $("rentBuyVerdict").textContent = r.verdict;
   $("rentBuyVerdict").className =
     `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
@@ -631,6 +657,29 @@ function renderBuyingPower(anchorPrice: number): void {
       : [],
     description: "Median San Diego home price against what a median California household could afford, 1987 to today.",
   });
+
+  const bpFig = $("buyingPowerChart").querySelector<HTMLElement>("[data-multi]");
+  if (bpFig) {
+    attachMultiHover(
+      bpFig,
+      [
+        {
+          key: "price",
+          label: "Median home",
+          color: SERIES_PRICE,
+          points: series.map((p) => ({ month: p.month, value: p.medianPrice })),
+        },
+        {
+          key: "afford",
+          label: "A median income buys",
+          color: SERIES_PAYMENT,
+          points: series.map((p) => ({ month: p.month, value: p.affordablePrice })),
+        },
+      ],
+      money,
+      (m) => `${MONTH_NAMES[Number(m.split("-")[1])]} ${m.split("-")[0]}`
+    );
+  }
 
   $("buyingPowerHeadline").textContent = v.headline;
 

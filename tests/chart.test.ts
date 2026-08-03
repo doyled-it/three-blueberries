@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { renderChart, type ChartPoint } from "../src/client/chart.ts";
+import { renderChart, renderMultiLine, verticalScale, type ChartPoint } from "../src/client/chart.ts";
 import { buildSeries } from "../lib/history.ts";
 
 const series = buildSeries();
@@ -113,4 +113,41 @@ test("REGRESSION: the hover dot paints above the data line, the crosshair below 
   for (let i = 1; i < positions.length; i++) {
     assert.ok(positions[i]! > positions[i - 1]!, `${order[i]} must paint after ${order[i - 1]}`);
   }
+});
+
+test("REGRESSION: render and hover share one vertical scale", () => {
+  // These were computed separately and disagreed: the renderer floored the axis
+  // at zero, the hover handler did not, so the dot sat visibly below its line.
+  const { yMin, yMax } = verticalScale(pricePoints.map((p) => p.value));
+  assert.equal(yMin, 0, "an all-positive money series should anchor at zero");
+  assert.ok(yMax > Math.max(...pricePoints.map((p) => p.value)));
+
+  // The first plotted vertex must land where the shared scale says it should.
+  const d = svg.match(/class="c-line" d="([^"]+)"/)![1]!;
+  const firstY = Number(d.slice(1).split(/[ML]/).filter(Boolean)[0]!.split(",")[1]);
+  const H = 200;
+  const PAD = { top: 18, bottom: 26 };
+  const plotH = H - PAD.top - PAD.bottom;
+  const expected = PAD.top + plotH - ((pricePoints[0]!.value - yMin) / (yMax - yMin)) * plotH;
+  assert.ok(Math.abs(firstY - expected) < 0.2, `line drawn at ${firstY}, scale says ${expected}`);
+});
+
+test("a negative series is not forced to a zero floor", () => {
+  const { yMin } = verticalScale([-500, 200, 900]);
+  assert.ok(yMin < -500, "net worth can start negative and must not be clipped");
+});
+
+test("multi-line charts ship a crosshair and one dot per series", () => {
+  const multi = renderMultiLine({
+    series: [
+      { key: "a", label: "A", color: "#3987e5", points: pricePoints.slice(0, 50) },
+      { key: "b", label: "B", color: "#d95926", points: pricePoints.slice(0, 50) },
+    ],
+    format: String,
+    description: "two series",
+  });
+  assert.ok(multi.includes('class="c-cross"'), "needs a crosshair");
+  assert.equal((multi.match(/class="c-dot"/g) ?? []).length, 2, "one dot per series");
+  assert.ok(multi.includes('data-series="a"') && multi.includes('data-series="b"'));
+  assert.ok(multi.includes('class="c-hit"'), "needs a hit target to hover over");
 });

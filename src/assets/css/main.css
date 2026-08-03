@@ -37,6 +37,7 @@
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
+  /* Reading measure, used only where a block is pure prose. */
   --measure: 68ch;
 }
 
@@ -136,7 +137,7 @@ a:hover {
   color: var(--berry-bright);
 }
 .hero__sub {
-  max-width: var(--measure);
+  max-width: 62ch;
   margin: 22px 0 0;
   color: var(--ink-2);
   font-size: 1.02rem;
@@ -174,7 +175,7 @@ a:hover {
   box-shadow: 0 0 12px var(--berry);
 }
 .panel__sub {
-  max-width: var(--measure);
+  max-width: 88ch;
   margin: 0 0 24px;
   color: var(--ink-3);
   font-size: 0.92rem;
@@ -255,7 +256,6 @@ input::placeholder {
   accent-color: var(--berry);
 }
 .field-note {
-  max-width: var(--measure);
   margin: 8px 0 0;
   color: var(--ink-4);
   font-size: 0.78rem;
@@ -472,7 +472,6 @@ input::placeholder {
   position: relative;
   margin-bottom: 11px;
   padding-left: 18px;
-  max-width: var(--measure);
 }
 .notes li::before,
 .warnings li::before {
@@ -490,7 +489,6 @@ input::placeholder {
 }
 
 .verdict {
-  max-width: var(--measure);
   margin: 20px 0 0;
   padding: 15px 18px;
   background: var(--panel);
@@ -915,11 +913,9 @@ input[type="range"] {
   font-style: italic;
   font-size: 1.02rem;
   line-height: 1.45;
-  max-width: var(--measure);
 }
 .instrument__body {
   padding: 0 2px 20px 21px;
-  max-width: var(--measure);
 }
 .instrument__body p {
   margin: 0 0 11px;
@@ -946,7 +942,6 @@ input[type="range"] {
   font-size: 0.82rem;
 }
 .site-footer p {
-  max-width: var(--measure);
   margin: 0 0 10px;
 }
 
