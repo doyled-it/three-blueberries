@@ -99,6 +99,11 @@ description: The real monthly cost of buying a house in California, itemized and
 
       <label for="monthlySavings">Saving per month</label>
       <input id="monthlySavings" type="text" class="money" value="2,000" inputmode="numeric" />
+
+      <label for="rentalIncome">
+        Rent you'd collect <span class="hint">roommate, ADU, second unit</span>
+      </label>
+      <input id="rentalIncome" type="text" class="money" value="0" inputmode="numeric" />
     </fieldset>
 
     <fieldset>
@@ -191,6 +196,15 @@ description: The real monthly cost of buying a house in California, itemized and
   <div id="holdVerdict" class="stats"></div>
   <div id="breakevenChart"></div>
   <p id="rentCapNote" class="field-note"></p>
+
+  <h3 class="sub-head">So should you buy?</h3>
+  <p class="panel__sub">
+    Not a yes or no, because that depends on assumptions nobody can pin down. What follows is every condition that
+    would have to be true, stated as a number, so you can judge which of them is plausible. Usually one is much
+    closer than the rest.
+  </p>
+  <p id="decisionVerdict" class="verdict"></p>
+  <div id="decisionLevers" class="levers"></div>
 
   <h3 class="sub-head">How much do you need saved, and are you gaining on it?</h3>
   <div id="savingsRace" class="stats"></div>

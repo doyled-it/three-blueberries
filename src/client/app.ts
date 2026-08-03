@@ -33,6 +33,7 @@ import {
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
   compareRentVsBuy,
+  decide,
   maxPriceForHoldPeriod,
   savingsRace,
   statutoryRentCap,
@@ -693,6 +694,35 @@ function renderRentVsBuy(input: ScenarioInput): void {
     height: 210,
   });
 
+  // --- the decision ---
+  const decision = decide({
+    base: { ...sweepBase, monthlyRentalIncome: num("rentalIncome", 0) },
+    costs: scaling,
+    price: input.purchasePrice,
+    holdYears,
+    downPercent: Math.max(downPercent, 0.05),
+  });
+
+  $("decisionVerdict").textContent = decision.verdict;
+  $("decisionVerdict").className = `verdict ${decision.worthIt ? "verdict--yes" : "verdict--no"}`;
+
+  $("decisionLevers").innerHTML = decision.levers
+    .map((l) => {
+      const done = l.note === "Already there." || l.note === "Not needed.";
+      const state = done ? "lever--met" : l.reachable ? "lever--close" : "lever--far";
+      return `
+      <div class="lever ${state}">
+        <span class="lever__label">${l.label}</span>
+        <div class="lever__values">
+          <span class="lever__now">${l.current}</span>
+          <span class="lever__arrow">${done ? "" : "needs"}</span>
+          <span class="lever__need">${done ? "met" : l.needed}</span>
+        </div>
+        <p class="lever__note">${l.note}</p>
+      </div>`;
+    })
+    .join("");
+
   $("rentCapNote").textContent =
     `Where the blue line sits below the orange one, buying wins over your horizon. California caps annual rent ` +
     `increases at ${pct(statutoryRentCap(), 1)} for San Diego under AB 1482 (5% plus regional CPI, never above 10%), ` +
@@ -1125,7 +1155,7 @@ function init(): void {
   }
 
   // The history panel's own controls re-render only the sections they affect.
-  for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears"]) {
+  for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears", "rentalIncome"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => renderRentVsBuy(readInput()));
   }
 

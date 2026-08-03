@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   breakevenByPrice,
   compareRentVsBuy,
+  decide,
+  requiredRate,
   maxPriceForHoldPeriod,
   savingsRace,
   statutoryRentCap,
@@ -203,4 +205,79 @@ test("selling before breakeven means you lost against renting", () => {
   if (r.breakevenYear === null || r.breakevenYear < 2) return;
   const before = r.years[r.breakevenYear - 2]!;
   assert.ok(before.buyNetWorth < before.rentNetWorth, "the year before breakeven, renting is still ahead");
+});
+
+// --- the decision ----------------------------------------------------------
+
+const DECIDE_BASE = { base: SWEEP, costs: COSTS, downPercent: 0.2 };
+
+test("a cheap-enough house comes back as a clear yes with every lever met", () => {
+  const d = decide({ ...DECIDE_BASE, price: 650_000, holdYears: 8 });
+  assert.equal(d.worthIt, true);
+  assert.ok(d.breakevenYear !== null && d.breakevenYear <= 8);
+  assert.match(d.verdict, /this works/i);
+  for (const lever of d.levers) {
+    assert.ok(lever.reachable, `${lever.key} should be satisfied when the house already works`);
+  }
+});
+
+test("an expensive house reports the exact threshold on every lever", () => {
+  const d = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 8 });
+  assert.equal(d.worthIt, false);
+  assert.ok(d.rateNeeded !== null && d.rateNeeded < SWEEP.interestRate, "should name a rate that would work");
+  assert.ok(d.priceNeeded !== null && d.priceNeeded < 1_200_000, "should name a price that would work");
+  assert.ok(d.rentalIncomeNeeded !== null && d.rentalIncomeNeeded > 0, "should name the rent that would tip it");
+  assert.equal(d.levers.length, 4);
+});
+
+test("every lever states where it is now and what it would take", () => {
+  const d = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 8 });
+  for (const lever of d.levers) {
+    assert.ok(lever.current.length > 0);
+    assert.ok(lever.needed.length > 0);
+    assert.ok(lever.note.length > 15, `${lever.key} needs a real note`);
+  }
+});
+
+test("REGRESSION: staying longer is honestly reported as not fixing an overpriced house", () => {
+  // Patience is the lever people reach for first and it is usually the wrong one.
+  const short = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 8 });
+  const long = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 25 });
+  assert.equal(short.worthIt, false);
+  assert.equal(long.worthIt, false);
+  const yearsLever = long.levers.find((l) => l.key === "years")!;
+  assert.match(yearsLever.note, /does not fix it|price to rent/i);
+});
+
+test("rental income offsets the cost of owning and can tip the decision", () => {
+  const without = decide({ ...DECIDE_BASE, price: 900_000, holdYears: 10 });
+  const needed = without.rentalIncomeNeeded;
+  if (needed === null || needed === 0) return;
+
+  const withIncome = decide({
+    ...DECIDE_BASE,
+    base: { ...SWEEP, monthlyRentalIncome: needed },
+    price: 900_000,
+    holdYears: 10,
+  });
+  assert.equal(withIncome.worthIt, true, `collecting ${needed}/mo should tip a house that needs exactly that`);
+});
+
+test("the verdict says plainly when nothing is close", () => {
+  const hopeless = decide({ ...DECIDE_BASE, price: 3_000_000, holdYears: 5 });
+  assert.equal(hopeless.worthIt, false);
+  assert.match(hopeless.verdict, /nothing here is close|keep renting/i);
+});
+
+test("required rate is the highest rate that still works, not just any rate", () => {
+  const price = 900_000;
+  const rate = requiredRate(SWEEP, COSTS, price, 10, 0.2);
+  assert.ok(rate !== null);
+  const justBelow = breakevenByPrice({ ...SWEEP, interestRate: rate - 0.004 }, COSTS, [price], 0.2)[0]!;
+  const justAbove = breakevenByPrice({ ...SWEEP, interestRate: rate + 0.004 }, COSTS, [price], 0.2)[0]!;
+  assert.ok(justBelow.breakevenYear !== null && justBelow.breakevenYear <= 10, "a lower rate must still work");
+  assert.ok(
+    justAbove.breakevenYear === null || justAbove.breakevenYear > 10,
+    "a higher rate must stop working, or the threshold is not tight"
+  );
 });

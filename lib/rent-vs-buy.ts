@@ -36,6 +36,13 @@ export interface RentVsBuyInput {
   /** What you pay in rent today. */
   monthlyRent: number;
 
+  /**
+   * Rent you would collect from the property, from a roommate, a granny flat or
+   * a unit. Offsets the cost of owning directly, and it is the lever people most
+   * often actually control.
+   */
+  monthlyRentalIncome?: number;
+
   /** Annual assumptions, as decimals. */
   homeAppreciation: number;
   rentGrowth: number;
@@ -124,7 +131,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
     const carryingAnnual = carrying * 12;
 
     for (let m = 0; m < 12; m++) {
-      const ownMonthly = pi + carrying + homeValue * maintenanceRate;
+      const ownMonthly = pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0);
       const difference = ownMonthly - rent;
       // If owning costs more, the renter banks the difference. If renting costs
       // more, the renter has to draw the difference out of the portfolio.
@@ -152,7 +159,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       rentNetWorth: portfolio,
       buyMoneyBurned: buyBurned,
       rentMoneyBurned: rentBurned,
-      monthlyOwnCost: pi + carrying + homeValue * maintenanceRate,
+      monthlyOwnCost: pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0),
       monthlyRentCost: rent,
     });
   }
@@ -163,7 +170,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   const firstYearBalance = balanceAfter(input.loanAmount, input.interestRate, input.termYears, 12);
   const principal1 = Math.max(input.loanAmount - firstYearBalance, 0);
   const interest1 = Math.max(pi * 12 - principal1, 0);
-  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance) * 12;
+  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12;
   const burned1 = interest1 + carry1;
   const rent1 = input.monthlyRent * 12;
 
@@ -327,7 +334,7 @@ export const AB_1482 = {
   sanDiegoCap: 0.082,
 } as const;
 
-export function statutoryRentCap(regionalCpi = AB_1482.sanDiegoCpi): number {
+export function statutoryRentCap(regionalCpi: number = AB_1482.sanDiegoCpi): number {
   return Math.min(AB_1482.base + regionalCpi, AB_1482.hardCeiling);
 }
 
@@ -454,6 +461,216 @@ export function maxPriceForHoldPeriod(
     else high = mid;
   }
   return Math.floor(low / 10_000) * 10_000;
+}
+
+// ---------------------------------------------------------------------------
+// The decision
+// ---------------------------------------------------------------------------
+
+export interface DecisionThresholds {
+  /** Does buying this house, at this rate, over this horizon, beat renting? */
+  worthIt: boolean;
+  breakevenYear: number | null;
+  priceToRent: number;
+
+  /** The rate at which this price starts to work. Null if no rate rescues it. */
+  rateNeeded: number | null;
+  /** The price that works at today's rate. Null if nothing does. */
+  priceNeeded: number | null;
+  /** How long you would have to stay at this price and rate. Null means never. */
+  yearsNeeded: number | null;
+  /** Rental income per month that would tip it, at this price and rate. */
+  rentalIncomeNeeded: number | null;
+
+  /** How far each lever has to move, as a share of where it is now. Smaller is closer. */
+  levers: Array<{ key: string; label: string; current: string; needed: string; reachable: boolean; note: string }>;
+  verdict: string;
+}
+
+function breakevenAt(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  downPercent: number,
+  closingCostRate: number,
+  extra: Partial<RentVsBuyInput> = {}
+) {
+  const down = price * downPercent;
+  return compareRentVsBuy({
+    ...base,
+    ...extra,
+    purchasePrice: price,
+    downPaymentAmount: down,
+    loanAmount: price - down,
+    closingCosts: price * closingCostRate,
+    monthlyCarryingCosts: (price * costs.carryingRate) / 12 + costs.fixedMonthly,
+    monthlyMaintenance: (price * costs.maintenanceRate) / 12,
+  }).breakevenYear;
+}
+
+/** The rate at which a given price starts to break even inside the horizon. */
+export function requiredRate(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  holdYears: number,
+  downPercent: number,
+  closingCostRate = 0.025
+): number | null {
+  const works = (rate: number) => {
+    const year = breakevenAt({ ...base, interestRate: rate }, costs, price, downPercent, closingCostRate);
+    return year !== null && year <= holdYears;
+  };
+  // Lower rates are strictly better, so search for the highest rate that works.
+  if (!works(0.001)) return null;
+  let low = 0.001;
+  let high = 0.15;
+  while (high - low > 0.0005) {
+    const mid = (low + high) / 2;
+    if (works(mid)) low = mid;
+    else high = mid;
+  }
+  return low;
+}
+
+/** Rental income per month that would make this house work as it stands. */
+export function requiredRentalIncome(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  holdYears: number,
+  downPercent: number,
+  closingCostRate = 0.025
+): number | null {
+  const works = (income: number) => {
+    const year = breakevenAt(base, costs, price, downPercent, closingCostRate, { monthlyRentalIncome: income });
+    return year !== null && year <= holdYears;
+  };
+  if (works(0)) return 0;
+  if (!works(8000)) return null;
+  let low = 0;
+  let high = 8000;
+  while (high - low > 25) {
+    const mid = (low + high) / 2;
+    if (works(mid)) high = mid;
+    else low = mid;
+  }
+  return Math.ceil(high / 25) * 25;
+}
+
+/**
+ * Everything that has to be true for buying this house to beat renting, stated
+ * as thresholds rather than as a probability.
+ *
+ * The point is not to produce a yes or no. It is to say which single thing would
+ * have to change, and by how much, so you can judge whether any of them are
+ * plausible. Usually one of them is much closer than the others.
+ */
+export function decide(args: {
+  base: SweepBase;
+  costs: ScalingCosts;
+  price: number;
+  holdYears: number;
+  downPercent: number;
+  closingCostRate?: number;
+}): DecisionThresholds {
+  const { base, costs, price, holdYears, downPercent } = args;
+  const closingCostRate = args.closingCostRate ?? 0.025;
+
+  const breakevenYear = breakevenAt(base, costs, price, downPercent, closingCostRate);
+  const worthIt = breakevenYear !== null && breakevenYear <= holdYears;
+  const priceToRent = price / (base.monthlyRent * 12);
+
+  const rateNeeded = requiredRate(base, costs, price, holdYears, downPercent, closingCostRate);
+  const priceNeeded = maxPriceForHoldPeriod(base, costs, holdYears, downPercent, closingCostRate);
+  const rentalIncomeNeeded = requiredRentalIncome(base, costs, price, holdYears, downPercent, closingCostRate);
+
+  const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
+
+  const levers: DecisionThresholds["levers"] = [
+    {
+      key: "rate",
+      label: "Interest rate",
+      current: pct(base.interestRate),
+      needed: rateNeeded === null ? "no rate works" : pct(rateNeeded),
+      // A rate you could plausibly refinance into within a few years.
+      reachable: rateNeeded !== null && rateNeeded > base.interestRate - 0.025,
+      note:
+        rateNeeded === null
+          ? "Even free money does not rescue this price against this rent."
+          : rateNeeded >= base.interestRate
+            ? "Already there."
+            : `You would need rates ${((base.interestRate - rateNeeded) * 100).toFixed(2)} points lower. Refinancing is the one lever that works after you buy.`,
+    },
+    {
+      key: "price",
+      label: "Purchase price",
+      current: money(price),
+      needed: priceNeeded === null ? "no price works" : money(priceNeeded),
+      reachable: priceNeeded !== null && priceNeeded >= price * 0.8,
+      note:
+        priceNeeded === null
+          ? "Nothing works at this rent and horizon."
+          : priceNeeded >= price
+            ? "Already there."
+            : `${money(price - priceNeeded)} less, which is ${(((price - priceNeeded) / price) * 100).toFixed(0)}% off. A smaller or less central place, or a real correction.`,
+    },
+    {
+      key: "years",
+      label: "Years you stay",
+      current: `${holdYears}`,
+      needed: breakevenYear === null ? "never breaks even" : `${breakevenYear}`,
+      reachable: breakevenYear !== null && breakevenYear <= 30,
+      note:
+        breakevenYear === null
+          ? "Staying longer does not fix it. Past about 15 years the constraint is price to rent, not patience."
+          : breakevenYear <= holdYears
+            ? "Already there."
+            : `${breakevenYear - holdYears} more years than you planned.`,
+    },
+    {
+      key: "income",
+      label: "Rent you collect",
+      current: money(base.monthlyRentalIncome ?? 0),
+      needed: rentalIncomeNeeded === null ? "not enough on its own" : `${money(rentalIncomeNeeded)}/mo`,
+      reachable: rentalIncomeNeeded !== null && rentalIncomeNeeded <= 2500,
+      note:
+        rentalIncomeNeeded === null
+          ? "Even a large second income on the property does not close the gap."
+          : rentalIncomeNeeded === 0
+            ? "Not needed."
+            : `A roommate, a converted garage or an ADU. This is the lever most people actually control.`,
+    },
+  ];
+
+  const closest = levers.filter((l) => l.reachable && l.needed !== "Already there.");
+
+  let verdict: string;
+  if (worthIt) {
+    verdict = `On these assumptions this works. Owning beats renting by year ${breakevenYear}, inside the ${holdYears} years you expect to stay.`;
+  } else if (closest.length === 0) {
+    verdict =
+      `Nothing here is close. At ${priceToRent.toFixed(1)}x price to rent, no single change of a plausible size makes ` +
+      `this house beat renting over ${holdYears} years. That is not a reason to feel bad, it is a reason to keep renting and keep investing.`;
+  } else {
+    const names = closest.map((l) => l.label.toLowerCase()).join(", or ");
+    verdict =
+      `Not yet, but it is not hopeless. The reachable levers are ${names}. ` +
+      `Everything else would have to move further than is realistic.`;
+  }
+
+  return {
+    worthIt,
+    breakevenYear,
+    priceToRent,
+    rateNeeded,
+    priceNeeded,
+    yearsNeeded: breakevenYear,
+    rentalIncomeNeeded,
+    levers,
+    verdict,
+  };
 }
 
 export const RENT_VS_BUY_DEFAULTS = DEFAULTS;

@@ -957,3 +957,78 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- the decision levers ---------- */
+.levers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1px;
+  background: var(--rule-soft);
+  border: 1px solid var(--rule-soft);
+  margin-top: 18px;
+}
+.lever {
+  padding: 18px;
+  background: var(--bg);
+}
+.lever--met {
+  box-shadow: inset 3px 0 0 var(--good);
+}
+.lever--close {
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.lever--far {
+  box-shadow: inset 3px 0 0 var(--bad);
+}
+.lever__label {
+  display: block;
+  color: var(--ink-4);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.lever__values {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 8px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.lever__now {
+  color: var(--ink-3);
+  font-size: 0.95rem;
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-4);
+}
+.lever--met .lever__now {
+  text-decoration: none;
+  color: var(--ink-2);
+}
+.lever__arrow {
+  color: var(--ink-4);
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lever__need {
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+.lever--met .lever__need {
+  color: var(--good);
+}
+.lever--close .lever__need {
+  color: var(--warn);
+}
+.lever--far .lever__need {
+  color: var(--bad);
+}
+.lever__note {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
