@@ -23,6 +23,7 @@ export interface TocEntry {
 
 /** Short labels: the rail is narrow, and the headings are questions. */
 const SHORT_LABELS: Record<string, string> = {
+  scenario: "The calculator",
   "what-will-it-actually-cost": "The cost",
   "things-nobody-tells-you": "The gotchas",
   "can-you-buy-it": "Can you buy it",
@@ -42,13 +43,18 @@ function slugify(text: string): string {
 
 export function buildToc(): TocEntry[] {
   const entries: TocEntry[] = [];
-  for (const panel of document.querySelectorAll<HTMLElement>("section.panel")) {
+  // The form is a panel too. It has no h2, so it names itself with an attribute,
+  // and it has to be reachable: a reader four sections down who wants to change
+  // the price should not have to scroll back by hand.
+  for (const panel of document.querySelectorAll<HTMLElement>(".panel")) {
+    const explicit = panel.dataset["tocLabel"];
     const heading = panel.querySelector("h2");
-    if (!heading) continue;
-    const id = panel.id || slugify(heading.textContent ?? "");
+    if (!explicit && !heading) continue;
+    const label = explicit ?? heading!.textContent!.trim();
+    const id = panel.id || slugify(label);
     if (!id) continue;
     panel.id = id;
-    entries.push({ id, label: SHORT_LABELS[id] ?? heading.textContent!.trim(), element: panel });
+    entries.push({ id, label: SHORT_LABELS[id] ?? label, element: panel });
   }
   return entries;
 }
@@ -74,7 +80,7 @@ export function renderToc(entries: TocEntry[]): string {
 <div class="tocbar" hidden>
   <button type="button" class="tocbar__toggle" aria-expanded="false" aria-controls="tocbar-list">
     <span class="tocbar__progress"><i></i></span>
-    <span class="tocbar__current">The cost</span>
+    <span class="tocbar__current">The calculator</span>
     <span class="tocbar__chev" aria-hidden="true">^</span>
   </button>
   <ol class="tocbar__list" id="tocbar-list" hidden>${items}</ol>

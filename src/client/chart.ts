@@ -456,9 +456,16 @@ export function attachStackHover(
   columns: StackColumn[],
   series: StackSeries[],
   format: (n: number) => string,
-  onSelect?: (index: number) => void
+  opts: {
+    onSelect?: (index: number) => void;
+    /** Reads each column against the reference line, in the reader's own terms. */
+    compare?: { value: number; less: string; more: string; same: string };
+    /** Names what a column is, e.g. "bought in" for a purchase year. */
+    prefix?: string;
+  } = {}
 ): void {
   const tip = figure.querySelector<HTMLElement>(".c-tip")!;
+  const { onSelect, compare, prefix } = opts;
 
   for (const g of figure.querySelectorAll<SVGGElement>(".c-col")) {
     const i = Number(g.dataset["col"]);
@@ -467,12 +474,23 @@ export function attachStackHover(
 
     g.addEventListener("pointerenter", () => {
       const total = series.reduce((sum, s) => sum + (col.values[s.key] ?? 0), 0);
+      const gap = compare ? compare.value - total : 0;
+      // Under a dollar apart is a rounding artefact, not a difference worth a claim.
+      const verdict = !compare
+        ? ""
+        : Math.abs(gap) < 1
+          ? `<span class="c-tip__gap">${compare.same}</span>`
+          : gap > 0
+            ? `<span class="c-tip__gap">${format(gap)}/mo ${compare.less}</span>`
+            : `<span class="c-tip__gap">${format(-gap)}/mo ${compare.more}</span>`;
+
       tip.hidden = false;
       tip.innerHTML =
-        `<strong>${format(total)}/mo cheaper</strong><span>bought ${col.label}</span>` +
+        `<strong>${format(total)}/mo</strong><span>${prefix ? `${prefix} ` : ""}${col.label}</span>` +
         series
           .map((s) => `<span><i style="background:${s.color}"></i>${s.label}: ${format(col.values[s.key] ?? 0)}</span>`)
-          .join("");
+          .join("") +
+        verdict;
       tip.style.left = `${((PAD.left + ((W - PAD.left - PAD.right) / columns.length) * (i + 0.5)) / W) * 100}%`;
     });
 

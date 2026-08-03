@@ -88,23 +88,14 @@ a:hover {
 }
 
 /* ---------- the mark: three blueberries ---------- */
+/* The icon itself rather than three flat dots: it is a vector, so the drawn
+   version costs nothing extra and holds its detail at any size. The berries are
+   separated by a stroke in --bg, so this only sits cleanly on the page ground. */
 .berries {
-  display: inline-flex;
-  gap: 5px;
-  vertical-align: middle;
-}
-.berries i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--berry-deep);
   display: block;
-}
-.berries i:nth-child(2) {
-  background: var(--berry);
-}
-.berries i:nth-child(3) {
-  background: var(--berry-bright);
+  width: 36px;
+  height: 36px;
+  flex: none;
 }
 
 /* ---------- hero ---------- */
@@ -653,6 +644,14 @@ input::placeholder {
   align-items: center;
   gap: 6px;
   color: var(--ink-3);
+}
+/* The comparison against the reference line: the point of the tooltip, so it
+   gets a rule above it and the ink weight of a conclusion. */
+.c-tip span.c-tip__gap {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-2);
 }
 .c-legend {
   display: flex;

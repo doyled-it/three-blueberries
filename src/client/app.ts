@@ -292,8 +292,8 @@ const SERIES_PAYMENT = "#d95926";
  * bar and that line, visible without having to be explained.
  */
 const COHORT_SERIES = [
-  { key: "pi", label: "Principal and interest they pay", color: "#3987e5" },
-  { key: "tax", label: "Property tax they pay", color: "#199e70" },
+  { key: "pi", label: "Their principal and interest", color: "#3987e5" },
+  { key: "tax", label: "Their property tax", color: "#199e70" },
 ];
 
 const COHORT_FIRST_YEAR = 1990;
@@ -347,9 +347,18 @@ function renderCohort(input: ScenarioInput): void {
 
   const fig = $("cohortChart").querySelector<HTMLElement>("[data-stack]");
   if (fig) {
-    attachStackHover(fig, columns, COHORT_SERIES, money, (i) => {
-      $<HTMLInputElement>("cohortYear").value = String(years[i]);
-      renderCohort(readInput());
+    attachStackHover(fig, columns, COHORT_SERIES, money, {
+      onSelect: (i) => {
+        $<HTMLInputElement>("cohortYear").value = String(years[i]);
+        renderCohort(readInput());
+      },
+      compare: {
+        value: yourPayment,
+        less: "less than you would pay",
+        more: "more than you would pay",
+        same: "the same as you would pay",
+      },
+      prefix: "for a house they bought in",
     });
   }
 

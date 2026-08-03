@@ -21,6 +21,14 @@ test("every panel has a heading the contents can be built from", () => {
   assert.ok(headings.length >= 6);
 });
 
+test("the form is in the contents, because it is what a reader scrolls back to", () => {
+  // Every other section is read once. The inputs get returned to from anywhere
+  // on the page, and without an entry that means scrolling by hand.
+  assert.match(markup, /<form id="scenario"[^>]*data-toc-label="[^"]+"/);
+  assert.match(toc, /dataset\["tocLabel"\]/);
+  assert.ok(toc.includes(`scenario: "The calculator"`));
+});
+
 test("REGRESSION: every heading has a short label, so the rail never shows a full question", () => {
   // The rail is 170px wide. A heading like "Why does everyone else seem to
   // manage?" has to be shortened, and a missing entry silently falls back to
@@ -40,7 +48,7 @@ test("short labels stay short enough for the rail", () => {
 });
 
 test("the contents is derived from the page, not duplicated", () => {
-  assert.match(toc, /querySelectorAll<HTMLElement>\("section\.panel"\)/);
+  assert.match(toc, /querySelectorAll<HTMLElement>\("\.panel"\)/);
   assert.ok(!/const SECTIONS = \[/.test(toc), "a hardcoded section list would drift");
 });
 
