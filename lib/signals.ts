@@ -170,7 +170,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: (at(TROUGH_2009)?.paymentToIncome ?? 0) * 100,
       lean: "bearish",
       reading:
-        "Buying costs about what it cost at the 2006 peak, relative to income. Affordability this stretched has preceded both declines on record — but it also persisted for years before either one broke.",
+        "About what it cost at the 2006 peak, relative to income. This stretched has preceded both declines on record — and also persisted for years before either broke.",
     },
     {
       key: "priceToIncome",
@@ -181,7 +181,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: at(TROUGH_2009)?.priceToIncome ?? null,
       lean: "bearish",
       reading:
-        "Near the 2006 peak multiple. The 2009 trough took this back to roughly 6x, which is what a 40%+ decline looks like from here.",
+        "Near the 2006 peak multiple. The 2009 trough took it back to ~6x — which is what a 40% decline looks like from here.",
     },
     {
       key: "supply",
@@ -192,9 +192,9 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: asOf(NEW_HOME_SUPPLY, TROUGH_2009),
       lean: "bearish",
       reading:
-        "Elevated — above where it sat at the 2006 peak, and near 2009 levels. Of everything measured here this has the strongest historical relationship with what prices did next.",
+        "Above where it sat at the 2006 peak and near 2009 levels. Of everything here, this has the strongest historical link to what prices did next.",
       caveat:
-        "NEW CONSTRUCTION ONLY. Builders now carry far more spec inventory than they did in the 1990s, so the level is not comparable across eras without care. Existing-home supply, the market most buyers actually shop, is currently around 4.6 months — elevated but nowhere near crisis.",
+        "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply — the market you actually shop — is around 4.6 months.",
     },
     {
       key: "delinquency",
@@ -205,7 +205,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: asOf(MORTGAGE_DELINQUENCY, TROUGH_2009),
       lean: "bullish",
       reading:
-        "Near historic lows, and the single strongest argument that this is not 2008. A price crash needs forced sellers. Today's borrowers are locked into cheap fixed rates and are not defaulting, so the supply of distressed inventory that drove the last collapse simply does not exist.",
+        "Near historic lows, and the strongest argument that this isn't 2008. A crash needs forced sellers; borrowers locked into cheap fixed rates aren't defaulting, so the distressed supply that drove the last collapse doesn't exist.",
     },
     {
       key: "unemployment",
@@ -216,22 +216,22 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: asOf(SD_UNEMPLOYMENT, TROUGH_2009),
       lean: "bullish",
       reading:
-        "Low. Job losses are what turn a slowdown into a cascade — people sell because they have to, not because prices fell. This is also the number that decides whether YOU could buy a dip: you have to still be employed at the bottom.",
+        "Low. Job losses turn a slowdown into a cascade — people sell because they must. It also decides whether you could buy a dip: you have to still be employed at the bottom.",
     },
   ];
 
   const summary =
-    "Valuation says stretched; credit says stable. Both of the last two declines had stretched valuations AND a trigger — a recession in 1990, a credit collapse in 2008. Today the valuation is there and the trigger is not. That argues for stagnation or a slow grind rather than a 2008-style break, which is also where most published forecasts sit. It is not a guarantee: a recession would supply the missing trigger.";
+    "Valuation says stretched; credit says stable. Both prior declines needed stretched valuations AND a trigger — a recession in 1990, a credit collapse in 2008. Today the valuation is here and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.";
 
   return {
     readings,
     summary,
     caveats: [
       `Two declines over 10% in 39 years is the entire sample. Any "formula" fitted to it is fitted to noise, including the correlations quoted here.`,
-      "The forward-looking correlations use overlapping 24-month windows, which inflates the apparent sample size by roughly the window length. Treat a reported n of 449 as closer to 19 real observations.",
-      "Supply and delinquency are national series; only unemployment is San Diego. Income is statewide California, annual, and the series ends in " +
+      "Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat a reported n of 449 as closer to 19 real observations.",
+      "Supply and delinquency are national; only unemployment is San Diego. Income is statewide California, annual, ending " +
         SIGNALS_INCOME_LAST_YEAR +
-        " — later months carry the last value forward, which slightly overstates the burden.",
+        ", carried forward after that — which slightly overstates the burden.",
       "Every indicator here is backward-looking. Markets turn on things that have not happened yet.",
     ],
   };

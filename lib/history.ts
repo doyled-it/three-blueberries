@@ -433,11 +433,11 @@ export function historicalContext() {
     status,
     extremes,
     caveats: [
-      "Two declines over 10% in 39 years is not a sample you can forecast from. Anyone who tells you they know what happens next is selling something.",
-      "Price is not payment. A 2021 buyer at peak prices paid roughly what a 2006 buyer at peak prices paid, because the rate was 2.84% instead of 6.24%. If a recession is what cracks prices, the Fed cutting rates is what stops them cracking further.",
-      "You have to still have a job at the bottom. San Diego unemployment roughly doubled during the last crash. The people who bought in 2009-2012 were the ones whose income survived it.",
-      "Credit tightens exactly when prices fall. In 2009 private lenders went back to demanding 20% down. Government-backed loans — FHA at 3.5% and VA at zero — were the ones that stayed open.",
-      "In California, buying lower is permanent. Prop 13 locks your assessed value to your purchase price and caps growth at 2%/year, so a lower entry price keeps paying you back for as long as you own the house.",
+      "Two declines over 10% in 39 years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.",
+      "Price is not payment. A 2021 peak buyer paid about what a 2006 peak buyer paid, because the rate was 2.84% not 6.24%. And if a recession cracks prices, rate cuts are what stop the cracking.",
+      "You have to still have a job at the bottom. San Diego unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
+      "Credit tightens exactly when prices fall. In 2009 private lenders went back to 20% down; FHA at 3.5% and VA at zero stayed open.",
+      "In California, buying lower is permanent. Prop 13 locks your assessed value to your price and caps growth at 2%/year, so a cheaper entry keeps paying you back for as long as you own it.",
     ],
   };
 }

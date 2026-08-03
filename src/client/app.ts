@@ -607,6 +607,7 @@ function renderInstruments(): void {
           <span class="instrument__name">${i.name}</span>
           <span class="instrument__level">${LEVEL_LABEL[i.level]}</span>
         </summary>
+        <span class="instrument__gist">${i.gist}</span>
         <div class="instrument__body">
           <p class="instrument__what"><strong>What it is.</strong> ${i.what}</p>
           <p class="instrument__rhyme"><strong>The rhyme.</strong> ${i.rhyme}</p>

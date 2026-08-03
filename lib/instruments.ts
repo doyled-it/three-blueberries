@@ -1,25 +1,22 @@
 /**
  * The instrument watchlist: what the next one might be built out of.
  *
- * ────────────────────────────────────────────────────────────────────────────
  * WHY THIS IS A WATCHLIST AND NOT MODEL FEATURES
  *
- * A new financial instrument has no history, so it cannot be learned. By the
- * time CDO-squared had enough observations to train on, it was 2009 and the
- * question was settled. Anything in this file is, by construction, a thing we
- * have never seen break — which is exactly why a model can say nothing useful
- * about it and a human has to.
+ * A new instrument has no history, so it cannot be learned. By the time
+ * CDO-squared had enough observations to train on, it was 2009 and the question
+ * was settled expensively. Everything here is by construction a thing nobody has
+ * watched break — which is exactly why a model says nothing and a human has to.
  *
- * This is also the lesson of the previous experiment. Aggregate financial
- * indicators — leverage, credit spreads, financial conditions — were tested and
- * they did not lead 2008; they confirmed it, roughly 21 months late. The people
- * who saw it coming were not reading indices. They were reading loan tapes and
- * noticing that a specific instrument had a specific structural flaw.
+ * It is also the lesson of the experiment in training/experiment_financial.py:
+ * aggregate leverage and credit-spread indicators did not lead 2008, they
+ * confirmed it about 21 months late. The people who saw it coming were reading
+ * structures, not indices.
  *
- * So this file is deliberately editorial: sourced claims, structural analogies,
- * and named tripwires. It is labeled as judgment in the UI, kept separate from
- * anything computed, and every entry has to say what would prove it wrong.
- * ────────────────────────────────────────────────────────────────────────────
+ * So this file is editorial on purpose — labeled as judgment in the UI, kept
+ * apart from anything computed. Each entry leads with a plain metaphor, because
+ * the mechanics are genuinely complicated and a reader deserves the shape of the
+ * thing before the detail. Each one must also name what would prove it wrong.
  */
 
 export type WatchLevel = "rhymes-hard" | "watch" | "context";
@@ -27,15 +24,17 @@ export type WatchLevel = "rhymes-hard" | "watch" | "context";
 export interface Instrument {
   id: string;
   name: string;
-  /** Plain-English: what the thing actually is. */
+  /** The metaphor. One sentence, no jargon — the shape of the thing. */
+  gist: string;
+  /** What it actually is, in plain terms. */
   what: string;
   /** The structural analogy to 2008, stated precisely rather than by vibe. */
   rhyme: string;
-  /** Where it stands now, with the number and its source. */
+  /** Where it stands now, with sourced numbers. */
   reading: string;
   /** The specific thing that would turn this from interesting into dangerous. */
   tripwire: string;
-  /** What we do not know, said out loud. */
+  /** What we don't know, said out loud. */
   unknown: string;
   level: WatchLevel;
   sources: { label: string; url: string }[];
@@ -45,15 +44,16 @@ export const INSTRUMENTS: Instrument[] = [
   {
     id: "dscr",
     name: "DSCR and non-QM lending",
-    what: "A DSCR loan is underwritten on whether the property's expected rent covers the mortgage payment. The borrower's own income is not verified, because it is not part of the test.",
+    gist: "A loan that checks whether the house has a job, not whether you do.",
+    what: "The lender tests whether expected rent covers the payment. Your income is never verified, because it isn't part of the test.",
     rhyme:
-      "This is the closest structural echo of stated-income lending in the whole market — not because documentation is fraudulent, but because the loan deliberately does not ask whether the borrower can pay. It asks whether the asset can. In 2006 that assumption held until prices stopped rising; here it holds until rents stop rising. Both are correlated across every loan in the pool at once, which is precisely the property that makes a securitisation fail all together rather than one at a time.",
+      "This is the closest living relative of stated-income lending — not because anyone lies, but because the loan does not ask whether the borrower can pay. It asks whether the asset can. In 2006 that held until prices stopped rising; here it holds until rents do. Either way the assumption is identical across every loan in the pool, which is what makes a securitisation fail all at once instead of one loan at a time.",
     reading:
-      "Non-QM issuance is projected above $100B in 2026, up about 46% year over year, and DSCR loans are roughly 30% of it. DSCR volumes have grown 91-97% year over year in private lending.",
+      "Non-QM issuance is projected above $100B in 2026, up ~46% year over year. DSCR is roughly 30% of it, and DSCR volumes have nearly doubled.",
     tripwire:
-      "Rent declines in investor-heavy metros, or a rise in DSCR delinquencies while employment is still strong. Falling rents with full employment would mean the collateral thesis is breaking on its own terms rather than because of a recession.",
+      "Rents falling in investor-heavy metros, or DSCR delinquencies rising while employment is still strong — that would mean the collateral thesis is breaking on its own terms.",
     unknown:
-      "Loan-level performance data for DSCR pools is thin and the vintages are young. Almost none of this paper has been through a downturn.",
+      "Loan-level performance data is thin and the vintages are young. Almost none of this paper has been through a downturn.",
     level: "rhymes-hard",
     sources: [
       {
@@ -65,23 +65,24 @@ export const INSTRUMENTS: Instrument[] = [
   {
     id: "private-credit",
     name: "Private credit and the insurance loop",
-    what: "Non-bank funds lending directly to companies, increasingly funded by life insurers who sell annuities to the public. Banks in turn lend to the funds.",
+    gist: "Everyone is holding everyone else's IOU, and each IOU is worth whatever its holder says — until someone has to sell.",
+    what: "Non-bank funds lending directly to companies, funded increasingly by life insurers selling annuities to the public. Banks lend to the funds in turn.",
     rhyme:
-      "The circularity is the point, and it is the same shape as 2008: banks lend roughly $1.4T to the non-banks that fund private credit; those funds lend to companies; insurers fund the funds; and about a fifth of the investments held by some asset-manager-affiliated insurers are loans to their own affiliated funds. A Federal Reserve staff note describes these structures as obscuring the true leverage of both parties. That is a bet on a bet on a bet with the same firm on more than one side of it. Add mark-to-model valuation and you have assets whose price is an opinion until somebody has to sell.",
+      "The circularity is the whole thing, and it is the shape of 2008. Banks lend roughly $1.4T to the non-banks that fund private credit; those funds lend to companies; insurers fund the funds; and at some asset-manager-affiliated insurers about a fifth of investments are loans to their own affiliated funds. A Fed staff note says these structures obscure the true leverage of both parties. Add mark-to-model pricing and you have assets whose value is an opinion nobody has been forced to test.",
     reading:
-      "Estimated $1.5-2.0 trillion in assets at end-2024. Life insurers hold about $807B in private and illiquid investments, up from $685B a year earlier — roughly 20% of their $4T fixed-income books. The FSB published a dedicated vulnerabilities report in May 2026 and the Fed gave it a special feature box.",
+      "Estimated $1.5-2.0T at end-2024. Life insurers hold ~$807B in private and illiquid assets, up from $685B a year earlier — about 20% of their fixed-income books.",
     tripwire:
-      "Forced selling that reveals marks were stale — most likely triggered by annuity surrenders or a redemption wave, not by credit losses themselves. Watch for insurers selling private assets at a discount to carrying value.",
+      "Forced selling that reveals stale marks — most likely from annuity surrenders or redemptions rather than credit losses. Watch for insurers selling private assets below carrying value.",
     unknown:
-      "This is mostly not a housing exposure. It matters to housing through the credit channel — if private credit seizes, financing for everything including construction and non-agency mortgages tightens at once. The link is real but indirect, and I have not seen it quantified well.",
+      "This is mostly not a housing exposure. It reaches housing through the credit channel: if private credit seizes, financing tightens everywhere at once. Real, but indirect and poorly quantified.",
     level: "rhymes-hard",
     sources: [
       {
-        label: "FSB — Report on Vulnerabilities in Private Credit (May 2026)",
+        label: "FSB — Vulnerabilities in Private Credit (May 2026)",
         url: "https://www.fsb.org/2026/05/report-on-vulnerabilities-in-private-credit/",
       },
       {
-        label: "American Banker — Is private credit a $2 trillion insurance timebomb?",
+        label: "American Banker — a $2 trillion insurance timebomb?",
         url: "https://www.americanbanker.com/news/is-private-credit-a-2-trillion-dollar-insurance-timebomb",
       },
     ],
@@ -89,77 +90,74 @@ export const INSTRUMENTS: Instrument[] = [
   {
     id: "nonbank-servicers",
     name: "Non-bank mortgage servicers",
-    what: "Most mortgages are no longer serviced by banks. They are serviced by thinly capitalised non-banks funded by short-term warehouse credit lines.",
+    gist: "The middleman must keep paying your mortgage for you when you stop — with money he borrowed short-term, from lenders who leave first.",
+    what: "Most mortgages are no longer serviced by banks but by thinly capitalised non-banks funded on short-term warehouse credit lines.",
     rhyme:
-      "Servicers must advance payments to bondholders when borrowers stop paying, whether or not they have the cash. That obligation scales with defaults exactly when their funding lines get pulled. It is the same maturity mismatch that killed Bear and Lehman, sitting in a less-watched part of the system — and unlike 2008, the federal government is now the counterparty on most of the underlying guarantees.",
+      "Servicers must advance payments to bondholders whether or not the borrower paid and whether or not they have the cash. That obligation grows with defaults at exactly the moment their funding gets pulled. It is the maturity mismatch that killed Bear and Lehman, relocated to a part of the system nobody watches — and this time the federal government guarantees most of what sits underneath.",
     reading:
-      "FSOC has issued repeated warnings on non-bank servicer liquidity risk and recommended new authority to manage it. As of Q3 2023, 37% of non-bank mortgage companies met FSOC's elevated-risk standard.",
+      "FSOC has repeatedly warned on non-bank servicer liquidity and asked for new authority. As of Q3 2023, 37% of non-bank mortgage companies met its elevated-risk standard.",
     tripwire:
-      "Rising delinquencies combined with any tightening in warehouse lending. Either alone is survivable; together they are the documented failure mode.",
+      "Rising delinquencies plus any tightening in warehouse lending. Either alone is survivable; together is the documented failure mode.",
     unknown:
-      "Servicer-level liquidity is not publicly reported in a usable, timely way. The FSOC reports are periodic, so this is genuinely hard to monitor in real time.",
+      "Servicer liquidity isn't publicly reported in a timely, usable form. FSOC reports are periodic, so this is genuinely hard to watch in real time.",
     level: "watch",
     sources: [
-      { label: "FSOC — Report on Nonbank Mortgage Servicing", url: "https://www.fsoc.gov/" },
       {
-        label: "Urban Institute — FSOC's framework for nonbank systemic risk",
+        label: "Urban Institute — FSOC and nonbank systemic risk",
         url: "https://www.urban.org/research/publication/fsocs-new-framework-addressing-nonbank-systemic-risk-works-well-mortgage",
       },
     ],
   },
   {
     id: "equity-extraction",
-    name: "Home equity extraction, second liens and HEIs",
-    what: "Products that convert paper home equity into spendable cash: HELOCs, second mortgages, and home equity investments, in which an investor buys a share of your home's future appreciation instead of lending you money.",
+    name: "Second liens, HELOCs and equity investments",
+    gist: "Spending the profit on your house before you've sold it — and now, selling a slice of the profit to a stranger.",
+    what: "Products that turn paper equity into cash: HELOCs, second mortgages, and home equity investments, where an investor buys a share of your home's future value instead of lending you money.",
     rhyme:
-      "Mortgage equity withdrawal was a major channel of the last bubble — it is how rising paper wealth became consumption and how households ended up owing more than the house was worth when prices turned. HEIs add something genuinely new: they are equity-like claims on individual homes, securitised into bonds. Nobody knows how they behave in a decline, because they have never seen one.",
+      "Equity withdrawal was a main channel of the last bubble — it is how rising paper wealth became spending, and how households ended up owing more than the house was worth once prices turned. HEIs add something genuinely new: equity-like claims on individual homes, bundled into bonds. Nobody knows how they behave in a decline because none of them has seen one.",
     reading:
-      "About $34.5 trillion of collective home equity. Home equity bond issuance passed $30B year to date in 2026. HEI-backed securitisations went from two deals in 2021 to six by 2024. A proposed Freddie Mac second-lien product is estimated to unlock up to $850B in originations.",
+      "About $34.5T in collective home equity. Home equity bond issuance passed $30B year-to-date in 2026. HEI securitisations went from two deals in 2021 to six by 2024.",
     tripwire:
-      "Rapid growth in second-lien origination against flat or falling prices. Extraction during appreciation is ordinary; extraction while prices fall means households are borrowing against equity that is disappearing.",
+      "Second-lien origination growing while prices are flat or falling — that means households are borrowing against equity that is actively disappearing.",
     unknown:
-      "HEI contracts are not clearly regulated as either loans or equity, and the CFPB has an open issue spotlight on exactly that ambiguity. Their behaviour in a downturn — including whether the homeowner or the investor absorbs the loss — is genuinely untested.",
+      "HEIs aren't clearly regulated as loans or as equity, and the CFPB has an open spotlight on exactly that. Who absorbs the loss in a downturn is untested.",
     level: "watch",
     sources: [
       {
         label: "CFPB — Home Equity Contracts: Market Overview",
         url: "https://www.consumerfinance.gov/data-research/research-reports/issue-spotlight-home-equity-contracts-market-overview/",
       },
-      {
-        label: "National Mortgage News — growth in home equity securitization",
-        url: "https://www.nationalmortgagenews.com/news/secondary-markets-see-growth-in-home-equity-securitization",
-      },
     ],
   },
   {
     id: "investor-share",
     name: "Investor share of purchases",
-    what: "The fraction of single-family homes bought by investors rather than owner-occupants.",
+    gist: "A third of the buyers have no reason to stay if the numbers stop working.",
+    what: "The share of single-family homes bought by investors rather than people who intend to live in them.",
     rhyme:
-      "Investors are the marginal seller in a downturn. An owner-occupant with a job usually stays put when prices fall; a levered investor whose cash flow inverts sells, and does so at the same time as every other investor because they all underwrote the same rent assumption. This concentrates and accelerates declines rather than causing them.",
+      "Investors are the marginal seller. An owner-occupant with a job usually sits tight when prices fall; a levered investor whose cash flow inverts sells — and does it at the same time as everyone else, because they all underwrote the same rent assumption. This doesn't cause declines. It concentrates and accelerates them.",
     reading:
-      "Investors bought roughly 30-34% of US single-family homes in 2025, the highest share in five years, and the share is expected to hold into 2026.",
+      "Investors bought roughly 30-34% of US single-family homes in 2025, the highest share in five years, and it is expected to hold into 2026.",
     tripwire:
-      "Investor share falling sharply while listings rise — that pattern means investors have flipped from buyers to sellers, which is what turns a soft market into a fast one.",
+      "Investor share dropping sharply while listings climb — that pattern means they have flipped from buyers to sellers, which is what turns a soft market into a fast one.",
     unknown:
-      "Definitions vary a lot between data providers, and 'investor' spans a retiree with one rental and an institution with fifty thousand. The headline number is noisier than it looks.",
+      "Definitions vary between providers, and 'investor' covers both a retiree with one rental and an institution with fifty thousand.",
     level: "watch",
-    sources: [
-      { label: "Redfin / CoreLogic investor purchase tracking", url: "https://www.redfin.com/news/data-center/" },
-    ],
+    sources: [{ label: "Redfin — investor purchase tracking", url: "https://www.redfin.com/news/data-center/" }],
   },
   {
     id: "counterweight",
     name: "The counterweight: household balance sheets",
-    what: "Aggregate household and business debt as a share of GDP, and mortgage delinquency.",
+    gist: "The fuel is missing. 2008 needed households that couldn't pay; today most of them comfortably can.",
+    what: "Household debt as a share of GDP, and mortgage delinquency.",
     rhyme:
-      "There isn't one, and that is the point of including it. The 2008 mechanism required households to be over-levered and defaulting. Today household debt to GDP has been trending DOWN to levels last seen in the early 2000s, and mortgage delinquency is near record lows because most borrowers are locked into cheap fixed-rate loans they have every reason to keep paying.",
+      "There isn't one, which is why it's here. The 2008 mechanism required over-levered households defaulting in volume. Household debt to GDP has been trending down toward early-2000s levels, and delinquency sits near record lows because most borrowers hold cheap fixed-rate loans they have every reason to keep paying. No forced sellers, no cascade.",
     reading:
-      "The Fed's May 2026 Financial Stability Report describes vulnerabilities from business and household debt as moderate, with the debt-to-GDP ratio continuing to trend down.",
+      "The Fed's May 2026 Financial Stability Report calls household and business debt vulnerabilities moderate, with debt-to-GDP still trending down.",
     tripwire:
-      "A sustained rise in mortgage delinquency while unemployment is still low. That combination would mean the payment burden itself is breaking households, which is not currently happening.",
+      "Mortgage delinquency rising while unemployment stays low — that would mean the payment burden itself is breaking households, which is not happening now.",
     unknown:
-      "Aggregates hide distribution. A healthy median household balance sheet is compatible with severe stress in a leveraged minority — which is roughly what 2006 looked like in aggregate data.",
+      "Aggregates hide distribution. A healthy median balance sheet is perfectly compatible with severe stress in a leveraged minority — which is roughly what 2006 looked like in aggregate too.",
     level: "context",
     sources: [
       {
@@ -171,12 +169,11 @@ export const INSTRUMENTS: Instrument[] = [
 ];
 
 export const WATCHLIST_PREAMBLE =
-  "Everything else on this page is computed from data. This section is not — it is a judgment call about instruments that are too new to have a track record, which is exactly why no model can help. " +
-  "A new instrument cannot be learned: by the time there is enough history to train on, the question has already been answered expensively. " +
-  "It is here because the tested indicators demonstrably failed to lead the last one, and the people who did see it coming were reading structures rather than indices.";
+  "Everything else here is computed. This is judgment — about instruments too new to have a track record, which is exactly why no model can help. " +
+  "A new instrument cannot be learned: by the time there's enough history to train on, the question has been answered expensively.";
 
 export const WATCHLIST_DISCIPLINE =
-  "Each entry names what would prove it dangerous and what we do not know. If an entry ever stops having a falsifiable tripwire, delete it — at that point it has become a vibe with footnotes.";
+  "Each entry names what would prove it dangerous and what we don't know. If an entry ever loses its falsifiable tripwire, delete it — it has become a vibe with footnotes.";
 
 export function byLevel(level: WatchLevel): Instrument[] {
   return INSTRUMENTS.filter((i) => i.level === level);

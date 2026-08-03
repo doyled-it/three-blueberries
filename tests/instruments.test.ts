@@ -48,3 +48,17 @@ test("DSCR is flagged as the closest structural rhyme", () => {
   assert.equal(dscr.level, "rhymes-hard");
   assert.match(dscr.rhyme, /does not ask whether the borrower can pay/i);
 });
+
+test("every entry leads with a jargon-free metaphor", () => {
+  const jargon = /securitis|amortis|tranche|LTV|DSCR|basis point|collateralis/i;
+  for (const i of INSTRUMENTS) {
+    assert.ok(i.gist.length > 30 && i.gist.length < 190, `${i.id} gist is the wrong length`);
+    assert.ok(!jargon.test(i.gist), `${i.id} gist uses jargon — the whole point is that it doesn't`);
+    assert.ok(/[.!]$/.test(i.gist), `${i.id} gist should be a sentence`);
+  }
+});
+
+test("the DSCR metaphor lands the actual mechanism", () => {
+  const dscr = INSTRUMENTS.find((i) => i.id === "dscr")!;
+  assert.match(dscr.gist, /house has a job/i);
+});

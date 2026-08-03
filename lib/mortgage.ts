@@ -238,7 +238,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
       sourceIds: mi.sourceIds,
       warning:
         input.loanType === "fha" && mi.endsAfterMonths === null
-          ? "This never goes away. Over a 30-year term it is the single largest avoidable cost of an FHA loan."
+          ? "This never goes away — over 30 years it's the largest avoidable cost of an FHA loan."
           : undefined,
     });
   } else if (input.loanType === "va") {
@@ -248,7 +248,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
       monthly: 0,
       annual: 0,
       basis:
-        "VA loans carry no monthly mortgage insurance at any down payment, including zero down. This is the benefit's single biggest advantage.",
+        "VA carries no monthly mortgage insurance at any down payment, including zero. The benefit's biggest advantage.",
       confidence: "statutory",
       sourceIds: ["va-funding-fee"],
     });
@@ -261,7 +261,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
       label: "HOA dues",
       monthly: input.hoaMonthly,
       annual: input.hoaMonthly * 12,
-      basis: "As entered. Lenders count HOA dues fully against your debt-to-income ratio.",
+      basis: "As entered. Lenders count HOA dues fully against your DTI.",
       confidence: "user",
       sourceIds: ["fannie-b3-6-02"],
     });
@@ -276,12 +276,12 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     basis:
       input.melloRoosAnnual > 0
         ? `${money(input.melloRoosAnnual)}/year in CFD special tax, as entered.`
-        : "Entered as zero. Verify this — a CFD does not show up on listing sites and is common in anything built after about 1982.",
+        : "Entered as zero. Verify it — CFDs don't show on listing sites and are common in anything built after ~1982.",
     confidence: "user",
     sourceIds: ["mello-roos"],
     warning:
       input.melloRoosAnnual === 0
-        ? "Unverified. Mello-Roos runs from a few hundred to over $10,000/year and is invisible on Zillow. The title report or the county auditor has the real number."
+        ? "Unverified. Mello-Roos runs from a few hundred to $10,000+/year and is invisible on Zillow. The title report has the real number."
         : undefined,
   });
 
@@ -340,7 +340,7 @@ function computeCashToClose(input: ScenarioInput, loan: LoanFacts, lines: LineIt
       basis: `Estimated at ${pct(DEFAULT_CLOSING_COST_RATE, 1)} of purchase price: lender fees, appraisal, title, and the buyer's share of escrow.`,
       confidence: "estimated",
       sourceIds: ["ca-closing-costs"],
-      warning: "California buyers typically land between 2% and 5%. Your Loan Estimate is the number that counts.",
+      warning: "CA buyers typically land between 2% and 5%. Your Loan Estimate is the number that counts.",
     },
     {
       key: "prepaidsAndImpounds",
@@ -359,7 +359,7 @@ function computeCashToClose(input: ScenarioInput, loan: LoanFacts, lines: LineIt
       label: input.loanType === "va" ? "VA funding fee (paid in cash)" : "FHA upfront MIP (paid in cash)",
       monthly: 0,
       annual: loan.upfrontFeePaidInCash,
-      basis: "You chose to pay this at closing rather than finance it into the loan.",
+      basis: "Paid at closing rather than financed into the loan.",
       confidence: "statutory",
       sourceIds: input.loanType === "va" ? ["va-funding-fee"] : ["hud-ml-2023-05"],
     });
@@ -416,7 +416,7 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
   const notes: string[] = [ceilingInfo.note];
   if (input.household.grossAnnualIncomes.length > 1) {
     notes.push(
-      `Both incomes are counted, but so is both people's debt. Two earners raise the ceiling proportionally — they do not halve the payment.`
+      `Both incomes count — and so does both people's debt. Two earners raise the ceiling; they don't halve the payment.`
     );
   }
 
@@ -451,7 +451,7 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
         `(${squareFeet.toLocaleString("en-US")} sq ft at $${VA_UTILITY_PER_SQFT}/sq ft), you would have ${money(available)}.`,
     };
     notes.push(
-      "VA weighs residual income more heavily than DTI. Clearing residual income can carry an approval well past a 41% ratio; failing it can sink one that looks fine."
+      "VA weighs residual income above DTI. Clearing it can carry an approval well past 41%; failing it sinks one that looks fine."
     );
   }
 
