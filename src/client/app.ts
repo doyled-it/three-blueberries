@@ -31,6 +31,7 @@ import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import {
   ASSUMPTION_SETS,
+  DEFAULT_MARGINAL_TAX_RATE,
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
   buyZone,
@@ -532,6 +533,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     investmentReturn: investReturn,
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
+    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
   });
 
   const f = r.firstYear;
@@ -635,6 +637,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     investmentReturn: investReturn,
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
+    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
   };
   // Costs that scale with price have to be recomputed per price, or a cheap
   // house gets charged an expensive house's taxes.
@@ -660,6 +663,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     investmentReturn: investReturn,
     propertyTaxGrowth: 0.02,
     sellingCostRate: 0.06,
+    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
   });
   const worksForYou = thisHouse.breakevenYear !== null && thisHouse.breakevenYear <= holdYears;
 

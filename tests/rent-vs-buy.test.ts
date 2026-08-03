@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   ASSUMPTION_SETS,
+  DEFAULT_MARGINAL_TAX_RATE,
+  RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
   buyZone,
   compareRentVsBuy,
@@ -421,4 +423,49 @@ test("the answer is stable once the periods are matched, which is the real findi
   const high = Math.max(...ceilings);
   assert.ok(low > 200_000, "every matched set should still support buying something");
   assert.ok(high < low * 1.8, `matched sets should agree within a narrow band, got ${low} to ${high}`);
+});
+
+// --- the mortgage interest deduction ---------------------------------------
+
+test("the deduction is modelled and materially favours owning", () => {
+  const without = scenario({ marginalTaxRate: 0 });
+  const withIt = scenario({ marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+  assert.ok(withIt.firstYear.burned < without.firstYear.burned, "relief must reduce money that buys nothing");
+  const relief = without.firstYear.burned - withIt.firstYear.burned;
+  assert.ok(relief > 10_000, `year-one relief on a large loan should be five figures, got ${relief}`);
+});
+
+test("only interest on the first $750,000 of debt is deductible", () => {
+  const small = scenario({ loanAmount: 700_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+  const large = scenario({ loanAmount: 1_400_000, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+
+  const reliefShare = (r: ReturnType<typeof compareRentVsBuy>, loan: number) => {
+    const gross = scenario({ loanAmount: loan, marginalTaxRate: 0 });
+    return (gross.firstYear.burned - r.firstYear.burned) / gross.firstYear.interestPaid;
+  };
+  // A $700k loan is fully deductible; a $1.4M loan only about half.
+  assert.ok(reliefShare(small, 700_000) > reliefShare(large, 1_400_000));
+  assert.ok(Math.abs(reliefShare(small, 700_000) - DEFAULT_MARGINAL_TAX_RATE) < 0.02);
+});
+
+test("REGRESSION: the deduction moves the buy ceiling by hundreds of thousands", () => {
+  // Leaving it out was not a rounding error, it changed the recommendation.
+  const base = { ...SWEEP, marginalTaxRate: 0 };
+  const withTax = { ...SWEEP, marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE };
+  const without = maxPriceForHoldPeriod(base, COSTS, 10, 0.2)!;
+  const withIt = maxPriceForHoldPeriod(withTax, COSTS, 10, 0.2)!;
+  assert.ok(withIt > without + 150_000, `expected a large shift, got ${without} to ${withIt}`);
+});
+
+test("the relief shrinks over the life of the loan as interest does", () => {
+  const r = scenario({ marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE });
+  // Owning cost rises over time partly because the deduction fades.
+  const early = r.years[1]!.monthlyOwnCost;
+  const late = r.years[24]!.monthlyOwnCost;
+  assert.ok(late > early, "the subsidy is front-loaded and must decay");
+});
+
+test("the caveat no longer claims to ignore the deduction", () => {
+  assert.match(RENT_VS_BUY_CAVEAT, /includes the mortgage interest deduction/i);
+  assert.match(RENT_VS_BUY_CAVEAT, /750,000/);
 });

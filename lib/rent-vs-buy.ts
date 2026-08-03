@@ -52,6 +52,22 @@ export interface RentVsBuyInput {
   /** Agent commissions and transfer costs on the way out. */
   sellingCostRate: number;
 
+  /**
+   * Combined marginal tax rate, for the mortgage interest deduction. Set to 0 to
+   * exclude it.
+   *
+   * This is a real and large subsidy that most rent-versus-buy comparisons skip,
+   * including earlier versions of this one. Interest on the first $750,000 of
+   * acquisition debt is deductible, and for a California earner in the 32%
+   * federal bracket the combined marginal rate is around 40%. On an $800,000 loan
+   * that is roughly $20,000 a year, which is worth several hundred thousand
+   * dollars of purchase price.
+   *
+   * Worth saying plainly: this is the tax code paying people to own rather than
+   * rent. It is one of the reasons renting can feel like losing a rigged game.
+   */
+  marginalTaxRate?: number;
+
   years?: number;
 }
 
@@ -91,6 +107,15 @@ export interface RentVsBuyResult {
   verdict: string;
 }
 
+/** Interest is deductible on acquisition debt up to this amount. */
+export const DEDUCTIBLE_DEBT_LIMIT = 750_000;
+
+/**
+ * A combined federal plus California marginal rate for a high earner. 32%
+ * federal on income above roughly $200k, plus about 9.3% California.
+ */
+export const DEFAULT_MARGINAL_TAX_RATE = 0.4;
+
 const DEFAULTS = {
   homeAppreciation: 0.035,
   rentGrowth: 0.035,
@@ -117,6 +142,10 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   let rentBurned = 0;
 
   const monthlyReturn = Math.pow(1 + input.investmentReturn, 1 / 12) - 1;
+  const taxRate = input.marginalTaxRate ?? 0;
+  // Only interest on the first $750,000 of acquisition debt is deductible.
+  const deductibleShare =
+    input.loanAmount > 0 ? Math.min(input.loanAmount, DEDUCTIBLE_DEBT_LIMIT) / input.loanAmount : 0;
 
   for (let year = 1; year <= years; year++) {
     const startBalance = balanceAfter(input.loanAmount, input.interestRate, input.termYears, (year - 1) * 12);
@@ -130,8 +159,12 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
     const maintenance = homeValue * maintenanceRate * 12;
     const carryingAnnual = carrying * 12;
 
+    // The deduction shrinks every year as the interest portion of the payment does.
+    const taxRelief = interestPaid * deductibleShare * taxRate;
+    const monthlyRelief = taxRelief / 12;
+
     for (let m = 0; m < 12; m++) {
-      const ownMonthly = pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0);
+      const ownMonthly = pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0) - monthlyRelief;
       const difference = ownMonthly - rent;
       // If owning costs more, the renter banks the difference. If renting costs
       // more, the renter has to draw the difference out of the portfolio.
@@ -139,7 +172,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       rentBurned += rent;
     }
 
-    buyBurned += interestPaid + carryingAnnual + maintenance;
+    buyBurned += interestPaid + carryingAnnual + maintenance - taxRelief;
 
     homeValue *= 1 + input.homeAppreciation;
     rent *= 1 + input.rentGrowth;
@@ -159,7 +192,7 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       rentNetWorth: portfolio,
       buyMoneyBurned: buyBurned,
       rentMoneyBurned: rentBurned,
-      monthlyOwnCost: pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0),
+      monthlyOwnCost: pi + carrying + homeValue * maintenanceRate - (input.monthlyRentalIncome ?? 0) - monthlyRelief,
       monthlyRentCost: rent,
     });
   }
@@ -170,7 +203,9 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   const firstYearBalance = balanceAfter(input.loanAmount, input.interestRate, input.termYears, 12);
   const principal1 = Math.max(input.loanAmount - firstYearBalance, 0);
   const interest1 = Math.max(pi * 12 - principal1, 0);
-  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12;
+  const relief1 = interest1 * deductibleShare * taxRate;
+  const carry1 =
+    (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12 - relief1;
   const burned1 = interest1 + carry1;
   const rent1 = input.monthlyRent * 12;
 
@@ -825,6 +860,7 @@ export const RENT_VS_BUY_DEFAULTS = DEFAULTS;
 
 export const RENT_VS_BUY_CAVEAT =
   "This is the most assumption-heavy thing on the page, and small changes to appreciation or investment return swing " +
-  "the answer by years. It ignores the mortgage interest deduction, which helps owning if you itemise, and it ignores " +
-  "tax on investment gains, which helps owning too. It also cannot price security of tenure: nobody can raise your " +
-  "fixed payment or decline to renew you.";
+  "the answer by years. It now includes the mortgage interest deduction, on the first $750,000 of debt at a 40% " +
+  "combined marginal rate, which is worth around $20,000 a year on a large loan and several hundred thousand of " +
+  "purchase price. It still ignores tax on investment gains, which helps owning further, though less if your savings " +
+  "sit in retirement accounts. It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";
