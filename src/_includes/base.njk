@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <meta name="description" content="{{ description }}" />
+    <link rel="stylesheet" href="/assets/css/main.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      {{ content | safe }}
+      <footer class="site-footer">
+        <p>
+          Three Blueberries shows its work. Every number above links to where it came from, and anything we
+          estimated is labeled as an estimate. Nothing here is financial advice, and nothing here is a quote —
+          only a lender's Loan Estimate is a quote.
+        </p>
+        <p>Your income and the rest of your inputs stay in your browser. Nothing is sent anywhere.</p>
+      </footer>
+    </div>
+    <script type="module" src="/assets/js/app.js"></script>
+  </body>
+</html>

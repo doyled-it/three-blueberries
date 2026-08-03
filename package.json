@@ -1,0 +1,35 @@
+{
+  "name": "three-blueberries",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "What a house in California actually costs you every month, with every number shown and sourced.",
+  "scripts": {
+    "dev": "npm run build:js && eleventy --serve --quiet",
+    "build": "npm run build:js && npm run build:site",
+    "build:js": "node scripts/build-client.mjs",
+    "build:site": "eleventy",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "test": "node --test 'tests/**/*.test.ts'",
+    "fmt": "prettier --write .",
+    "data:loan-limits": "node scripts/fetch-loan-limits.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "demo": "node scripts/demo.ts",
+    "data:history": "node scripts/fetch-history.mjs",
+    "data:signals": "node scripts/fetch-signals.mjs",
+    "data:panel": "node scripts/fetch-panel.mjs",
+    "train": "uv run python -m training.train",
+    "train:test": "uv run pytest -q",
+    "data:international": "node scripts/fetch-international.mjs",
+    "data:financial": "node scripts/fetch-financial.mjs"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^3.1.5",
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "@types/node": "^26.1.2",
+    "esbuild": "^0.25.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.86.0"
+  }
+}

@@ -1,0 +1,245 @@
+---
+layout: base.njk
+title: Three Blueberries — what a California house actually costs
+description: The real monthly cost of buying a house in California, itemized and sourced. No lead capture, no lender trying to sell you anything.
+---
+
+<header class="hero">
+  <p class="hero__kicker">Three Blueberries</p>
+  <h1>What does this house <em>actually</em> cost me every month?</h1>
+  <p class="hero__sub">
+    Every mortgage calculator on the internet is built by someone who wants to sell you a loan, and every one
+    of them leaves things out. This one shows the whole bill — property tax reassessed to what you paid,
+    mortgage insurance and when it stops, Mello-Roos, insurance in a state where insurance is a crisis, and the
+    maintenance nobody budgets for. Every line cites its source.
+  </p>
+</header>
+
+<form id="scenario" class="panel">
+  <div class="grid">
+    <fieldset>
+      <legend>The house</legend>
+
+      <label for="purchasePrice">Purchase price</label>
+      <input id="purchasePrice" type="text" class="money" value="900,000" inputmode="numeric" />
+
+      <label for="county">County</label>
+      <select id="county"></select>
+
+      <label for="hoaMonthly">HOA dues <span class="hint">per month</span></label>
+      <input id="hoaMonthly" type="text" class="money" value="0" inputmode="numeric" />
+
+      <label for="melloRoosAnnual">
+        Mello-Roos <span class="hint">per year — check the title report, it won't be on Zillow</span>
+      </label>
+      <input id="melloRoosAnnual" type="text" class="money" value="0" inputmode="numeric" />
+
+      <label for="squareFeet">Square feet <span class="hint">optional, used for the VA residual test</span></label>
+      <input id="squareFeet" type="text" class="money" placeholder="1,500" inputmode="numeric" />
+    </fieldset>
+
+    <fieldset>
+      <legend>The loan</legend>
+
+      <label for="loanType">Loan type</label>
+      <select id="loanType">
+        <option value="conventional" selected>Conventional</option>
+        <option value="va">VA</option>
+        <option value="fha">FHA</option>
+        <option value="jumbo">Jumbo</option>
+      </select>
+
+      <label for="downPaymentPercent">Down payment <span class="hint">percent</span></label>
+      <input id="downPaymentPercent" type="number" value="20" step="0.5" min="0" max="100" inputmode="decimal" />
+
+      <label for="interestRate">Interest rate <span class="hint">percent</span></label>
+      <input id="interestRate" type="number" value="6.66" step="0.005" min="0" inputmode="decimal" />
+      <p id="rate-note" class="field-note">Fetching the current national average…</p>
+
+      <label for="termYears">Term</label>
+      <select id="termYears">
+        <option value="30" selected>30 years</option>
+        <option value="15">15 years</option>
+      </select>
+
+      <label for="creditScore">Credit score</label>
+      <input id="creditScore" type="number" value="740" step="10" min="300" max="850" inputmode="numeric" />
+
+      <div id="va-fields" hidden>
+        <label class="check">
+          <input id="vaFirstUse" type="checkbox" checked /> First time using a VA loan
+        </label>
+        <label class="check">
+          <input id="vaDisabilityExempt" type="checkbox" />
+          Service-connected disability rating <span class="hint">waives the funding fee entirely</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>You</legend>
+
+      <label for="income1">Gross annual income</label>
+      <input id="income1" type="text" class="money" value="180,000" inputmode="numeric" />
+
+      <label for="income2">Second income <span class="hint">optional</span></label>
+      <input id="income2" type="text" class="money" placeholder="none" inputmode="numeric" />
+
+      <label for="monthlyDebts">
+        Other monthly debt <span class="hint">car, student loans, card minimums</span>
+      </label>
+      <input id="monthlyDebts" type="text" class="money" value="750" inputmode="numeric" />
+
+      <label for="householdSize">Household size</label>
+      <input id="householdSize" type="number" value="2" step="1" min="1" inputmode="numeric" />
+    </fieldset>
+
+    <fieldset>
+      <legend>Overrides <span class="hint">leave blank to use our estimate</span></legend>
+
+      <label for="insuranceAnnual">
+        Homeowners insurance <span class="hint">per year — use a real quote if you have one</span>
+      </label>
+      <input id="insuranceAnnual" type="text" class="money" placeholder="estimated" inputmode="numeric" />
+
+      <label for="propertyTaxRate">
+        Property tax rate <span class="hint">percent — from your county assessor</span>
+      </label>
+      <input id="propertyTaxRate" type="number" placeholder="county default" step="0.01" min="0" inputmode="decimal" />
+
+      <label class="check">
+        <input id="homeownersExemption" type="checkbox" checked />
+        Claiming the homeowners' exemption <span class="hint">$7,000 off assessed value — you must file</span>
+      </label>
+    </fieldset>
+  </div>
+</form>
+
+<section class="panel">
+  <h2>Your monthly payment, itemized</h2>
+  <p class="panel__sub">Click any line to see how it was calculated and where the number came from.</p>
+  <div id="breakdown" class="breakdown"></div>
+</section>
+
+<section class="panel">
+  <h2>Can you actually buy this?</h2>
+  <div id="qualification" class="stats"></div>
+  <ul id="notes" class="notes"></ul>
+</section>
+
+<section class="panel panel--thesis">
+  <h2>Three blueberries</h2>
+  <p class="panel__sub">
+    Houses getting expensive is not the story — wages rose too, and a 1987 dollar isn't a 2026 dollar. The story
+    is what the <em>same job</em> buys. Both lines below are in dollars, so they're directly comparable: what the
+    median home cost, against what a median household could carry at 30% of gross income and that month's rate.
+    The shaded gap is the part that isn't about you.
+  </p>
+  <div id="buyingPowerChart"></div>
+  <p id="buyingPowerHeadline" class="verdict verdict--no"></p>
+  <div id="buyingPower" class="stats"></div>
+  <p id="buyingPowerCaveat" class="field-note"></p>
+</section>
+
+<section class="panel panel--warn">
+  <h2>Things nobody tells you</h2>
+  <ul id="warnings" class="warnings"></ul>
+</section>
+
+<section class="panel">
+  <h2>How is anyone affording this?</h2>
+  <p class="panel__sub">
+    Almost never because they out-earn you. Here is what the person already living in this house pays for it,
+    using the Case-Shiller repeat-sales index to price the same home at an earlier date.
+  </p>
+
+  <label for="cohortYear" class="slider-label">
+    They bought in <output id="cohortYearOut">2019</output>
+    <span class="hint">click a bar or drag — anyone who owned before mid-2020 refinances at the real record low</span>
+  </label>
+  <input id="cohortYear" type="range" min="1990" max="2025" value="2019" step="1" />
+
+  <div id="cohortChart" class="cohort-chart"></div>
+  <div id="cohort" class="stats"></div>
+  <ul id="cohortNotes" class="notes"></ul>
+</section>
+
+<section class="panel">
+  <h2>Should you wait for the crash?</h2>
+  <p class="panel__sub">
+    Forty years of San Diego prices and the rate that went with them. The two charts share a timeline on
+    purpose: the top one is what a house cost, the bottom is what it cost you <em>per month</em>. They are not
+    the same shape, and that difference is the whole argument.
+  </p>
+
+  <div id="history" class="history"></div>
+
+  <h3 class="sub-head">Is this the worst time in history to buy?</h3>
+  <p id="worstTime" class="verdict"></p>
+
+  <h3 class="sub-head">Is there a tell?</h3>
+  <p class="panel__sub">
+    What the standard warning signs read today, against what they read at the 2006 peak and the 2009 bottom.
+    Nothing here predicts anything — there have been two declines in 39 years, which is not a sample you can
+    build a formula from. It is a description of conditions, and the caveats are part of the output.
+  </p>
+  <div id="signals" class="signals"></div>
+  <p id="signalSummary" class="verdict"></p>
+  <details class="method">
+    <summary>How well does any of this actually correlate?</summary>
+    <div id="correlations"></div>
+    <ul id="signalCaveats" class="warnings"></ul>
+  </details>
+
+  <h3 class="sub-head">We trained a forecaster. It doesn't work.</h3>
+  <p class="panel__sub">
+    A real one: ridge, gradient boosting and random forest, on 20 Case-Shiller metros, at three horizons,
+    validated walk-forward with the target-overlap purge applied. It produces a number for San Diego right now.
+    That number is shown below <em>underneath</em> its own track record, because the track record is the part
+    that matters.
+  </p>
+  <div id="forecastVerdict"></div>
+  <div id="forecastCurrent" class="stats"></div>
+  <details class="method">
+    <summary>What it learned to weight, and how it scored</summary>
+    <div id="forecastWeights"></div>
+    <div id="forecastScores"></div>
+  </details>
+
+  <h3 class="sub-head">What the next one might be built out of</h3>
+  <p id="watchPreamble" class="panel__sub"></p>
+  <div id="instruments" class="instruments"></div>
+  <p id="watchDiscipline" class="field-note"></p>
+
+  <h3 class="sub-head">Model your own crash</h3>
+  <p class="panel__sub">
+    These presets are the actual declines on record, not round numbers we made up. The default is the
+    <em>milder</em> of the two — averaging a 17% event and a 42% event would invent a "typical crash" that has
+    never happened.
+  </p>
+  <div id="presets" class="presets"></div>
+  <p id="presetBasis" class="field-note"></p>
+  <div class="grid grid--tight">
+    <div>
+      <label for="crashDepth">Prices fall <output id="crashDepthOut">25%</output></label>
+      <input id="crashDepth" type="range" min="0" max="50" value="25" step="1" />
+
+      <label for="crashMonths">over <output id="crashMonthsOut">36 months</output></label>
+      <input id="crashMonths" type="range" min="6" max="84" value="36" step="1" />
+    </div>
+    <div>
+      <label for="crashRate">Rate at the bottom: <output id="crashRateOut">6.00%</output></label>
+      <input id="crashRate" type="range" min="300" max="1100" value="600" step="5" />
+
+      <label for="waitRent">Your rent while waiting <span class="hint">per month</span></label>
+      <input id="waitRent" type="text" class="money" value="3,290" inputmode="numeric" />
+
+      <label for="waitSavings">Extra saved per month <span class="hint">goes to the down payment</span></label>
+      <input id="waitSavings" type="text" class="money" value="1,000" inputmode="numeric" />
+    </div>
+  </div>
+
+  <div id="waiting" class="stats"></div>
+  <p id="waitingVerdict" class="verdict"></p>
+  <ul id="waitingCaveats" class="warnings"></ul>
+</section>

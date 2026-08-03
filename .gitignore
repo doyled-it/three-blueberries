@@ -1,0 +1,26 @@
+# --- node / site ---
+node_modules/
+_site/
+src/assets/js/
+.wrangler/
+.dev.vars
+.env
+.DS_Store
+*.log
+
+# --- python (uv) ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# --- data ---
+# Raw FRED responses. Purely a politeness cache so re-runs don't hammer their
+# servers; every byte is regenerable and none of it is the scientific record.
+data/.fred-cache/
+
+# The built panels ARE committed on purpose. FRED revises series and renames
+# files yearly, so "just re-run the fetch script" does not reproduce the numbers
+# quoted in CLAUDE.md and in the model's validation output. The panels are the
+# vintage those conclusions were drawn from.

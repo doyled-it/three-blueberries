@@ -1,0 +1,200 @@
+/**
+ * "How is anyone affording this?"
+ *
+ * The answer is almost never that they out-earn you. It's that they entered the
+ * market at a different point, and California's tax structure makes that entry
+ * point permanent. This module quantifies the gap between what you'd pay for a
+ * house today and what the person already living in it pays.
+ *
+ * Every number here is derived from the same historical series as lib/history.ts,
+ * so the comparison is against what actually happened, not a vibe.
+ */
+
+import { balanceAfter, monthlyPayment } from "./amortization.ts";
+import { PROP_13_MAX_ANNUAL_GROWTH } from "./data/ca-property.ts";
+import { HISTORY_LATEST_INDEX, HISTORY_LATEST_MONTH, SD_HISTORY } from "./data/history.ts";
+
+export interface CohortInput {
+  /** Today's price for the house in question. */
+  currentPrice: number;
+  /** Today's rate, as a decimal. */
+  currentRate: number;
+  downPercent: number;
+  propertyTaxRate: number;
+  /** The month an earlier buyer purchased, e.g. "2019-06". */
+  purchaseMonth: string;
+  /**
+   * If the earlier buyer refinanced, the rate they refinanced into. Most people
+   * who owned through 2020-2021 did, which is a large part of the gap.
+   */
+  refinancedRate?: number;
+  /** The month they refinanced. Required for refinancedRate to be applied correctly. */
+  refinanceMonth?: string;
+}
+
+export interface CohortComparison {
+  purchaseMonth: string;
+  /** What the same house cost back then, per the repeat-sales index. */
+  priceThen: number;
+  /** The prevailing 30-year rate that month. */
+  rateThen: number;
+  /** The rate they're actually paying now, after any refinance. */
+  effectiveRate: number;
+  /** The month they refinanced, if they did. */
+  refinancedMonth: string | null;
+  /** Their Prop 13 assessed value today: purchase price grown 2%/year. */
+  assessedValueNow: number;
+  /** What you'd be assessed at: today's purchase price. */
+  yourAssessedValue: number;
+
+  theirPayment: { principalAndInterest: number; propertyTax: number; total: number };
+  yourPayment: { principalAndInterest: number; propertyTax: number; total: number };
+
+  /** Total monthly advantage they hold on the identical house. */
+  totalAdvantage: number;
+  /** How much of the gap is the interest rate. */
+  rateAdvantage: number;
+  /** How much of the gap is Prop 13's frozen assessment. */
+  prop13Advantage: number;
+  /** How much is simply having borrowed against a smaller price. */
+  priceAdvantage: number;
+  /** Appreciation they've captured since buying. */
+  equityGained: number;
+  yearsHeld: number;
+}
+
+const indexFor = (month: string): number | null => {
+  const row = SD_HISTORY.find((r) => r[0] === month);
+  return row ? row[1] : null;
+};
+
+const rateFor = (month: string): number | null => {
+  const row = SD_HISTORY.find((r) => r[0] === month);
+  return row ? row[2] / 100 : null;
+};
+
+const monthsBetween = (a: string, b: string): number => {
+  const [ay, am] = a.split("-").map(Number) as [number, number];
+  const [by, bm] = b.split("-").map(Number) as [number, number];
+  return (by - ay) * 12 + (bm - am);
+};
+
+export const EARLIEST_COHORT_MONTH = SD_HISTORY[0]![0];
+export const LATEST_COHORT_MONTH = HISTORY_LATEST_MONTH;
+
+/**
+ * The refinance window: the stretch of historically cheap money that anyone who
+ * already owned a home could refinance into. Derived from the data rather than
+ * asserted — we take the actual cheapest month in the window, because that is
+ * what a motivated owner would have locked.
+ */
+export const REFI_WINDOW = { from: "2020-06", to: "2021-12" } as const;
+
+export const BEST_REFI = (() => {
+  const window = SD_HISTORY.filter((r) => r[0] >= REFI_WINDOW.from && r[0] <= REFI_WINDOW.to);
+  const best = window.reduce((a, b) => (b[2] < a[2] ? b : a), window[0]!);
+  return { month: best[0], rate: best[2] / 100 };
+})();
+
+/**
+ * Could someone who bought in `purchaseMonth` have refinanced into the cheap
+ * window? Only if they already owned before it opened.
+ */
+export function refinanceOpportunity(purchaseMonth: string): { month: string; rate: number } | null {
+  return purchaseMonth < REFI_WINDOW.from ? BEST_REFI : null;
+}
+
+/**
+ * Compare your cost of buying a house today against the cost carried by someone
+ * who bought the same house in `purchaseMonth`.
+ *
+ * The price for the earlier buyer is derived by scaling today's price back along
+ * the Case-Shiller repeat-sales index — which is exactly what that index is for,
+ * since it tracks what the same homes resell for.
+ */
+export function compareToCohort(input: CohortInput): CohortComparison | null {
+  const { currentPrice, currentRate, downPercent, propertyTaxRate, purchaseMonth, refinancedRate, refinanceMonth } =
+    input;
+
+  const thenIndex = indexFor(purchaseMonth);
+  const thenRate = rateFor(purchaseMonth);
+  if (thenIndex === null || thenRate === null) return null;
+
+  const priceThen = (currentPrice * thenIndex) / HISTORY_LATEST_INDEX;
+  const effectiveRate = refinancedRate ?? thenRate;
+
+  const monthsHeld = monthsBetween(purchaseMonth, HISTORY_LATEST_MONTH);
+  const yearsHeld = monthsHeld / 12;
+
+  // Prop 13: assessed value is the purchase price, growing at most 2% a year.
+  const assessedValueNow = priceThen * Math.pow(1 + PROP_13_MAX_ANNUAL_GROWTH, yearsHeld);
+
+  const theirLoan = priceThen * (1 - downPercent);
+
+  // A refinance replaces the REMAINING BALANCE with a new loan, not the original
+  // amount. Someone who bought in 2003 and refinanced in 2021 had already paid
+  // down 18 years first — modelling it against the original loan would overstate
+  // what they pay today by a wide margin.
+  let theirPi: number;
+  if (refinancedRate !== undefined && refinanceMonth !== undefined && refinanceMonth > purchaseMonth) {
+    const monthsBeforeRefi = monthsBetween(purchaseMonth, refinanceMonth);
+    const balanceAtRefi = balanceAfter(theirLoan, thenRate, 30, monthsBeforeRefi);
+    theirPi = monthlyPayment(balanceAtRefi, refinancedRate, 30);
+  } else {
+    theirPi = monthlyPayment(theirLoan, effectiveRate, 30);
+  }
+
+  const theirTax = (assessedValueNow * propertyTaxRate) / 12;
+
+  const yourLoan = currentPrice * (1 - downPercent);
+  const yourPi = monthlyPayment(yourLoan, currentRate, 30);
+  const yourTax = (currentPrice * propertyTaxRate) / 12;
+
+  // Decompose the P&I gap into "rate" and "price" components by asking what your
+  // loan would cost at their rate. The remainder is attributable to loan size.
+  const yourLoanAtTheirRate = monthlyPayment(yourLoan, effectiveRate, 30);
+  const rateAdvantage = yourPi - yourLoanAtTheirRate;
+  // Everything left in the P&I gap: a smaller original price, plus the years of
+  // principal they've already retired.
+  const priceAdvantage = yourLoanAtTheirRate - theirPi;
+  const prop13Advantage = yourTax - theirTax;
+
+  return {
+    purchaseMonth,
+    priceThen,
+    rateThen: thenRate,
+    effectiveRate,
+    refinancedMonth: refinancedRate !== undefined ? (refinanceMonth ?? null) : null,
+    assessedValueNow,
+    yourAssessedValue: currentPrice,
+    theirPayment: { principalAndInterest: theirPi, propertyTax: theirTax, total: theirPi + theirTax },
+    yourPayment: { principalAndInterest: yourPi, propertyTax: yourTax, total: yourPi + yourTax },
+    totalAdvantage: yourPi + yourTax - (theirPi + theirTax),
+    rateAdvantage,
+    prop13Advantage,
+    priceAdvantage,
+    equityGained: currentPrice - priceThen,
+    yearsHeld,
+  };
+}
+
+/**
+ * The other half of the answer: household composition.
+ *
+ * A second income moves the affordability ceiling more than any amount of
+ * frugality or down payment saving does, and most buyers have one. Returns the
+ * income needed to carry a given payment at a given DTI, for a range of
+ * household shapes.
+ */
+export function incomeLadder(
+  monthlyHousingPayment: number,
+  monthlyDebts: number,
+  dtiCeiling: number
+): Array<{ label: string; earners: number; totalRequired: number; perEarner: number }> {
+  const required = ((monthlyHousingPayment + monthlyDebts) / dtiCeiling) * 12;
+  return [
+    { label: "One earner", earners: 1, totalRequired: required, perEarner: required },
+    { label: "Two earners, split evenly", earners: 2, totalRequired: required, perEarner: required / 2 },
+    { label: "Two earners, 60/40 split", earners: 2, totalRequired: required, perEarner: required * 0.6 },
+  ];
+}

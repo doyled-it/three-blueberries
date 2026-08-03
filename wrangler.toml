@@ -1,0 +1,24 @@
+name = "three-blueberries"
+main = "worker/index.ts"
+compatibility_date = "2026-04-29"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./_site"
+binding = "ASSETS"
+# Only the API paths need the worker; everything else is served straight from assets.
+run_worker_first = ["/api/*"]
+
+# Cache for upstream API responses. Doubles as the budget guard for any
+# metered listings API — see worker/index.ts.
+#
+# Create it once with:
+#   npx wrangler kv namespace create CACHE
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_ME"
+
+# Secrets are NOT set here. Use:
+#   npx wrangler secret put FRED_API_KEY
+# Free key: https://fredaccount.stlouisfed.org/apikeys

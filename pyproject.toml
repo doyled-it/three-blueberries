@@ -1,0 +1,26 @@
+[project]
+name = "three-blueberries-training"
+version = "0.1.0"
+description = "Offline model training for the Three Blueberries housing forecaster"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "scipy>=1.14",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 110
+
+[tool.pytest.ini_options]
+testpaths = ["training/tests"]
