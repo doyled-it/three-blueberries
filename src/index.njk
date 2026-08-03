@@ -181,7 +181,10 @@ description: The real monthly cost of buying a house in California, itemized and
       <p class="field-note">San Diego ran 5.4%/yr since 1987, 2.9% over the last 20 years, 7.0% over the last 10.</p>
     </div>
     <div>
-      <label for="investReturn">If you invested instead <output id="investReturnOut">7.0%</output>/yr</label>
+      <label for="investReturn">
+        Return on invested savings <output id="investReturnOut">7.0%</output>/yr
+        <span class="hint">what the money you did not spend on the house earns</span>
+      </label>
       <input id="investReturn" type="range" min="0" max="120" value="70" step="1" />
       <label for="rentGrowth">Rent rises <output id="rentGrowthOut">3.5%</output>/yr</label>
       <input id="rentGrowth" type="range" min="0" max="80" value="35" step="1" />

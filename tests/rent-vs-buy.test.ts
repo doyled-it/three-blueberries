@@ -344,3 +344,33 @@ test("the second-unit lever distinguishes an existing unit from buying a house t
   assert.match(lever.note, /adds a home to the rental stock/i);
   assert.match(lever.note, /Buying a single-family house to let does not/i);
 });
+
+test("REGRESSION: the rate threshold is the highest rate that works, not the lowest", () => {
+  // The ceiling descends as the rate rises, so searching a rate-ascending array
+  // forward returns the cheapest rate on the axis. The UI reported "needs 3.00%"
+  // for a house that actually worked up to 4.00%.
+  const rates: number[] = [];
+  for (let r = 0.03; r <= 0.1001; r += 0.0025) rates.push(r);
+  const zone = buyZone(
+    { ...SWEEP, homeAppreciation: 0.07, rentGrowth: 0.05, investmentReturn: 0.1 },
+    COSTS,
+    rates,
+    10,
+    0.2
+  );
+
+  const price = 1_200_000;
+  const forward = zone.find((z) => (z.maxPrice ?? 0) >= price)!;
+  const backward = [...zone].reverse().find((z) => (z.maxPrice ?? 0) >= price)!;
+
+  assert.ok(backward.rate > forward.rate, "the two searches must differ, or this test proves nothing");
+  // Everything at or below the threshold works; the next step up does not.
+  const above = zone.find((z) => z.rate > backward.rate + 0.001);
+  assert.ok((above?.maxPrice ?? 0) < price, "the step above the threshold must fail");
+});
+
+test("the ceiling reported for a rate matches an exact recomputation", () => {
+  const exact = maxPriceForHoldPeriod(SWEEP, COSTS, 10, 0.2);
+  const sampled = buyZone(SWEEP, COSTS, [SWEEP.interestRate], 10, 0.2)[0]!.maxPrice;
+  assert.equal(exact, sampled, "the same rate must produce the same ceiling from either path");
+});

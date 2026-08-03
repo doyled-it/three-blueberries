@@ -702,10 +702,9 @@ function renderRentVsBuy(input: ScenarioInput): void {
   const zone = buyZone(sweepBase, scaling, rates, holdYears, Math.max(downPercent, 0.05));
   const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, Math.max(downPercent, 0.05));
 
-  const nearestRate = zone.reduce((a, b) =>
-    Math.abs(b.rate - input.interestRate) < Math.abs(a.rate - input.interestRate) ? b : a
-  );
-  const ceilingHere = nearestRate.maxPrice;
+  // Use the exact ceiling at the actual rate. Reading it off the nearest sampled
+  // point on the curve produced a figure that disagreed with the stat card above.
+  const ceilingHere = maxPrice;
 
   $("buyZoneChart").innerHTML = renderMultiLine({
     series: [
@@ -753,7 +752,10 @@ function renderRentVsBuy(input: ScenarioInput): void {
     );
   }
 
-  const crossing = zone.find((z) => (z.maxPrice ?? 0) >= input.purchasePrice);
+  // The ceiling DESCENDS as the rate rises, so the threshold is the LAST rate
+  // whose ceiling still clears the price, not the first. Searching forward
+  // returned the cheapest rate on the axis and reported it as the requirement.
+  const crossing = [...zone].reverse().find((z) => (z.maxPrice ?? 0) >= input.purchasePrice);
   $("buyZoneNote").textContent =
     `Below the blue line, buying beats renting over ${holdYears} years. Above it, renting wins. ` +
     (crossing
