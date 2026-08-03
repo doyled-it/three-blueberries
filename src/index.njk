@@ -118,8 +118,12 @@ description: The real monthly cost of buying a house in California, itemized and
       </label>
     </fieldset>
 
-    <fieldset>
-      <legend>Overrides <span class="hint">leave blank to use our estimate</span></legend>
+  </div>
+
+  <details class="overrides">
+    <summary>Overrides <span class="hint">leave these blank to use our estimates</span></summary>
+    <div class="grid">
+      <fieldset>
 
       <label for="insuranceAnnual">
         Homeowners insurance <span class="hint">per year. Use a real quote if you have one</span>
@@ -135,8 +139,9 @@ description: The real monthly cost of buying a house in California, itemized and
         <input id="homeownersExemption" type="checkbox" checked />
         Claiming the homeowners' exemption <span class="hint">$7,000 off assessed value. You must file</span>
       </label>
-    </fieldset>
-  </div>
+      </fieldset>
+    </div>
+  </details>
 </form>
 
 <section class="panel">

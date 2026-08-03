@@ -55,6 +55,7 @@ import {
   type ChartPoint,
   type StackColumn,
 } from "./chart.ts";
+import { attachToc, buildToc, renderToc } from "./toc.ts";
 import type { CaCounty } from "../../lib/data/ca-loan-limits.ts";
 import type { Confidence, LineItem, LoanType, ScenarioInput } from "../../lib/types.ts";
 
@@ -1313,6 +1314,11 @@ function attachMoneyFormatting(el: HTMLInputElement): void {
 }
 
 function init(): void {
+  // Built from the page's own headings, so it cannot drift when sections move.
+  const toc = buildToc();
+  document.body.insertAdjacentHTML("afterbegin", renderToc(toc));
+  attachToc(toc);
+
   const countySelect = $<HTMLSelectElement>("county");
   countySelect.innerHTML = CA_COUNTIES.map(
     (c) => `<option value="${c}"${c === "San Diego" ? " selected" : ""}>${c}</option>`

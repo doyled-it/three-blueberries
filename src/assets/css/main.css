@@ -251,16 +251,62 @@ input::placeholder {
   color: var(--ink-4);
   font-family: var(--sans);
 }
+/* Checkboxes: box in its own column so the label and its hint stack under one
+   another instead of the hint floating off to the side. */
 .check {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  margin-top: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 4px 9px;
+  margin-top: 18px;
   font-weight: 400;
+  line-height: 1.45;
 }
 .check input {
-  flex: none;
+  margin: 3px 0 0;
   accent-color: var(--berry);
+}
+.check .hint {
+  grid-column: 2;
+  display: block;
+}
+
+/* ---------- advanced inputs ---------- */
+.overrides {
+  margin-top: 30px;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 14px;
+}
+.overrides summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-3);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.overrides summary::-webkit-details-marker {
+  display: none;
+}
+.overrides summary::before {
+  content: "+ ";
+  font-family: var(--mono);
+  letter-spacing: 0;
+}
+.overrides[open] summary::before {
+  content: "\2212 ";
+}
+.overrides summary .hint {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+}
+.overrides .grid {
+  margin-top: 6px;
+}
+.overrides fieldset {
+  max-width: 460px;
 }
 .field-note {
   margin: 8px 0 0;
@@ -1044,4 +1090,150 @@ input[type="range"] {
   margin: 26px 0 10px;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+/* ---------- table of contents ---------- */
+/* Wide screens: a rail in the margin the 980px column already leaves empty. */
+.toc {
+  display: none;
+}
+.toc__list,
+.tocbar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.toc a,
+.tocbar a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border: 0;
+  color: var(--ink-4);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.toc a:hover,
+.tocbar a:hover {
+  color: var(--ink-2);
+}
+.toc__num {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  opacity: 0.6;
+}
+.toc a.is-active {
+  color: var(--berry-bright);
+}
+.toc a.is-active .toc__num {
+  opacity: 1;
+}
+.toc a.is-active .toc__label {
+  position: relative;
+}
+.toc a.is-active .toc__label::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--berry);
+}
+
+@media (min-width: 1180px) {
+  .toc {
+    display: block;
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    left: max(20px, calc((100vw - 980px) / 2 - 190px));
+    width: 170px;
+    z-index: 5;
+  }
+  .tocbar {
+    display: none !important;
+  }
+}
+
+/* Narrow screens: pinned to the bottom, where a thumb is. */
+.tocbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  background: color-mix(in oklab, var(--panel) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--rule);
+}
+.tocbar__toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 20px calc(13px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.tocbar__progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--rule);
+}
+.tocbar__progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--berry);
+  transition: width 0.25s;
+}
+.tocbar__current {
+  flex: 1;
+}
+.tocbar__chev {
+  color: var(--ink-4);
+  font-family: var(--mono);
+  transition: transform 0.2s;
+}
+.tocbar.is-open .tocbar__chev {
+  transform: rotate(180deg);
+}
+.tocbar__list {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 4px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--rule-soft);
+}
+.tocbar a.is-active {
+  color: var(--berry-bright);
+}
+.tocbar__list a {
+  padding: 11px 0;
+  font-size: 0.92rem;
+}
+
+/* Keep the bottom bar from covering the end of the page. */
+@media (max-width: 1179px) {
+  .wrap {
+    padding-bottom: 96px;
+  }
+}
+
+/* Anchored jumps should not land under anything. */
+.panel {
+  scroll-margin-top: 24px;
 }
