@@ -21,7 +21,7 @@
 
 import { monthlyPayment } from "./amortization.ts";
 import { HISTORY_LATEST_INDEX, SD_HISTORY } from "./data/history.ts";
-import { CA_MEDIAN_INCOME, SIGNALS_INCOME_LAST_YEAR } from "./data/signals.ts";
+import { CA_MEDIAN_INCOME, CPI, CPI_LATEST, SIGNALS_INCOME_LAST_YEAR } from "./data/signals.ts";
 import { DEFAULT_ANCHOR_PRICE } from "./history.ts";
 
 /** The share of gross income a household is assumed to put toward principal and interest. */
@@ -30,6 +30,8 @@ export const ASSUMED_DOWN_PAYMENT = 0.2;
 
 export interface BuyingPowerPoint {
   month: string;
+  /** Multiplier that restates this month's dollars in today's money. */
+  inflationFactor: number;
   /** What the median home cost that month. */
   medianPrice: number;
   /** What a median household could buy at 30% of income and that month's rate. */
@@ -70,22 +72,44 @@ export function affordablePriceAt(
   return loan / (1 - downPercent);
 }
 
-export function buyingPowerSeries(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPowerPoint[] {
+const cpiFor = (month: string): number => {
+  const exact = CPI.find((r) => r[0] === month);
+  if (exact) return exact[1];
+  const before = CPI.filter((r) => r[0] <= month);
+  return before.length ? before[before.length - 1]![1] : CPI[0]![1];
+};
+
+/**
+ * Restate old dollars in today's money.
+ *
+ * Over 39 years the nominal chart is dominated by inflation, which makes every
+ * line look like it exploded and hides the thing that actually changed. The
+ * RATIO between the two lines is inflation-neutral either way, so the headline
+ * findings do not move. Only the shape of the chart and the axis do.
+ */
+export function inflationFactor(month: string): number {
+  return CPI_LATEST / cpiFor(month);
+}
+
+export function buyingPowerSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, inTodaysDollars = false): BuyingPowerPoint[] {
   return SD_HISTORY.map(([month, index, ratePercent]) => {
     const rate = ratePercent / 100;
-    const medianPrice = (anchorPrice * index) / HISTORY_LATEST_INDEX;
+    const factor = inTodaysDollars ? inflationFactor(month) : 1;
+    const medianPrice = ((anchorPrice * index) / HISTORY_LATEST_INDEX) * factor;
     const income = incomeForYear(month.slice(0, 4));
     const budget = (income / 12) * AFFORDABILITY_EFFORT;
-    const affordablePrice = affordablePriceAt(budget, rate);
+    const affordablePrice = affordablePriceAt(budget, rate) * factor;
 
     return {
       month,
+      inflationFactor: factor,
       medianPrice,
       affordablePrice,
-      income,
+      income: income * factor,
       rate,
+      // Both sides carry the same factor, so these are unchanged either way.
       purchasingRatio: affordablePrice / medianPrice,
-      yearsOfIncome: medianPrice / income,
+      yearsOfIncome: medianPrice / (income * factor),
       shortfall: medianPrice - affordablePrice,
     };
   });

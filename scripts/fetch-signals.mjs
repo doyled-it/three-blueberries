@@ -31,6 +31,7 @@ const SERIES = {
   newHomeSupply: "MSACSR",
   delinquency: "DRSFRMACBS",
   sdUnemployment: "LAUMT064174000000003A",
+  cpi: "CPIAUCSL",
 };
 
 async function fetchSeries(id) {
@@ -45,8 +46,8 @@ async function fetchSeries(id) {
     .map(([date, v]) => [date.slice(0, 7), Number(v)]);
 }
 
-const [income, supply, delinquency, unemployment] = await Promise.all(
-  [SERIES.income, SERIES.newHomeSupply, SERIES.delinquency, SERIES.sdUnemployment].map(fetchSeries)
+const [income, supply, delinquency, unemployment, cpi] = await Promise.all(
+  [SERIES.income, SERIES.newHomeSupply, SERIES.delinquency, SERIES.sdUnemployment, SERIES.cpi].map(fetchSeries)
 );
 
 // Trim to the era the price index covers.
@@ -93,6 +94,13 @@ ${fmt(delinquency)}
 export const SD_UNEMPLOYMENT: readonly SignalRow[] = [
 ${fmt(unemployment)}
 ];
+
+/** Consumer price index, all urban consumers, monthly. Used to state old dollars in today's money. */
+export const CPI: readonly SignalRow[] = [
+${fmt(since(cpi, "1987-01"))}
+];
+
+export const CPI_LATEST = ${cpi[cpi.length - 1][1]};
 
 export const SIGNALS_INCOME_LAST_YEAR = ${JSON.stringify(income[income.length - 1][0].slice(0, 4))};
 `;

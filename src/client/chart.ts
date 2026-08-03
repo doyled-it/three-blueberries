@@ -371,13 +371,15 @@ export function renderStackedColumns(opts: {
   format: (n: number) => string;
   height?: number;
   description: string;
+  /** A horizontal marker, so every column can be read against one value. */
+  referenceLine?: { value: number; label: string; color: string };
 }): string {
-  const { columns, series, format, description } = opts;
+  const { columns, series, format, description, referenceLine } = opts;
   const H = opts.height ?? 230;
   if (columns.length === 0) return "";
 
   const totals = columns.map((c) => series.reduce((sum, s) => sum + (c.values[s.key] ?? 0), 0));
-  const yMax = Math.max(...totals) * 1.1 || 1;
+  const yMax = Math.max(...totals, referenceLine?.value ?? 0) * 1.1 || 1;
 
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -437,6 +439,12 @@ export function renderStackedColumns(opts: {
   <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${description}">
     ${grid}
     ${bars}
+    ${
+      referenceLine
+        ? `<line class="c-ref" x1="${PAD.left}" x2="${W - PAD.right}" y1="${y(referenceLine.value).toFixed(1)}" y2="${y(referenceLine.value).toFixed(1)}" style="stroke:${referenceLine.color}"/>` +
+          `<text class="c-ref-label" x="${W - PAD.right}" y="${(y(referenceLine.value) - 7).toFixed(1)}" text-anchor="end" style="fill:${referenceLine.color}">${referenceLine.label}</text>`
+        : ""
+    }
     ${xAxis}
   </svg>
   <div class="c-tip" hidden></div>

@@ -283,10 +283,17 @@ function render(): void {
 const SERIES_PRICE = "#3987e5";
 const SERIES_PAYMENT = "#d95926";
 
+/**
+ * The bars show what each cohort PAYS, not how far ahead of you they are.
+ *
+ * Plotting the advantage meant a taller bar signalled a cheaper payment, which
+ * reads exactly backwards. Now the tallest bar is the most expensive, your own
+ * payment is drawn across as a reference, and the advantage is the gap between a
+ * bar and that line, visible without having to be explained.
+ */
 const COHORT_SERIES = [
-  { key: "rate", label: "Their interest rate", color: "#3987e5" },
-  { key: "size", label: "Owing less", color: "#d95926" },
-  { key: "prop13", label: "Prop 13", color: "#199e70" },
+  { key: "pi", label: "Principal and interest they pay", color: "#3987e5" },
+  { key: "tax", label: "Property tax they pay", color: "#199e70" },
 ];
 
 const COHORT_FIRST_YEAR = 1990;
@@ -307,6 +314,7 @@ function renderCohort(input: ScenarioInput): void {
   for (let y = COHORT_FIRST_YEAR; y <= lastYear; y++) years.push(y);
 
   const columns: StackColumn[] = [];
+  let yourPayment = 0;
   for (const y of years) {
     const month = `${y}-06`;
     const refi = refinanceOpportunity(month);
@@ -321,19 +329,20 @@ function renderCohort(input: ScenarioInput): void {
       label: String(y),
       active: y === year,
       values: {
-        rate: Math.max(c.rateAdvantage, 0),
-        size: Math.max(c.priceAdvantage, 0),
-        prop13: Math.max(c.prop13Advantage, 0),
+        pi: Math.max(c.theirPayment.principalAndInterest, 0),
+        tax: Math.max(c.theirPayment.propertyTax, 0),
       },
     });
+    yourPayment = c.yourPayment.total;
   }
 
   $("cohortChart").innerHTML = renderStackedColumns({
     columns,
     series: COHORT_SERIES,
     format: (n) => (n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${Math.round(n)}`),
+    referenceLine: { value: yourPayment, label: `you would pay ${money(yourPayment)}`, color: SERIES_PAYMENT },
     description:
-      "Monthly cost advantage held by earlier buyers of the same house, by purchase year, split into interest rate, loan size, and Prop 13.",
+      "What each purchase-year cohort pays monthly for the same house today, principal and interest plus property tax, against what you would pay.",
   });
 
   const fig = $("cohortChart").querySelector<HTMLElement>("[data-stack]");
@@ -932,27 +941,31 @@ function renderRentVsBuy(input: ScenarioInput): void {
   $("savingsVerdict").className = `verdict ${race.losingGround ? "verdict--no" : "verdict--yes"}`;
 }
 
-let buyingPowerRendered = false;
+let buyingPowerWired = false;
 
 function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
-  if (buyingPowerRendered) return;
-  buyingPowerRendered = true;
+  // Over 39 years a nominal chart is dominated by inflation, which makes both
+  // lines look like they exploded and hides what actually changed. Real dollars
+  // are the default. The ratio and "last month it worked" are inflation-neutral,
+  // so no headline figure moves either way.
+  const inTodaysDollars = $<HTMLInputElement>("realDollars").checked;
 
-  const series = buyingPowerSeries(anchorPrice);
+  const series = buyingPowerSeries(anchorPrice, inTodaysDollars);
   const v = buyingPowerVerdict(anchorPrice);
   const compact = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
+  const unit = inTodaysDollars ? " in today's money" : " in the money of the day";
 
   $("buyingPowerChart").innerHTML = renderMultiLine({
     series: [
       {
         key: "price",
-        label: "What the median home cost",
+        label: `What the median home cost${unit}`,
         color: SERIES_PRICE,
         points: series.map((p) => ({ month: p.month, value: p.medianPrice })),
       },
       {
         key: "afford",
-        label: "What a median income could buy",
+        label: `What a median income could buy${unit}`,
         color: SERIES_PAYMENT,
         points: series.map((p) => ({ month: p.month, value: p.affordablePrice })),
       },
@@ -964,6 +977,11 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
       : [],
     description: "Median San Diego home price against what a median California household could afford, 1987 to today.",
   });
+
+  if (!buyingPowerWired) {
+    buyingPowerWired = true;
+    $<HTMLInputElement>("realDollars").addEventListener("change", () => renderBuyingPower(anchorPrice));
+  }
 
   const bpFig = $("buyingPowerChart").querySelector<HTMLElement>("[data-multi]");
   if (bpFig) {

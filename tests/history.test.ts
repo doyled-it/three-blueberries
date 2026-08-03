@@ -19,6 +19,7 @@ import {
   buyingPowerSeries,
   buyingPowerVerdict,
 } from "../lib/buying-power.ts";
+import { DEFAULT_ANCHOR_PRICE } from "../lib/history.ts";
 import { monthlyPayment } from "../lib/amortization.ts";
 import { SD_HISTORY, HISTORY_LATEST_INDEX, HISTORY_LATEST_MONTH, HISTORY_LATEST_RATE } from "../lib/data/history.ts";
 
@@ -428,4 +429,31 @@ test("the thesis copy states the relative claim, not just 'houses are expensive'
 test("the buying-power caveat discloses the generous assumptions", () => {
   assert.match(BUYING_POWER_CAVEAT, /excludes tax, insurance/i);
   assert.match(BUYING_POWER_CAVEAT, /most generous possible reading/i);
+});
+
+test("REGRESSION: stating old dollars in today's money leaves the ratio untouched", () => {
+  // The chart can be shown either way. If the inflation adjustment moved the
+  // headline findings, one of the two views would be lying.
+  const nominal = buyingPowerVerdict();
+  const real = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, true);
+  const nominalSeries = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, false);
+
+  for (let i = 0; i < real.length; i += 37) {
+    assert.ok(
+      Math.abs(real[i]!.purchasingRatio - nominalSeries[i]!.purchasingRatio) < 1e-9,
+      `ratio drifted at ${real[i]!.month}`
+    );
+    assert.ok(Math.abs(real[i]!.yearsOfIncome - nominalSeries[i]!.yearsOfIncome) < 1e-9);
+  }
+  assert.ok(nominal.lastAffordableMonth);
+});
+
+test("old dollars really were worth more, so the adjustment does something", () => {
+  const real = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, true);
+  const nominal = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, false);
+  // 1987 prices should roughly triple when restated in today's money.
+  const factor = real[0]!.medianPrice / nominal[0]!.medianPrice;
+  assert.ok(factor > 2.5 && factor < 3.5, `expected roughly 3x, got ${factor.toFixed(2)}`);
+  // And the latest month should be essentially unchanged.
+  assert.ok(Math.abs(real.at(-1)!.medianPrice / nominal.at(-1)!.medianPrice - 1) < 0.02);
 });

@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { renderChart, renderMultiLine, verticalScale, type ChartPoint } from "../src/client/chart.ts";
+import {
+  renderChart,
+  renderMultiLine,
+  renderStackedColumns,
+  verticalScale,
+  type ChartPoint,
+} from "../src/client/chart.ts";
 import { buildSeries } from "../lib/history.ts";
 
 const series = buildSeries();
@@ -150,4 +156,41 @@ test("multi-line charts ship a crosshair and one dot per series", () => {
   assert.equal((multi.match(/class="c-dot"/g) ?? []).length, 2, "one dot per series");
   assert.ok(multi.includes('data-series="a"') && multi.includes('data-series="b"'));
   assert.ok(multi.includes('class="c-hit"'), "needs a hit target to hover over");
+});
+
+test("REGRESSION: a stacked chart can carry a reference line above its tallest bar", () => {
+  // The cohort chart plots what each cohort pays, with the reader's own payment
+  // drawn across. If the reference sat outside the scale it would be invisible,
+  // and the comparison the chart exists to make would be lost.
+  const columns = [
+    { label: "1990", values: { pi: 800, tax: 200 } },
+    { label: "2026", values: { pi: 5000, tax: 1100 } },
+  ];
+  const series = [
+    { key: "pi", label: "P and I", color: "#3987e5" },
+    { key: "tax", label: "Tax", color: "#199e70" },
+  ];
+  const svg = renderStackedColumns({
+    columns,
+    series,
+    format: (n) => `$${n}`,
+    referenceLine: { value: 9000, label: "you", color: "#d95926" },
+    description: "test",
+  });
+  assert.match(svg, /class="c-ref"/);
+  assert.match(svg, /class="c-ref-label"/);
+
+  // The line must be inside the plot area, which means the scale grew to hold it.
+  const y = Number(svg.match(/class="c-ref"[^>]*y1="([\d.]+)"/)![1]);
+  assert.ok(y > 18 && y < 230 - 26, `reference line at ${y} is outside the plot`);
+});
+
+test("a stacked chart without a reference line does not emit one", () => {
+  const svg = renderStackedColumns({
+    columns: [{ label: "a", values: { x: 1 } }],
+    series: [{ key: "x", label: "X", color: "#3987e5" }],
+    format: String,
+    description: "test",
+  });
+  assert.ok(!svg.includes("c-ref"));
 });

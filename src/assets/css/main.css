@@ -1130,19 +1130,34 @@ input[type="range"] {
 .toc a.is-active .toc__num {
   opacity: 1;
 }
-.toc a.is-active .toc__label {
+/* The active marker needs a gutter of its own. Hanging it off the label put it
+   on top of the section number. */
+.toc__list {
+  padding-left: 16px;
+}
+.toc a {
   position: relative;
 }
-.toc a.is-active .toc__label::before {
+.toc a.is-active::before {
   content: "";
   position: absolute;
-  left: -12px;
+  left: -16px;
   top: 50%;
   width: 5px;
   height: 5px;
   margin-top: -2.5px;
   border-radius: 50%;
   background: var(--berry);
+}
+
+.c-ref {
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.c-ref-label {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
 }
 
 @media (min-width: 1180px) {
