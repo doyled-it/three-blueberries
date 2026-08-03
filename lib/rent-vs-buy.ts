@@ -573,8 +573,14 @@ export function decide(args: {
   holdYears: number;
   downPercent: number;
   closingCostRate?: number;
+  /**
+   * Set when the owner will not let out part of the property. A lever somebody
+   * has ruled out is not a path to yes, and counting it anyway produces advice
+   * they will never take.
+   */
+  excludeRentalIncome?: boolean;
 }): DecisionThresholds {
-  const { base, costs, price, holdYears, downPercent } = args;
+  const { base, costs, price, holdYears, downPercent, excludeRentalIncome = false } = args;
   const closingCostRate = args.closingCostRate ?? 0.025;
 
   const breakevenYear = breakevenAt(base, costs, price, downPercent, closingCostRate);
@@ -631,16 +637,21 @@ export function decide(args: {
     },
     {
       key: "income",
-      label: "Rent you collect",
+      label: "Second unit income",
       current: money(base.monthlyRentalIncome ?? 0),
-      needed: rentalIncomeNeeded === null ? "not enough on its own" : `${money(rentalIncomeNeeded)}/mo`,
-      reachable: rentalIncomeNeeded !== null && rentalIncomeNeeded <= 2500,
-      note:
-        rentalIncomeNeeded === null
+      needed: excludeRentalIncome
+        ? "ruled out"
+        : rentalIncomeNeeded === null
+          ? "not enough on its own"
+          : `${money(rentalIncomeNeeded)}/mo`,
+      reachable: !excludeRentalIncome && rentalIncomeNeeded !== null && rentalIncomeNeeded <= 2500,
+      note: excludeRentalIncome
+        ? "You have ruled this out, so it is not counted as a path to yes. Worth noting the distinction it turns on: letting the second half of a duplex, or an ADU that already exists, adds a home to the rental stock. Buying a single-family house to let does not."
+        : rentalIncomeNeeded === null
           ? "Even a large second income on the property does not close the gap."
           : rentalIncomeNeeded === 0
             ? "Not needed."
-            : `A roommate, a converted garage or an ADU. This is the lever most people actually control.`,
+            : "The other half of a duplex, or an ADU. A unit that already exists houses someone either way.",
     },
   ];
 
@@ -670,6 +681,82 @@ export function decide(args: {
     rentalIncomeNeeded,
     levers,
     verdict,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The buy zone
+// ---------------------------------------------------------------------------
+
+export interface BuyZonePoint {
+  rate: number;
+  /** The most you can justify paying at this rate. Null if nothing works. */
+  maxPrice: number | null;
+  priceToRent: number | null;
+}
+
+/**
+ * The affordability frontier: the most you can justify paying, at every rate.
+ *
+ * This is the clearest way to see what an interest rate actually does. It is not
+ * that a high rate makes the payment bigger, though it does. It is that a high
+ * rate moves the entire boundary between "buying beats renting" and "it doesn't",
+ * because interest is money that builds no equity, exactly like rent. Above the
+ * curve you are paying more to own than the house can return. Below it, you are
+ * not.
+ *
+ * The curve is steep, which is the point. Rates are the only lever here that can
+ * move by a factor of two in a couple of years, and they can be refinanced after
+ * you buy, unlike the price.
+ */
+export function buyZone(
+  base: SweepBase,
+  costs: ScalingCosts,
+  rates: number[],
+  holdYears: number,
+  downPercent: number,
+  closingCostRate = 0.025
+): BuyZonePoint[] {
+  return rates.map((rate) => {
+    const maxPrice = maxPriceForHoldPeriod(
+      { ...base, interestRate: rate },
+      costs,
+      holdYears,
+      downPercent,
+      closingCostRate
+    );
+    return {
+      rate,
+      maxPrice,
+      priceToRent: maxPrice === null ? null : maxPrice / (base.monthlyRent * 12),
+    };
+  });
+}
+
+/**
+ * How much a rate move is worth, in dollars of house.
+ *
+ * Answers "what does waiting for a better rate actually buy me", which is the
+ * only version of the timing question with a checkable answer.
+ */
+export function rateSensitivity(
+  base: SweepBase,
+  costs: ScalingCosts,
+  holdYears: number,
+  downPercent: number,
+  step = 0.005
+): { perQuarterPoint: number; atCurrent: number | null; atLower: number | null } {
+  const atCurrent = maxPriceForHoldPeriod(base, costs, holdYears, downPercent);
+  const atLower = maxPriceForHoldPeriod(
+    { ...base, interestRate: base.interestRate - step },
+    costs,
+    holdYears,
+    downPercent
+  );
+  return {
+    perQuarterPoint: atCurrent !== null && atLower !== null ? atLower - atCurrent : 0,
+    atCurrent,
+    atLower,
   };
 }
 

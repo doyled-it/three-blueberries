@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   breakevenByPrice,
+  buyZone,
   compareRentVsBuy,
   decide,
+  rateSensitivity,
   requiredRate,
   maxPriceForHoldPeriod,
   savingsRace,
@@ -280,4 +282,65 @@ test("required rate is the highest rate that still works, not just any rate", ()
     justAbove.breakevenYear === null || justAbove.breakevenYear > 10,
     "a higher rate must stop working, or the threshold is not tight"
   );
+});
+
+// --- the buy zone ----------------------------------------------------------
+
+test("the affordability ceiling falls monotonically as rates rise", () => {
+  const rates = [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09];
+  const zone = buyZone(SWEEP, COSTS, rates, 10, 0.2);
+  for (let i = 1; i < zone.length; i++) {
+    const prev = zone[i - 1]!.maxPrice ?? 0;
+    const here = zone[i]!.maxPrice ?? 0;
+    assert.ok(here <= prev, `ceiling should not rise with the rate (at ${rates[i]})`);
+  }
+});
+
+test("REGRESSION: the rate moves the ceiling by a large, checkable amount", () => {
+  // The headline claim of the buy-zone chart. If this stops being true the copy
+  // is wrong, not just the number.
+  const cheap = buyZone(SWEEP, COSTS, [0.03], 10, 0.2)[0]!.maxPrice!;
+  const dear = buyZone(SWEEP, COSTS, [0.08], 10, 0.2)[0]!.maxPrice!;
+  assert.ok(cheap > dear * 2, "3% versus 8% should more than double the ceiling");
+
+  const s = rateSensitivity(SWEEP, COSTS, 10, 0.2);
+  assert.ok(s.perQuarterPoint > 20_000, "half a point should be worth real money in house");
+});
+
+test("a house above the ceiling at every modelled rate is reported as such", () => {
+  const zone = buyZone(SWEEP, COSTS, [0.03, 0.05, 0.08], 10, 0.2);
+  assert.ok(
+    zone.every((z) => (z.maxPrice ?? 0) < 5_000_000),
+    "the ceiling should never be absurd"
+  );
+  assert.ok(zone[0]!.priceToRent !== null && zone[0]!.priceToRent > zone[2]!.priceToRent!);
+});
+
+// --- ruling out a lever ----------------------------------------------------
+
+test("a lever the owner has ruled out is not offered as a path to yes", () => {
+  const counted = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 10 });
+  const excluded = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 10, excludeRentalIncome: true });
+
+  const countedLever = counted.levers.find((l) => l.key === "income")!;
+  const excludedLever = excluded.levers.find((l) => l.key === "income")!;
+
+  assert.ok(countedLever.reachable, "normally this is the reachable lever at this price");
+  assert.equal(excludedLever.reachable, false, "once ruled out it must not count");
+  assert.equal(excludedLever.needed, "ruled out");
+  assert.match(excludedLever.note, /ruled this out/i);
+});
+
+test("ruling out the last reachable lever changes the verdict, not just a label", () => {
+  const counted = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 10 });
+  const excluded = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 10, excludeRentalIncome: true });
+  assert.match(counted.verdict, /not hopeless/i);
+  assert.match(excluded.verdict, /nothing here is close|keep renting/i);
+});
+
+test("the second-unit lever distinguishes an existing unit from buying a house to let", () => {
+  const d = decide({ ...DECIDE_BASE, price: 1_200_000, holdYears: 10, excludeRentalIncome: true });
+  const lever = d.levers.find((l) => l.key === "income")!;
+  assert.match(lever.note, /adds a home to the rental stock/i);
+  assert.match(lever.note, /Buying a single-family house to let does not/i);
 });

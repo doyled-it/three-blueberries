@@ -101,9 +101,15 @@ description: The real monthly cost of buying a house in California, itemized and
       <input id="monthlySavings" type="text" class="money" value="2,000" inputmode="numeric" />
 
       <label for="rentalIncome">
-        Rent you'd collect <span class="hint">roommate, ADU, second unit</span>
+        Second unit income <span class="hint">the other half of a duplex, or an existing ADU</span>
       </label>
       <input id="rentalIncome" type="text" class="money" value="0" inputmode="numeric" />
+
+      <label class="check">
+        <input id="excludeRental" type="checkbox" />
+        I would not let out part of a home
+        <span class="hint">removes it as a path to yes</span>
+      </label>
     </fieldset>
 
     <fieldset>
@@ -203,6 +209,10 @@ description: The real monthly cost of buying a house in California, itemized and
     would have to be true, stated as a number, so you can judge which of them is plausible. Usually one is much
     closer than the rest.
   </p>
+  <h4 class="chart-title">What the interest rate actually decides</h4>
+  <div id="buyZoneChart"></div>
+  <p id="buyZoneNote" class="field-note"></p>
+
   <p id="decisionVerdict" class="verdict"></p>
   <div id="decisionLevers" class="levers"></div>
 

@@ -32,8 +32,10 @@ import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../.
 import {
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
+  buyZone,
   compareRentVsBuy,
   decide,
+  rateSensitivity,
   maxPriceForHoldPeriod,
   savingsRace,
   statutoryRentCap,
@@ -694,6 +696,73 @@ function renderRentVsBuy(input: ScenarioInput): void {
     height: 210,
   });
 
+  // --- the buy zone: what the rate actually decides ---
+  const rates: number[] = [];
+  for (let rate = 0.03; rate <= 0.1001; rate += 0.0025) rates.push(rate);
+  const zone = buyZone(sweepBase, scaling, rates, holdYears, Math.max(downPercent, 0.05));
+  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, Math.max(downPercent, 0.05));
+
+  const nearestRate = zone.reduce((a, b) =>
+    Math.abs(b.rate - input.interestRate) < Math.abs(a.rate - input.interestRate) ? b : a
+  );
+  const ceilingHere = nearestRate.maxPrice;
+
+  $("buyZoneChart").innerHTML = renderMultiLine({
+    series: [
+      {
+        key: "zone",
+        label: "Most you can justify paying",
+        color: SERIES_PRICE,
+        points: zone.map((z, i) => ({ month: String(i), value: z.maxPrice ?? 0 })),
+      },
+      {
+        key: "yours",
+        label: `This house (${money(input.purchasePrice)})`,
+        color: SERIES_PAYMENT,
+        points: zone.map((_, i) => ({ month: String(i), value: input.purchasePrice })),
+      },
+    ],
+    format: (n) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`),
+    shadeGap: true,
+    xTicks: zone.map((z, i) => ({ index: i, label: pct(z.rate, 1) })).filter((_, i) => i % 4 === 0),
+    description:
+      "The most you can justify paying for a home at each interest rate, against the price you are considering.",
+    height: 220,
+  });
+
+  const zoneFig = $("buyZoneChart").querySelector<HTMLElement>("[data-multi]");
+  if (zoneFig) {
+    attachMultiHover(
+      zoneFig,
+      [
+        {
+          key: "zone",
+          label: "Ceiling",
+          color: SERIES_PRICE,
+          points: zone.map((z, i) => ({ month: String(i), value: z.maxPrice ?? 0 })),
+        },
+        {
+          key: "yours",
+          label: "This house",
+          color: SERIES_PAYMENT,
+          points: zone.map((_, i) => ({ month: String(i), value: input.purchasePrice })),
+        },
+      ],
+      money,
+      (label) => `At ${pct(zone[Number(label)]?.rate ?? 0, 2)}`
+    );
+  }
+
+  const crossing = zone.find((z) => (z.maxPrice ?? 0) >= input.purchasePrice);
+  $("buyZoneNote").textContent =
+    `Below the blue line, buying beats renting over ${holdYears} years. Above it, renting wins. ` +
+    (crossing
+      ? `${money(input.purchasePrice)} needs a rate at or under ${pct(crossing.rate, 2)}, against ${pct(input.interestRate)} today. `
+      : `${money(input.purchasePrice)} does not work at any rate down to 3%. `) +
+    `Every half point of rate is worth about ${money(Math.abs(sensitivity.perQuarterPoint) * 1)} of house, which is why rates move this ` +
+    `decision more than anything else, and why they are the one thing you can change after you buy.` +
+    (ceilingHere ? ` At today's rate your ceiling is ${money(ceilingHere)}.` : "");
+
   // --- the decision ---
   const decision = decide({
     base: { ...sweepBase, monthlyRentalIncome: num("rentalIncome", 0) },
@@ -701,6 +770,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     price: input.purchasePrice,
     holdYears,
     downPercent: Math.max(downPercent, 0.05),
+    excludeRentalIncome: $<HTMLInputElement>("excludeRental").checked,
   });
 
   $("decisionVerdict").textContent = decision.verdict;
@@ -1155,7 +1225,7 @@ function init(): void {
   }
 
   // The history panel's own controls re-render only the sections they affect.
-  for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears", "rentalIncome"]) {
+  for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears", "rentalIncome", "excludeRental"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => renderRentVsBuy(readInput()));
   }
 
