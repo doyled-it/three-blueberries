@@ -5,7 +5,7 @@
 The two changes being tested together:
   1. 19 countries of genuinely independent housing cycles instead of 20 US metros
      that all broke in the same quarter.
-  2. Credit — the variable the literature ranks first and the US panel lacked.
+  2. Credit, the variable the literature ranks first and the US panel lacked.
 
 Same validation discipline as everything else: purged walk-forward, embargo
 applied, baselines reported, and an explicit out-of-sample test on the events
@@ -165,7 +165,7 @@ def main() -> None:
     f12 = horizon_frame_intl(frame, 12)
     with_credit = run(f12, FEATURE_KEYS_INTL, 12)
     no_credit_keys = [k for k in FEATURE_KEYS_INTL if "credit" not in k]
-    # dict.fromkeys dedupes while preserving order — mom4 is already in the
+    # dict.fromkeys dedupes while preserving order, mom4 is already in the
     # no-credit key list, and a duplicated column makes test["mom4"] a DataFrame.
     cols = list(dict.fromkeys(["period", "quarter", "country", "target", "drawdown", "mom4", *no_credit_keys]))
     without = run(f12[cols], no_credit_keys, 12)
@@ -195,7 +195,7 @@ def main() -> None:
     for label, code, lo, hi in events:
         mask = (cn == code) & (q >= lo) & (q <= hi)
         if mask.sum() == 0:
-            print(f"  {label:<22}    — not in the out-of-sample window")
+            print(f"  {label:<22}, not in the out-of-sample window")
             continue
         print(
             f"  {label:<22} {int(mask.sum()):>4} {p_gbm[mask].mean() * 100:>10.1f}% {a[mask].mean() * 100:>8.1f}% "

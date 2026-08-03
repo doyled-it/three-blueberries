@@ -85,7 +85,7 @@ export const LATEST_COHORT_MONTH = HISTORY_LATEST_MONTH;
 /**
  * The refinance window: the stretch of historically cheap money that anyone who
  * already owned a home could refinance into. Derived from the data rather than
- * asserted — we take the actual cheapest month in the window, because that is
+ * asserted, we take the actual cheapest month in the window, because that is
  * what a motivated owner would have locked.
  */
 export const REFI_WINDOW = { from: "2020-06", to: "2021-12" } as const;
@@ -109,7 +109,7 @@ export function refinanceOpportunity(purchaseMonth: string): { month: string; ra
  * who bought the same house in `purchaseMonth`.
  *
  * The price for the earlier buyer is derived by scaling today's price back along
- * the Case-Shiller repeat-sales index — which is exactly what that index is for,
+ * the Case-Shiller repeat-sales index, which is exactly what that index is for,
  * since it tracks what the same homes resell for.
  */
 export function compareToCohort(input: CohortInput): CohortComparison | null {
@@ -133,7 +133,7 @@ export function compareToCohort(input: CohortInput): CohortComparison | null {
 
   // A refinance replaces the REMAINING BALANCE with a new loan, not the original
   // amount. Someone who bought in 2003 and refinanced in 2021 had already paid
-  // down 18 years first — modelling it against the original loan would overstate
+  // down 18 years first, modelling it against the original loan would overstate
   // what they pay today by a wide margin.
   let theirPi: number;
   if (refinancedRate !== undefined && refinanceMonth !== undefined && refinanceMonth > purchaseMonth) {

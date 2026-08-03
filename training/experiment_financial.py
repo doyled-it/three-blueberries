@@ -4,7 +4,7 @@
 
 Tests the hypothesis directly: add the Chicago Fed's leverage subindex, overall
 financial conditions, the credit and risk subindices, credit spreads, and the
-growth of mortgage and financial-sector debt to the US metro panel — then look
+growth of mortgage and financial-sector debt to the US metro panel, then look
 at what the model says in 2004-2006 specifically.
 
 The eyeball evidence already suggests this will not work (leverage sat at the
@@ -149,7 +149,7 @@ def main() -> None:
         with_fin = run(f_fin, FEATURE_KEYS_V2 + FINANCIAL_KEYS, horizon)
 
         print("\n" + "=" * 78)
-        print(f"{horizon}-MONTH HORIZON — does the plumbing help?  (n={with_fin['n']:,}, identical rows)")
+        print(f"{horizon}-MONTH HORIZON, does the plumbing help?  (n={with_fin['n']:,}, identical rows)")
         print("=" * 78)
         print(f"  {'feature set':<26} {'vs momentum':>12} {'dir edge':>10} {'AUC':>8}")
         print(f"  {'housing only':<26} {without['skill_vs_momentum']:>12.3f} {without['dir_edge'] * 100:>9.1f}p {without['auc']:>8.3f}")
@@ -168,7 +168,7 @@ def main() -> None:
     print("WHY")
     print("=" * 78)
     print("  Credit spreads were TIGHTER than average through the run-up: 1.69 in")
-    print("  2006-03 against 2.86 in 2003. Risk was not mispriced by accident — narrow")
+    print("  2006-03 against 2.86 in 2003. Risk was not mispriced by accident, narrow")
     print("  spreads ARE the bubble condition. The indicator that should warn you looks")
     print("  its best right before the fall, because complacency is the thing being")
     print("  measured. That is not a data problem you can fix with a better model.")

@@ -1,4 +1,4 @@
-// GENERATED FILE — do not edit by hand.
+// GENERATED FILE, do not edit by hand.
 // Regenerate with: npm run data:loan-limits
 //
 // Source: FHFA 2026 conforming loan limits, one-unit properties.

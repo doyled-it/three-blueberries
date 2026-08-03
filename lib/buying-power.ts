@@ -2,14 +2,14 @@
  * Three blueberries: what a median income can actually buy.
  *
  * This is the thesis of the whole project, and it is deliberately NOT "houses
- * got expensive." Prices rising is unremarkable — wages rise too, and a 1987
+ * got expensive." Prices rising is unremarkable, wages rise too, and a 1987
  * dollar is not a 2026 dollar. The claim that means something is *relative*:
  * the same job buys less house than it used to.
  *
  * So rather than plot prices, this plots two lines that share a unit:
  *
  *   1. What the median home actually cost.
- *   2. What the median household could have afforded that month — derived from
+ *   2. What the median household could have afforded that month, derived from
  *      their income, the prevailing mortgage rate, and a fixed 30% share of
  *      gross income spent on housing.
  *
@@ -138,7 +138,7 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
     incomeNeededToday,
     headline:
       `In ${first.month.slice(0, 4)} the median California household could afford ${first.purchasingRatio.toFixed(2)}x the median San Diego home. ` +
-      `Today it is ${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone — not because prices rose, ` +
+      `Today it is ${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone, not because prices rose, ` +
       `but because they rose ${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`,
     blueberries:
       `The median home costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ${first.month.slice(0, 4)} it cost ` +
@@ -149,8 +149,8 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
 
 /** Income series ends before the price series; the UI should say so. */
 export const BUYING_POWER_CAVEAT =
-  `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR} — ` +
+  `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR}, ` +
   `later months carry the last value forward, which if anything understates the gap. ` +
   `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
-  `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at that month's prevailing rate. It excludes tax, insurance and everything else — ` +
+  `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at that month's prevailing rate. It excludes tax, insurance and everything else, ` +
   `so it is the most generous possible reading of what a household could carry.`;

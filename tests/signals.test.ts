@@ -64,7 +64,7 @@ test("signal readings carry both a 2006 and a 2009 comparison", () => {
   }
 });
 
-test("the dashboard is not one-sided — it carries both bearish and bullish reads", () => {
+test("the dashboard is not one-sided. It carries both bearish and bullish reads", () => {
   const { readings } = crashSignals();
   assert.ok(
     readings.some((r) => r.lean === "bearish"),
@@ -85,7 +85,7 @@ test("REGRESSION: the new-home supply signal ships its new-construction caveat",
   assert.match(supply.caveat, /existing-home supply/i);
 });
 
-test("delinquency is flagged bullish — it is the strongest not-2008 argument", () => {
+test("delinquency is flagged bullish, it is the strongest not-2008 argument", () => {
   const d = crashSignals().readings.find((r) => r.key === "delinquency")!;
   assert.equal(d.lean, "bullish");
   assert.ok(d.now! < d.at2009Trough! / 2, "delinquency should be far below crisis levels");

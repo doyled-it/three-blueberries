@@ -6,7 +6,7 @@
  * Why this exists: the 20-metro US panel contains roughly two independent
  * downturns. Every US metro crashed in 2008 for the same reason, so twenty
  * markets is not twenty experiments. Nineteen countries across 55 years gives
- * genuinely separate events — Japan 1991, the Nordic banking crises 1991-93,
+ * genuinely separate events, Japan 1991, the Nordic banking crises 1991-93,
  * Asia 1997, Spain and Ireland 2008, each with its own credit regime, its own
  * central bank, and its own timing.
  *
@@ -14,7 +14,7 @@
  * CREDIT. Jorda, Schularick & Taylor ("Leveraged Bubbles", 2015) study 140 years
  * across 17 countries and find that what separates a dangerous housing bubble
  * from a harmless one is whether it was financed by credit. We had mortgage
- * delinquency, which is coincident at best — a measure of damage already done,
+ * delinquency, which is coincident at best. A measure of damage already done,
  * not of risk building up.
  *
  * Series (all BIS or OECD, via FRED's public CSV endpoint, no API key):
@@ -72,7 +72,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * FRED rate-limits bursts. 133 requests fired as fast as Node can manage gets
  * most of them dropped, and a dropped request is NOT the same as a missing
- * series — treating it as one silently shrinks the panel, which is exactly the
+ * series, treating it as one silently shrinks the panel, which is exactly the
  * kind of quiet data loss that produces a confident wrong answer later.
  *
  * So: pace the requests, back off exponentially on failure, and cache to disk so
@@ -130,7 +130,7 @@ for (const [code, name] of Object.entries(COUNTRIES)) {
   for (const [key, rows] of fetched) if (rows) entry.series[key] = rows;
 
   if (!entry.series.realPrice) {
-    console.log(`  skip ${name} — no price series`);
+    console.log(`  skip ${name}, no price series`);
     continue;
   }
   countries[code] = entry;
@@ -152,5 +152,5 @@ await fs.writeFile(OUT, JSON.stringify(payload), "utf8");
 const bytes = (await fs.stat(OUT)).size;
 const quarters = Object.values(countries).reduce((n, c) => n + c.series.realPrice.length, 0);
 console.log(
-  `\nWrote ${path.relative(root, OUT)} — ${Object.keys(countries).length} countries, ${quarters} country-quarters, ${(bytes / 1024).toFixed(0)}KB`
+  `\nWrote ${path.relative(root, OUT)}, ${Object.keys(countries).length} countries, ${quarters} country-quarters, ${(bytes / 1024).toFixed(0)}KB`
 );

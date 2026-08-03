@@ -10,7 +10,7 @@ import type { LoanType } from "../types.ts";
 import type { SourceId } from "./sources.ts";
 
 // ---------------------------------------------------------------------------
-// VA funding fee — purchase loans
+// VA funding fee, purchase loans
 // Source: va-funding-fee (statutory)
 // ---------------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ export function fhaMipDurationMonths(ltv: number): number | null {
 
 // ---------------------------------------------------------------------------
 // Conventional PMI
-// Source: pmi-rate-bands (ESTIMATE — insurer rate cards are not public)
+// Source: pmi-rate-bands (ESTIMATE, insurer rate cards are not public)
 // ---------------------------------------------------------------------------
 
 /**
@@ -107,7 +107,7 @@ export function fhaMipDurationMonths(ltv: number): number | null {
  */
 const PMI_BANDS: ReadonlyArray<{
   maxLtv: number;
-  /** Descending credit floors — first match wins. */
+  /** Descending credit floors, first match wins. */
   byScore: ReadonlyArray<{ minScore: number; rate: number }>;
 }> = [
   {
@@ -187,7 +187,7 @@ export const PMI_REQUEST_CANCELLATION_LTV = 0.8;
 
 /**
  * `typical` is what a lender will comfortably approve and what we use to answer
- * "how much do I need to make." `max` is the documented outer edge — reachable
+ * "how much do I need to make." `max` is the documented outer edge, reachable
  * with automated approval and compensating factors, but living there means
  * every dollar of your life is already spoken for.
  */
@@ -217,7 +217,7 @@ export const DTI_CEILINGS: Record<
     typical: 0.41,
     max: 0.6,
     sourceIds: ["va-residual-income"],
-    note: "41% is a guideline, not a cap. VA has no hard DTI limit — it cares about residual income instead, and will approve well past 41% if enough money is left over each month.",
+    note: "41% is a guideline, not a cap. VA has no hard DTI limit. It cares about residual income instead, and will approve well past 41% if enough money is left over each month.",
   },
 };
 
@@ -232,11 +232,11 @@ export const DTI_CEILINGS: Record<
  * the highest minimums in the country.
  *
  * This test is why a VA borrower can be approved at a DTI that would sink a
- * conventional application — and why a VA borrower with a big family can be
+ * conventional application, and why a VA borrower with a big family can be
  * denied at a DTI that looks fine on paper.
  */
 export const VA_RESIDUAL_INCOME_WEST = {
-  /** Loan amounts of $80,000 and above — effectively every California purchase. */
+  /** Loan amounts of $80,000 and above, effectively every California purchase. */
   large: { 1: 491, 2: 823, 3: 990, 4: 1117, 5: 1158, additional: 80 },
   small: { 1: 390, 2: 654, 3: 788, 4: 888, 5: 921, additional: 75 },
 } as const;

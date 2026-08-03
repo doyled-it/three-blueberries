@@ -23,7 +23,7 @@ test("every claim carries a source", () => {
   }
 });
 
-test("the watchlist is not one-sided — it ships a counterweight", () => {
+test("the watchlist is not one-sided. It ships a counterweight", () => {
   const context = byLevel("context");
   assert.ok(context.length > 0, "an all-bearish watchlist is advocacy, not analysis");
   assert.match(context[0]!.rhyme, /There isn't one/i);
@@ -53,7 +53,7 @@ test("every entry leads with a jargon-free metaphor", () => {
   const jargon = /securitis|amortis|tranche|LTV|DSCR|basis point|collateralis/i;
   for (const i of INSTRUMENTS) {
     assert.ok(i.gist.length > 30 && i.gist.length < 190, `${i.id} gist is the wrong length`);
-    assert.ok(!jargon.test(i.gist), `${i.id} gist uses jargon — the whole point is that it doesn't`);
+    assert.ok(!jargon.test(i.gist), `${i.id} gist uses jargon. The whole point is that it doesn't`);
     assert.ok(/[.!]$/.test(i.gist), `${i.id} gist should be a sentence`);
   }
 });

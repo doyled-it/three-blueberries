@@ -8,7 +8,7 @@
  *
  * There are two kinds of 2008 indicator, and only one of them is worth modelling.
  *
- * INSTRUMENT-SPECIFIC — subprime origination share, private-label MBS issuance,
+ * INSTRUMENT-SPECIFIC, subprime origination share, private-label MBS issuance,
  * CDO and CDO-squared volume, the ABX index. These are the fingerprint of one
  * crisis. They have superb hindsight and no future: the ABX barely exists now,
  * CDO-squared issuance is a rounding error, and the next crisis will be built out
@@ -16,7 +16,7 @@
  * -> crash" has learned it from exactly one event, and cannot fire again because
  * the instrument is gone. That is fitting N=1 and calling it a forecaster.
  *
- * STRUCTURAL — how leveraged the financial system is, how wide risk premia are,
+ * STRUCTURAL, how leveraged the financial system is, how wide risk premia are,
  * how stressed funding markets are. These are instrument-agnostic. They were
  * elevated before 2008, before 1998, before the Nordic crises, and they will be
  * elevated before the next one, whatever it is built from.
@@ -24,7 +24,7 @@
  * This file fetches the structural ones. The Chicago Fed's NFCI leverage
  * subindex is the closest honest proxy for what The Big Short is about: it
  * measures debt and equity leverage across the financial sector, weekly, back
- * to 1971 — so it covers several crises rather than one.
+ * to 1971, so it covers several crises rather than one.
  * ───────────────────────────────────────────────────────────────────────────
  *
  * CAVEAT THAT MUST TRAVEL WITH THIS DATA: every series here is UNITED STATES
@@ -43,7 +43,7 @@ const OUT = path.join(root, "data", "financial.json");
 const CACHE = path.join(root, "data", ".fred-cache");
 
 const SERIES = {
-  /** Chicago Fed NFCI, leverage subindex — debt and equity leverage in the financial sector. */
+  /** Chicago Fed NFCI, leverage subindex, debt and equity leverage in the financial sector. */
   leverage: "NFCILEVERAGE",
   /** Overall national financial conditions. Positive = tighter than average. */
   conditions: "NFCI",
@@ -51,11 +51,11 @@ const SERIES = {
   conditionsAdjusted: "ANFCI",
   /** Credit-market subindex. */
   credit: "NFCICREDIT",
-  /** Risk subindex — volatility and funding risk. */
+  /** Risk subindex, volatility and funding risk. */
   risk: "NFCIRISK",
   /** Baa corporate over 10-year Treasury: the price of credit risk. */
   creditSpread: "BAA10Y",
-  /** Household mortgage debt outstanding — the securitisation boom shows up here. */
+  /** Household mortgage debt outstanding. The securitisation boom shows up here. */
   mortgageDebt: "HHMSDODNS",
   /** Financial-sector debt outstanding. */
   financialDebt: "DODFS",
@@ -132,7 +132,7 @@ await fs.writeFile(
   OUT,
   JSON.stringify({
     retrieved: new Date().toISOString().slice(0, 10),
-    scope: "UNITED STATES ONLY — see scripts/fetch-financial.mjs for why that matters",
+    scope: "UNITED STATES ONLY, see scripts/fetch-financial.mjs for why that matters",
     series: out,
   }),
   "utf8"

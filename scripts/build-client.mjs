@@ -1,7 +1,7 @@
 /**
  * Bundles the TypeScript engine for the browser.
  *
- * The whole calculator runs client-side — no round trip, no server holding your
+ * The whole calculator runs client-side. No round trip, no server holding your
  * income. The only thing the worker is for is fetching live rates.
  */
 

@@ -1,4 +1,4 @@
-"""Richer, more time-aware features — testing whether the first attempt was underpowered.
+"""Richer, more time-aware features, testing whether the first attempt was underpowered.
 
 The v1 feature set was mostly levels and simple trailing returns. Three hypotheses
 this module exists to test:
@@ -162,7 +162,7 @@ def horizon_frame_v2(frame: pd.DataFrame, horizon: int) -> pd.DataFrame:
 
 
 def add_lags(frame: pd.DataFrame, keys: list[str], lags=(6, 12, 24)) -> tuple[pd.DataFrame, list[str]]:
-    """Lagged copies of selected features — a tabular stand-in for a sequence model.
+    """Lagged copies of selected features. A tabular stand-in for a sequence model.
 
     Gradient boosting over a lagged window can represent most of what a small
     recurrent net would learn from this much data, without the sample size a

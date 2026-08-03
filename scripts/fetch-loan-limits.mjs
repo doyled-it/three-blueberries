@@ -23,7 +23,7 @@ const OUT = path.join(root, "lib", "data", "ca-loan-limits.ts");
 
 const QUOTE = '"';
 
-/** Minimal RFC 4180 parser — the FHFA file has quoted headers containing newlines. */
+/** Minimal RFC 4180 parser. The FHFA file has quoted headers containing newlines. */
 function parseCsv(s) {
   const rows = [];
   let row = [];
@@ -73,7 +73,7 @@ function titleCase(s) {
 
 const res = await fetch(SOURCE_URL);
 if (!res.ok) {
-  throw new Error(`FHFA returned ${res.status} for ${SOURCE_URL}. Check the URL — they rename this file yearly.`);
+  throw new Error(`FHFA returned ${res.status} for ${SOURCE_URL}. Check the URL. They rename this file yearly.`);
 }
 const rows = parseCsv(await res.text());
 const header = rows[0].map((h) => h.replace(/\s+/g, " ").trim());
@@ -103,7 +103,7 @@ if (counties.length !== 58) {
 const baseline = Math.min(...counties.map((c) => c.oneUnit));
 const ceiling = Math.max(...counties.map((c) => c.oneUnit));
 
-const body = `// GENERATED FILE — do not edit by hand.
+const body = `// GENERATED FILE. Do not edit by hand.
 // Regenerate with: npm run data:loan-limits
 //
 // Source: FHFA ${YEAR} conforming loan limits, one-unit properties.

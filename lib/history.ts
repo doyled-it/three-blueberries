@@ -281,11 +281,11 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
   let verdict: string;
   if (monthlySaving <= 0) {
     verdict =
-      "Waiting loses. The rate you're assuming at the bottom cancels out the price drop — you'd pay the same or more per month for the same house, having paid rent the whole time. This is the trap: prices and rates usually move in opposite directions, because the thing that crashes prices is also the thing that makes the Fed cut rates.";
+      "Waiting loses. The rate you're assuming at the bottom cancels out the price drop, you'd pay the same or more per month for the same house, having paid rent the whole time. This is the trap: prices and rates usually move in opposite directions, because the thing that crashes prices is also the thing that makes the Fed cut rates.";
   } else if (breakevenMonths !== null && breakevenMonths > 84) {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month, but you'd pay ${Math.round(rentPaid).toLocaleString("en-US")} in rent to get there — about ${(breakevenMonths / 12).toFixed(1)} years just to break even on that rent. That's a long time to be right about timing.`;
+    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month, but you'd pay ${Math.round(rentPaid).toLocaleString("en-US")} in rent to get there, about ${(breakevenMonths / 12).toFixed(1)} years just to break even on that rent. That's a long time to be right about timing.`;
   } else {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month and repays the rent you spent waiting in about ${Math.round(breakevenMonths ?? 0)} months. On these assumptions it's worth it — provided the crash actually arrives on your schedule, and you still have your job when it does.`;
+    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month and repays the rent you spent waiting in about ${Math.round(breakevenMonths ?? 0)} months. On these assumptions it's worth it, provided the crash actually arrives on your schedule, and you still have your job when it does.`;
   }
 
   return {
@@ -360,7 +360,7 @@ export function crashPresets(): CrashPreset[] {
       depthPercent: Math.round(Math.abs(severe.depthPercent)),
       monthsToBottom: severe.monthsPeakToTrough,
       rateAtBottom: rateAtTroughOf(severe),
-      basis: `The worst decline on record: ${Math.abs(severe.depthPercent).toFixed(1)}% over ${severe.monthsPeakToTrough} months, bottoming ${severe.troughMonth}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then — the crash and the rate relief arrived together.`,
+      basis: `The worst decline on record: ${Math.abs(severe.depthPercent).toFixed(1)}% over ${severe.monthsPeakToTrough} months, bottoming ${severe.troughMonth}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then. The crash and the rate relief arrived together.`,
     },
     {
       id: "soft",
@@ -369,7 +369,7 @@ export function crashPresets(): CrashPreset[] {
       monthsToBottom: 18,
       rateAtBottom: 0.055,
       basis:
-        "Prices flat, rates drifting back toward 5.5%. This is the consensus 2026 forecast and by far the most common historical outcome — San Diego has spent 37 of the last 39 years not crashing.",
+        "Prices flat, rates drifting back toward 5.5%. This is the consensus 2026 forecast and by far the most common historical outcome, San Diego has spent 37 of the last 39 years not crashing.",
     },
     {
       id: "stagflation",
@@ -396,7 +396,7 @@ export function crashPresets(): CrashPreset[] {
       monthsToBottom: 48,
       rateAtBottom: 0.04,
       basis:
-        "Beyond anything in the San Diego record — the 2006 crash was 42%. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and today's mortgage delinquency rate is near a historic low rather than climbing.",
+        "Beyond anything in the San Diego record. The 2006 crash was 42%. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and today's mortgage delinquency rate is near a historic low rather than climbing.",
     },
     {
       id: "japan",
@@ -405,7 +405,7 @@ export function crashPresets(): CrashPreset[] {
       monthsToBottom: 84,
       rateAtBottom: 0.045,
       basis:
-        "Not a crash — a grind. Prices drift down modestly over seven years while rates ease. Japan after 1991 and California through the 1990s both looked more like this than like 2008: the 1990-96 decline took 74 months to bottom, twice as long as 2006-09.",
+        "Not a crash, a grind. Prices drift down modestly over seven years while rates ease. Japan after 1991 and California through the 1990s both looked more like this than like 2008: the 1990-96 decline took 74 months to bottom, twice as long as 2006-09.",
     },
   ];
 }

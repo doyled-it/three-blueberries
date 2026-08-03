@@ -1,11 +1,11 @@
 /*
- * Three Blueberries — visual system.
+ * Three Blueberries, visual system.
  *
  * The idea: this page is a financial statement, not a marketing site. Ledger
  * rules, tabular figures, generous whitespace, an editorial serif for headings
  * so it reads with authority rather than enthusiasm.
  *
- * The palette is the fruit — deep indigo ground, blueberry violet accent, warm
+ * The palette is the fruit: deep indigo ground, blueberry violet accent, warm
  * off-white ink. Three dots recur as the mark.
  *
  * Chart colours are the validated dataviz slots, NOT part of this scheme. They
@@ -56,7 +56,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Paper grain — the only texture, kept almost invisible. */
+/* Paper grain, the only texture, kept almost invisible. */
 body::before {
   content: "";
   position: fixed;

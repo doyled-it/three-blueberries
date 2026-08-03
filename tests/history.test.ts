@@ -47,7 +47,7 @@ test("the 2006 crash is found with the right shape", () => {
   assert.ok(big.monthsUnderwater! > 120, `expected 10+ years underwater, got ${big.monthsUnderwater}`);
 });
 
-test("San Diego has crashed rarely — the sample is too small to forecast from", () => {
+test("San Diego has crashed rarely. The sample is too small to forecast from", () => {
   const drops = findDrawdowns(10);
   assert.ok(drops.length <= 3, `expected at most 3 major declines in 39 years, got ${drops.length}`);
   assert.ok(drops.length >= 2, "expected at least the 1990s and 2000s declines");
@@ -123,7 +123,7 @@ test("a big enough rate rise turns a price crash into a losing wait", () => {
 
 test("Prop 13 pushes the break-even rate higher than payment math alone suggests", () => {
   // At a 20% crash, a naive read of P&I says 9% rates roughly cancel 6.66%.
-  // They nearly do — but the permanently lower assessed value tips it back to
+  // They nearly do, but the permanently lower assessed value tips it back to
   // favouring the wait. This is a real California-specific effect and the
   // reason this model tracks tax separately from principal and interest.
   const at9 = evaluateWaiting({ ...waitBase, crashDepthPercent: 20, monthsToBottom: 36, rateAtBottom: 0.09 });
@@ -353,7 +353,7 @@ test("the default preset is the milder decline, not an average of the two", () =
   const drops = findDrawdowns(10);
   const mildest = drops.reduce((a, b) => (b.depthPercent > a.depthPercent ? b : a));
   assert.equal(preset.depthPercent, Math.round(Math.abs(mildest.depthPercent)));
-  // An average of -16.7 and -42.2 would be ~29 — a crash that has never happened.
+  // An average of -16.7 and -42.2 would be ~29. A crash that has never happened.
   assert.notEqual(preset.depthPercent, 29);
   assert.match(preset.basis, /milder/i);
 });
@@ -369,7 +369,7 @@ test("every preset explains where its numbers came from", () => {
 test("the severe preset reproduces the 2008 crash as it actually happened", () => {
   const severe = crashPresets().find((p) => p.id === "severe")!;
   assert.equal(severe.depthPercent, 42);
-  // Rates had already fallen to the mid-4s by the 2009 trough — the crash and
+  // Rates had already fallen to the mid-4s by the 2009 trough. The crash and
   // the rate relief arrived together, which is the historically normal pattern.
   assert.ok(severe.rateAtBottom < 0.055, `expected sub-5.5% at the 2009 trough, got ${severe.rateAtBottom}`);
 });

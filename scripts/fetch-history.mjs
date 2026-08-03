@@ -7,7 +7,7 @@
  *   SDXRSA       S&P CoreLogic Case-Shiller San Diego home price index
  *   MORTGAGE30US Freddie Mac 30-year fixed average (weekly, averaged to monthly)
  *
- * Uses FRED's public fredgraph CSV endpoint, which needs no API key — so this
+ * Uses FRED's public fredgraph CSV endpoint, which needs no API key, so this
  * stays runnable by anyone who clones the repo.
  */
 
@@ -57,13 +57,13 @@ for (const p of priceRows) {
 }
 
 if (rows.length < 400) {
-  throw new Error(`Only ${rows.length} joined months — expected 400+. Refusing to write a truncated history.`);
+  throw new Error(`Only ${rows.length} joined months, expected 400+. Refusing to write a truncated history.`);
 }
 
 const first = rows[0];
 const latest = rows[rows.length - 1];
 
-const body = `// GENERATED FILE — do not edit by hand.
+const body = `// GENERATED FILE. Do not edit by hand.
 // Regenerate with: npm run data:history
 //
 // Sources (both public, no API key needed):

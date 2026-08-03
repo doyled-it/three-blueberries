@@ -44,7 +44,7 @@ test("every plotted point lands inside the viewBox", () => {
   }
 });
 
-test("the line is monotonic left to right — no back-tracking", () => {
+test("the line is monotonic left to right. No back-tracking", () => {
   const d = svg.match(/class="c-line" d="([^"]+)"/)![1]!;
   const xs = d
     .slice(1)
@@ -100,6 +100,17 @@ test("the chart carries an accessible label", () => {
   assert.ok(svg.includes('aria-label="test chart"'));
 });
 
-test("a single-series chart ships no legend — the title names it", () => {
+test("a single-series chart ships no legend. The title names it", () => {
   assert.ok(!/legend/i.test(svg), "single series charts must not render a legend box");
+});
+
+test("REGRESSION: the hover dot paints above the data line, the crosshair below it", () => {
+  // SVG has no z-index. Paint order is document order, and the hover dot was
+  // ambiguous enough here to read as sitting under the line.
+  const order = ["c-cross", "c-line", "c-hit", "c-dot"];
+  const positions = order.map((cls) => svg.indexOf(`class="${cls}"`));
+  positions.forEach((pos, i) => assert.ok(pos > -1, `${order[i]} missing from the chart`));
+  for (let i = 1; i < positions.length; i++) {
+    assert.ok(positions[i]! > positions[i - 1]!, `${order[i]} must paint after ${order[i - 1]}`);
+  }
 });

@@ -1,5 +1,5 @@
 /**
- * The learned forecaster — and the case against believing it.
+ * The learned forecaster, and the case against believing it.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * This module exists because the honest result of building a housing forecaster
@@ -170,7 +170,7 @@ export function verdict(horizon = 24): Verdict {
   }
   if (r.classifier.auc !== null && r.classifier.auc <= 0.5) {
     failures.push(
-      `The crash classifier has an AUC of ${r.classifier.auc.toFixed(2)}. Below 0.5 is worse than random — it ranks the safe periods as riskier than the dangerous ones.`
+      `The crash classifier has an AUC of ${r.classifier.auc.toFixed(2)}. Below 0.5 is worse than random. It ranks the safe periods as riskier than the dangerous ones.`
     );
   }
   if (r.classifier.preCrashProbability < r.classifier.preCrashActual) {

@@ -1,7 +1,7 @@
 """Leakage tests.
 
 These are the most important tests in the repository. A forecaster that peeks at
-the future produces spectacular, entirely fake results — and it does so silently.
+the future produces spectacular, entirely fake results, and it does so silently.
 That is not hypothetical here: an earlier JavaScript implementation of this
 pipeline had its embargo condition inverted, so it trained *exclusively* on rows
 whose targets resolved inside the test window. It reported an out-of-sample R² of
@@ -65,7 +65,7 @@ def test_expanding_zscore_never_uses_the_future(panel):
         # a full-sample z-score would differ systematically and by a lot.
         assert abs(actual - expected) < 1.0, (
             f"z-score at position {position} ({actual:.3f}) is far from the "
-            f"causally-computable value ({expected:.3f}) — suspect lookahead"
+            f"causally-computable value ({expected:.3f}), suspect lookahead"
         )
 
 
@@ -133,7 +133,7 @@ def test_the_embargo_actually_removes_data(panel):
     """A purge that drops nothing is not a purge.
 
     With a 36-month horizon the embargo should discard three years of the most
-    recent training data in every fold — the data a naive implementation would
+    recent training data in every fold. The data a naive implementation would
     happily keep.
     """
     frame = horizon_frame(panel, 36)

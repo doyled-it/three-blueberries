@@ -1,6 +1,6 @@
 /**
  * Amortization primitives. Pure arithmetic, no opinions, no rounding until the
- * very end — every other module builds on these.
+ * very end, every other module builds on these.
  */
 
 export interface AmortizationPeriod {
@@ -79,7 +79,7 @@ export function totalInterest(principal: number, annualRate: number, termYears: 
 
 /**
  * First month at which the loan balance falls to `targetLtv` of the ORIGINAL
- * value — which is the standard the Homeowners Protection Act uses for PMI
+ * value, which is the standard the Homeowners Protection Act uses for PMI
  * termination. Appreciation does not count here; only the amortization schedule
  * does. Returns null if the loan never gets there within its term.
  */

@@ -3,7 +3,7 @@
     uv run python -m training.train
 
 Reports, for every horizon and every model family, out-of-sample performance on
-identical purged walk-forward folds — plus the diagnostics that actually decide
+identical purged walk-forward folds, plus the diagnostics that actually decide
 whether the thing is useful:
 
   * skill against "predict the average" and "assume the trend continues"
@@ -94,7 +94,7 @@ def evaluate_horizon(panel, horizon: int) -> dict:
     preds.drawdown_prob["gradient_boosting"] = []
 
     folds = list(walk_forward(frame, horizon))
-    print(f"\n{'=' * 74}\n{horizon}-MONTH HORIZON — {len(frame):,} rows, {len(folds)} walk-forward folds\n{'=' * 74}")
+    print(f"\n{'=' * 74}\n{horizon}-MONTH HORIZON, {len(frame):,} rows, {len(folds)} walk-forward folds\n{'=' * 74}")
 
     for fold in folds:
         train = frame.loc[fold.train_index]
@@ -277,7 +277,7 @@ def emit(payload: dict, panel, sd_row: pd.Series) -> None:
             return clean(float(obj))
         return obj
 
-    body = f"""// GENERATED FILE — do not edit by hand.
+    body = f"""// GENERATED FILE. Do not edit by hand.
 // Regenerate with: npm run data:panel && npm run train
 //
 // Trained by training/train.py (scikit-learn) on a panel of {len(panel.metros)} Case-Shiller

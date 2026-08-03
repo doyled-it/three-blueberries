@@ -2,11 +2,11 @@
  * The engine, run backwards.
  *
  * "How much do I need to make to buy a $900,000 house" is answered directly by
- * evaluateScenario — it falls out of the DTI ceiling. The harder and more useful
+ * evaluateScenario, it falls out of the DTI ceiling. The harder and more useful
  * question is the other one: given what I actually make, what can I actually buy?
  *
  * That one can't be solved in closed form. Price feeds back into property tax,
- * insurance, PMI band, and whether the loan crosses into jumbo — so we search.
+ * insurance, PMI band, and whether the loan crosses into jumbo, so we search.
  */
 
 import { evaluateScenario } from "./mortgage.ts";
@@ -32,8 +32,8 @@ function passes(result: ScenarioResult): boolean {
 /**
  * Binary search for the highest purchase price that still qualifies.
  *
- * Every constraint is monotonic in price — a more expensive house is never
- * easier to afford — so bisection is safe and converges in about 25 steps.
+ * Every constraint is monotonic in price. A more expensive house is never
+ * easier to afford, so bisection is safe and converges in about 25 steps.
  */
 export function maxAffordablePrice(
   base: ScenarioInput,
@@ -45,7 +45,7 @@ export function maxAffordablePrice(
 
   const at = (price: number) => evaluateScenario({ ...base, purchasePrice: price });
 
-  // If even the floor fails, there is no answer to give — report it honestly
+  // If even the floor fails, there is no answer to give, report it honestly
   // rather than returning a price the household cannot carry.
   const atFloor = at(floor);
   if (!passes(atFloor)) {
@@ -77,7 +77,7 @@ export function maxAffordablePrice(
     else hi = mid;
   }
 
-  // Round down to a clean number — false precision here is worse than useless.
+  // Round down to a clean number, false precision here is worse than useless.
   const price = Math.floor(lo / 1000) * 1000;
   const scenario = at(price);
 
@@ -105,7 +105,7 @@ export function incomeRequiredFor(input: ScenarioInput): { annual: number; month
 }
 
 /**
- * How the answer moves as one input moves — for showing the shape of a
+ * How the answer moves as one input moves, for showing the shape of a
  * tradeoff rather than a single number. Useful for "what if rates drop half a
  * point" and "what does another 5% down actually buy me."
  */

@@ -29,6 +29,7 @@ import { crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signa
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
+import { RENT_VS_BUY_CAVEAT, compareRentVsBuy, savingsRace } from "../../lib/rent-vs-buy.ts";
 import {
   attachChartHover,
   attachStackHover,
@@ -79,11 +80,11 @@ async function loadRate(): Promise<void> {
     }
 
     note.innerHTML = data.stale
-      ? `Could not reach the rate feed — showing the last known value from ${data.asOf}. Enter your own quote.`
-      : `Freddie Mac weekly average as of ${data.asOf}. <a href="${data.source.url}" target="_blank" rel="noopener">Source</a>. This is a national average for a well-qualified borrower — your quote will differ.`;
+      ? `Could not reach the rate feed, showing the last known value from ${data.asOf}. Enter your own quote.`
+      : `Freddie Mac weekly average as of ${data.asOf}. <a href="${data.source.url}" target="_blank" rel="noopener">Source</a>. This is a national average for a well-qualified borrower. Your quote will differ.`;
     render();
   } catch {
-    note.textContent = "Rate feed unavailable. The default below is a placeholder — enter your own quote.";
+    note.textContent = "Rate feed unavailable. The default below is a placeholder, enter your own quote.";
   }
 }
 
@@ -207,7 +208,7 @@ function render(): void {
     </div>
     <div class="stat">
       <span class="stat__label">Most house you can buy</span>
-      <span class="stat__value">${afford.maxPurchasePrice > 0 ? money(afford.maxPurchasePrice) : "—"}</span>
+      <span class="stat__value">${afford.maxPurchasePrice > 0 ? money(afford.maxPurchasePrice) : ", "}</span>
       <span class="stat__note">${
         afford.maxPurchasePrice > 0
           ? `On ${money(haveIncome)}/year, limited by ${afford.bindingConstraint === "residual-income" ? "VA residual income" : "debt-to-income"}. Needs ${money(afford.cashRequired)} cash.`
@@ -221,7 +222,7 @@ function render(): void {
     </div>
     <div class="stat ${q.passesDti ? "stat--pass" : "stat--fail"}">
       <span class="stat__label">Your debt-to-income</span>
-      <span class="stat__value">${Number.isFinite(q.backEndDti) ? pct(q.backEndDti, 1) : "—"}</span>
+      <span class="stat__value">${Number.isFinite(q.backEndDti) ? pct(q.backEndDti, 1) : ", "}</span>
       <span class="stat__note">${q.passesDti ? "Within" : "Above"} the ${pct(q.dtiCeiling, 0)} ceiling for this program.</span>
     </div>
     ${
@@ -237,6 +238,7 @@ function render(): void {
   $("notes").innerHTML = q.notes.map((n) => `<li>${n}</li>`).join("");
   $("warnings").innerHTML = result.warnings.map((w) => `<li>${w}</li>`).join("");
 
+  renderRentVsBuy(input);
   renderBuyingPower(input.purchasePrice);
   renderCohort(input);
   renderHistory(input.purchasePrice);
@@ -330,7 +332,7 @@ function renderCohort(input: ScenarioInput): void {
   }
 
   const refiNote = c.refinancedMonth
-    ? ` and refinanced their remaining balance to ${pct(c.effectiveRate)} in ${c.refinancedMonth} — the cheapest month on record`
+    ? ` and refinanced their remaining balance to ${pct(c.effectiveRate)} in ${c.refinancedMonth}. The cheapest month on record`
     : ` at ${pct(c.rateThen)}, too late to catch the 2020-21 refinance window`;
 
   $("cohort").innerHTML = `
@@ -358,13 +360,13 @@ function renderCohort(input: ScenarioInput): void {
       <span class="stat__label">From Prop 13</span>
       <span class="stat__value">${money(c.prop13Advantage)}<span class="stat__unit">/mo</span></span>
       <span class="stat__note">
-        They're assessed at ${money(c.assessedValueNow)} — their ${year} price grown 2%/year. You'd be assessed at
+        They're assessed at ${money(c.assessedValueNow)}, their ${year} price grown 2%/year. You'd be assessed at
         ${money(c.yourAssessedValue)}. This gap never closes; it widens.
       </span>
     </div>`;
 
   $("cohortNotes").innerHTML = [
-    `After ${c.yearsHeld.toFixed(0)} years they've captured ${money(c.equityGained)} in appreciation, which becomes the down payment on the next house. This is how repeat buyers outbid you — the median repeat buyer is 62 and arrives with equity, not salary.`,
+    `After ${c.yearsHeld.toFixed(0)} years they've captured ${money(c.equityGained)} in appreciation, which becomes the down payment on the next house. This is how repeat buyers outbid you. The median repeat buyer is 62 and arrives with equity, not salary.`,
     `A second income moves this more than anything you can control. Most buyers have one: 61% of buyers are married couples.`,
     `Prop 13 is why the gap is permanent rather than temporary. Their assessed value can rise at most 2% a year no matter what the house is worth; yours resets to what you pay, on the day you pay it.`,
   ]
@@ -452,7 +454,7 @@ function renderHistory(anchorPrice: number): void {
         <span class="stat__value">${status.percentOffRecentPeak.toFixed(1)}%<span class="stat__unit"> off peak</span></span>
         <span class="stat__note">
           ${status.consecutiveDeclines} consecutive monthly ${status.consecutiveDeclines === 1 ? "decline" : "declines"}
-          through ${status.month}. Real, but small — the 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
+          through ${status.month}. Real, but small. The 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
         </span>
       </div>
     </div>`;
@@ -463,6 +465,138 @@ function renderHistory(anchorPrice: number): void {
   }
 
   $("waitingCaveats").innerHTML = ctx.caveats.map((c) => `<li>${c}</li>`).join("");
+}
+
+const CARRYING_KEYS = ["propertyTax", "homeownersInsurance", "mortgageInsurance", "hoa", "melloRoos"];
+
+function renderRentVsBuy(input: ScenarioInput): void {
+  const result = evaluateScenario(input);
+  const carrying = result.lines.filter((l) => CARRYING_KEYS.includes(l.key)).reduce((sum, l) => sum + l.monthly, 0);
+  const maintenance = result.lines.find((l) => l.key === "maintenanceReserve")?.monthly ?? 0;
+
+  const rent = num("currentRent", 2750);
+  const appreciation = Number($<HTMLInputElement>("appreciation").value) / 1000;
+  const investReturn = Number($<HTMLInputElement>("investReturn").value) / 1000;
+  const rentGrowth = Number($<HTMLInputElement>("rentGrowth").value) / 1000;
+
+  $("appreciationOut").textContent = pct(appreciation, 1);
+  $("investReturnOut").textContent = pct(investReturn, 1);
+  $("rentGrowthOut").textContent = pct(rentGrowth, 1);
+
+  const priceToRent = rent > 0 ? input.purchasePrice / (rent * 12) : Infinity;
+  const ratioVerdict =
+    priceToRent < 15
+      ? { label: "buying territory", cls: "stat--pass" }
+      : priceToRent < 20
+        ? { label: "genuinely a toss-up", cls: "" }
+        : { label: "renting territory", cls: "stat--fail" };
+
+  $("rentRatio").innerHTML = `
+    <div class="stat stat--wide ${ratioVerdict.cls}">
+      <span class="stat__label">Price to rent</span>
+      <span class="stat__value">${Number.isFinite(priceToRent) ? priceToRent.toFixed(1) + "x" : "—"}<span class="stat__unit"> ${ratioVerdict.label}</span></span>
+      <span class="stat__note">
+        The purchase price divided by a year of your rent. Under 15 favours buying, over 20 favours renting, and it is
+        the single strongest predictor of which way this comes out. Yours: ${money(input.purchasePrice)} against
+        ${money(rent)}/month.
+      </span>
+    </div>`;
+
+  const r = compareRentVsBuy({
+    purchasePrice: input.purchasePrice,
+    downPaymentAmount: result.loan.downPaymentAmount,
+    closingCosts: Math.max(result.cashToClose.total - result.loan.downPaymentAmount, 0),
+    loanAmount: result.loan.totalLoanAmount,
+    interestRate: input.interestRate,
+    termYears: input.termYears,
+    monthlyCarryingCosts: carrying,
+    monthlyMaintenance: maintenance,
+    monthlyRent: rent,
+    homeAppreciation: appreciation,
+    rentGrowth,
+    investmentReturn: investReturn,
+    propertyTaxGrowth: 0.02,
+    sellingCostRate: 0.06,
+  });
+
+  const f = r.firstYear;
+  $("burnCompare").innerHTML = `
+    <div class="stat stat--fail">
+      <span class="stat__label">Owning, money that buys nothing</span>
+      <span class="stat__value">${money(f.burned)}</span>
+      <span class="stat__note">${money(f.interestPaid)} interest, ${money(f.carryingAndMaintenance)} tax, insurance and upkeep. None of it is equity.</span>
+    </div>
+    <div class="stat">
+      <span class="stat__label">Renting, money that buys nothing</span>
+      <span class="stat__value">${money(f.rentPaid)}</span>
+      <span class="stat__note">All of it. That is the honest comparison, and it is ${money(Math.abs(f.burnedMoreThanRent))} ${f.burnedMoreThanRent > 0 ? "less" : "more"} than owning burns.</span>
+    </div>
+    <div class="stat stat--pass">
+      <span class="stat__label">Owning, actual saving</span>
+      <span class="stat__value">${money(f.principalPaid)}</span>
+      <span class="stat__note">The principal portion in year one. This is the only part of a mortgage payment that is not spent.</span>
+    </div>`;
+
+  $("rentBuyChart").innerHTML = renderMultiLine({
+    series: [
+      {
+        key: "buy",
+        label: "Net worth if you buy",
+        color: SERIES_PRICE,
+        points: r.years.map((y) => ({ month: `${2026 + y.year}-01`, value: y.buyNetWorth })),
+      },
+      {
+        key: "rent",
+        label: "Net worth if you rent and invest the difference",
+        color: SERIES_PAYMENT,
+        points: r.years.map((y) => ({ month: `${2026 + y.year}-01`, value: y.rentNetWorth })),
+      },
+    ],
+    format: (n) => (Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`),
+    shadeGap: true,
+    markers: r.breakevenYear
+      ? [{ seriesKey: "buy", month: `${2026 + r.breakevenYear}-01`, label: `buying wins, year ${r.breakevenYear}` }]
+      : [],
+    description: "Net worth over 30 years if you buy, against renting and investing the difference.",
+  });
+
+  $("rentBuyVerdict").textContent = r.verdict;
+  $("rentBuyVerdict").className =
+    `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
+  $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
+
+  // --- the savings treadmill ---
+  const race = savingsRace({
+    targetPrice: input.purchasePrice,
+    downPaymentPercent: input.downPayment.kind === "percent" ? input.downPayment.value : 0.2,
+    closingCostRate: 0.025,
+    currentSavings: num("currentSavings", 0),
+    monthlySavings: num("monthlySavings", 0),
+    savingsReturn: 0.045,
+    homeAppreciation: appreciation,
+  });
+
+  $("savingsRace").innerHTML = `
+    <div class="stat">
+      <span class="stat__label">Cash needed today</span>
+      <span class="stat__value">${money(race.cashNeededToday)}</span>
+      <span class="stat__note">Down payment plus closing costs on ${money(input.purchasePrice)}.</span>
+    </div>
+    <div class="stat ${race.losingGround ? "stat--fail" : "stat--pass"}">
+      <span class="stat__label">Time to get there</span>
+      <span class="stat__value">${race.yearsToAfford ? race.yearsToAfford + " yr" : "never"}</span>
+      <span class="stat__note">${
+        race.priceThen ? `The house costs ${money(race.priceThen)} by then.` : "The target moves faster than you save."
+      }</span>
+    </div>
+    <div class="stat ${race.losingGround ? "stat--fail" : "stat--pass"}">
+      <span class="stat__label">The race</span>
+      <span class="stat__value">${money(race.savingsGrowBy - race.targetGrowsBy)}<span class="stat__unit">/yr ${race.losingGround ? "behind" : "ahead"}</span></span>
+      <span class="stat__note">Your savings grow ${money(race.savingsGrowBy)}/yr. The deposit you need grows ${money(race.targetGrowsBy)}/yr.</span>
+    </div>`;
+
+  $("savingsVerdict").textContent = race.verdict;
+  $("savingsVerdict").className = `verdict ${race.losingGround ? "verdict--no" : "verdict--yes"}`;
 }
 
 let buyingPowerRendered = false;
@@ -537,7 +671,7 @@ function renderSignals(anchorPrice: number): void {
 
   const { readings, summary, caveats } = crashSignals(anchorPrice);
   const fmt = (v: number | null, unit: string) =>
-    v === null ? "—" : unit.startsWith("x") ? `${v.toFixed(1)}x` : `${v.toFixed(1)}${unit.startsWith("%") ? "%" : ""}`;
+    v === null ? ", " : unit.startsWith("x") ? `${v.toFixed(1)}x` : `${v.toFixed(1)}${unit.startsWith("%") ? "%" : ""}`;
 
   $("signals").innerHTML = readings
     .map(
@@ -660,7 +794,7 @@ function renderForecast(): void {
   $("forecastWeights").innerHTML = `
     <p class="field-note">
       What the 24-month ridge model learned to weight, per standard deviation of each indicator. These describe
-      the model, not the housing market — a model this poorly validated has no authority to tell you what matters.
+      the model, not the housing market. A model this poorly validated has no authority to tell you what matters.
     </p>
     <div class="corr">
       ${weights
@@ -692,7 +826,7 @@ function renderForecast(): void {
           <span class="${r.best.skillVsMean > 0 ? "ok" : "bad"}">${r.best.skillVsMean.toFixed(2)}</span>
           <span class="${r.best.skillVsMomentum > 0 ? "ok" : "bad"}">${r.best.skillVsMomentum.toFixed(2)}</span>
           <span class="${r.best.directionalEdge > 0 ? "ok" : "bad"}">${(r.best.directionalEdge * 100).toFixed(1)} pts</span>
-          <span class="${(r.classifier.auc ?? 0) > 0.5 ? "ok" : "bad"}">${r.classifier.auc?.toFixed(2) ?? "—"}</span>
+          <span class="${(r.classifier.auc ?? 0) > 0.5 ? "ok" : "bad"}">${r.classifier.auc?.toFixed(2) ?? ", "}</span>
         </div>`
         )
         .join("")}
@@ -756,7 +890,7 @@ function renderWaiting(input: ScenarioInput): void {
     <div class="stat">
       <span class="stat__label">Buy today</span>
       <span class="stat__value">${money(r.buyNow.total)}<span class="stat__unit">/mo</span></span>
-      <span class="stat__note">${money(r.buyNow.price)} at ${pct(input.interestRate)} — principal, interest and tax.</span>
+      <span class="stat__note">${money(r.buyNow.price)} at ${pct(input.interestRate)}, principal, interest and tax.</span>
     </div>
     <div class="stat">
       <span class="stat__label">Buy at the bottom</span>
@@ -805,7 +939,7 @@ function renderWaiting(input: ScenarioInput): void {
  *
  * These fields are deliberately `type="text"`, not `type="number"`. A number
  * input reports `.value` as an empty string the moment its contents aren't a
- * bare number — so a browser will happily *display* "1,200,000" while handing
+ * bare number, so a browser will happily *display* "1,200,000" while handing
  * the script "". Owning the formatting ourselves keeps what you see and what
  * gets calculated the same thing.
  */
@@ -834,6 +968,10 @@ function init(): void {
   }
 
   // The history panel's own controls re-render only the sections they affect.
+  for (const id of ["appreciation", "investReturn", "rentGrowth"]) {
+    $<HTMLInputElement>(id).addEventListener("input", () => renderRentVsBuy(readInput()));
+  }
+
   for (const id of ["cohortYear", "crashDepth", "crashMonths", "crashRate", "waitRent", "waitSavings"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => {
       const current = readInput();

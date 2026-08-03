@@ -61,7 +61,7 @@ export interface BurdenPoint {
  * The affordability burden series: what a median household would spend on a
  * 20%-down median home, as a share of income, every month since 1987.
  *
- * This is the honest way to ask "is now the worst time ever" — price alone
+ * This is the honest way to ask "is now the worst time ever", price alone
  * ignores rates, and rates alone ignore price.
  */
 export function burdenSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, downPercent = 0.2): BurdenPoint[] {
@@ -110,7 +110,7 @@ export function worstTimeToBuy(anchorPrice = DEFAULT_ANCHOR_PRICE): WorstTimeVer
   const answer =
     rank === 1
       ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive month to buy in the ${series.length} months on record.`
-      : `No — but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, which is worse than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of all months since ${series[0]!.month.slice(0, 4)}. The actual worst was ${worstEver.month}, at ${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The median month in this record was ${pct(median)} — roughly half what you'd pay now.`;
+      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, which is worse than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of all months since ${series[0]!.month.slice(0, 4)}. The actual worst was ${worstEver.month}, at ${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The median month in this record was ${pct(median)}, roughly half what you'd pay now.`;
 
   return {
     latest,
@@ -170,7 +170,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: (at(TROUGH_2009)?.paymentToIncome ?? 0) * 100,
       lean: "bearish",
       reading:
-        "About what it cost at the 2006 peak, relative to income. This stretched has preceded both declines on record — and also persisted for years before either broke.",
+        "About what it cost at the 2006 peak, relative to income. This stretched has preceded both declines on record, and also persisted for years before either broke.",
     },
     {
       key: "priceToIncome",
@@ -181,7 +181,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: at(TROUGH_2009)?.priceToIncome ?? null,
       lean: "bearish",
       reading:
-        "Near the 2006 peak multiple. The 2009 trough took it back to ~6x — which is what a 40% decline looks like from here.",
+        "Near the 2006 peak multiple. The 2009 trough took it back to ~6x, which is what a 40% decline looks like from here.",
     },
     {
       key: "supply",
@@ -194,7 +194,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       reading:
         "Above where it sat at the 2006 peak and near 2009 levels. Of everything here, this has the strongest historical link to what prices did next.",
       caveat:
-        "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply — the market you actually shop — is around 4.6 months.",
+        "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply. The market you actually shop, is around 4.6 months.",
     },
     {
       key: "delinquency",
@@ -216,12 +216,12 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2009Trough: asOf(SD_UNEMPLOYMENT, TROUGH_2009),
       lean: "bullish",
       reading:
-        "Low. Job losses turn a slowdown into a cascade — people sell because they must. It also decides whether you could buy a dip: you have to still be employed at the bottom.",
+        "Low. Job losses turn a slowdown into a cascade, people sell because they must. It also decides whether you could buy a dip: you have to still be employed at the bottom.",
     },
   ];
 
   const summary =
-    "Valuation says stretched; credit says stable. Both prior declines needed stretched valuations AND a trigger — a recession in 1990, a credit collapse in 2008. Today the valuation is here and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.";
+    "Valuation says stretched; credit says stable. Both prior declines needed stretched valuations AND a trigger. A recession in 1990, a credit collapse in 2008. Today the valuation is here and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.";
 
   return {
     readings,
@@ -231,7 +231,7 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       "Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat a reported n of 449 as closer to 19 real observations.",
       "Supply and delinquency are national; only unemployment is San Diego. Income is statewide California, annual, ending " +
         SIGNALS_INCOME_LAST_YEAR +
-        ", carried forward after that — which slightly overstates the burden.",
+        ", carried forward after that, which slightly overstates the burden.",
       "Every indicator here is backward-looking. Markets turn on things that have not happened yet.",
     ],
   };
@@ -248,7 +248,7 @@ export interface Correlation {
   r: number;
   /** Raw overlapping-window count. */
   observations: number;
-  /** observations / windowMonths — the honest sample size. */
+  /** observations / windowMonths, the honest sample size. */
   effectiveObservations: number;
   strength: "strong" | "moderate" | "weak";
 }

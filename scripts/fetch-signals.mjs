@@ -54,7 +54,7 @@ const since = (rows, from) => rows.filter(([m]) => m >= from);
 
 const fmt = (rows) => rows.map(([m, v]) => `  [${JSON.stringify(m)}, ${v}],`).join("\n");
 
-const body = `// GENERATED FILE — do not edit by hand.
+const body = `// GENERATED FILE. Do not edit by hand.
 // Regenerate with: npm run data:signals
 //
 // Sources (all FRED, public CSV endpoint, no API key):

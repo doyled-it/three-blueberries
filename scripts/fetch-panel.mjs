@@ -102,7 +102,7 @@ await fs.writeFile(OUT, JSON.stringify(panel), "utf8");
 const totalObs = metroEntries.reduce((sum, [, m]) => sum + m.series.length, 0);
 const bytes = (await fs.stat(OUT)).size;
 console.log(
-  `Wrote ${path.relative(root, OUT)} — ${metroEntries.length} metros, ${totalObs} metro-months, ${(bytes / 1024).toFixed(0)}KB`
+  `Wrote ${path.relative(root, OUT)}, ${metroEntries.length} metros, ${totalObs} metro-months, ${(bytes / 1024).toFixed(0)}KB`
 );
 for (const [key, series] of Object.entries(national)) {
   console.log(`  ${key.padEnd(13)} ${series.length} rows, ${series[0][0]} -> ${series[series.length - 1][0]}`);

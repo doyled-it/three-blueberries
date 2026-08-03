@@ -1,4 +1,4 @@
-// GENERATED FILE — do not edit by hand.
+// GENERATED FILE, do not edit by hand.
 // Regenerate with: npm run data:panel && npm run train
 //
 // Trained by training/train.py (scikit-learn) on a panel of 20 Case-Shiller

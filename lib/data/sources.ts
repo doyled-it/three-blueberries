@@ -2,7 +2,7 @@
  * The citation registry.
  *
  * Every number this app shows you traces back to an entry here. If a figure
- * can't cite something, it doesn't ship — and if a figure is an estimate rather
+ * can't cite something, it doesn't ship, and if a figure is an estimate rather
  * than a published rule, it says so in `kind` and the UI labels it that way.
  *
  * This is the whole point of the project: mortgage calculators hand you a
@@ -145,7 +145,7 @@ export const SOURCES = {
     asOf: "2026-01-01",
     kind: "estimate",
     caveat:
-      "A CFD special tax on top of your property tax, common in developments built after ~1982. Ranges from a few hundred to over $10,000/year and is invisible on most listing sites. It is per-parcel — the only reliable number comes from the title report or the county auditor.",
+      "A CFD special tax on top of your property tax, common in developments built after ~1982. Ranges from a few hundred to over $10,000/year and is invisible on most listing sites. It is per-parcel. The only reliable number comes from the title report or the county auditor.",
   },
 
   "pmi-rate-bands": {
@@ -167,7 +167,7 @@ export const SOURCES = {
     asOf: "1999-07-29",
     kind: "statutory",
     caveat:
-      "Automatic termination at 78% LTV of ORIGINAL value, on the amortization schedule — not on what your house is worth now. You can request cancellation at 80%. Neither applies to FHA loans.",
+      "Automatic termination at 78% LTV of ORIGINAL value, on the amortization schedule, not on what your house is worth now. You can request cancellation at 80%. Neither applies to FHA loans.",
   },
 
   "ca-insurance-market": {

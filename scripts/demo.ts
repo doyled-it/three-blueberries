@@ -47,16 +47,16 @@ function show(label: string, input: ScenarioInput) {
   if (r.qualification.residualIncome) {
     const ri = r.qualification.residualIncome;
     console.log(
-      `  VA residual: ${m(ri.available)} available vs ${m(ri.required)} required — ${ri.passes ? "PASSES" : "FAILS"}`
+      `  VA residual: ${m(ri.available)} available vs ${m(ri.required)} required, ${ri.passes ? "PASSES" : "FAILS"}`
     );
   }
   console.log("");
   for (const w of r.warnings) console.log(`  ! ${w}\n`);
 }
 
-show("CONVENTIONAL — 10% down, 740 score, San Diego", base);
+show("CONVENTIONAL, 10% down, 740 score, San Diego", base);
 
-show("VA — 0% down, first use, no disability exemption", {
+show("VA, 0% down, first use, no disability exemption", {
   ...base,
   loanType: "va",
   downPayment: { kind: "percent", value: 0 },
@@ -65,7 +65,7 @@ show("VA — 0% down, first use, no disability exemption", {
   household: { ...base.household, size: 3 },
 });
 
-show("FHA — 3.5% down, 680 score", {
+show("FHA, 3.5% down, 680 score", {
   ...base,
   loanType: "fha",
   downPayment: { kind: "percent", value: 0.035 },
@@ -74,7 +74,7 @@ show("FHA — 3.5% down, 680 score", {
 
 const afford = maxAffordablePrice(base);
 console.log("\n" + "=".repeat(78));
-console.log("AFFORDABILITY — what can this household actually buy?");
+console.log("AFFORDABILITY, what can this household actually buy?");
 console.log("=".repeat(78));
 console.log(`  Max purchase price: ${m(afford.maxPurchasePrice)}`);
 console.log(`  Binding constraint: ${afford.bindingConstraint}`);

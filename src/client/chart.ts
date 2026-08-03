@@ -3,7 +3,7 @@
  *
  * Deliberately NOT a dual-axis chart. Price and payment are different measures
  * on different scales, so they get two stacked charts sharing an x-axis rather
- * than two y-scales on one plot — which is the single most misleading thing a
+ * than two y-scales on one plot, which is the single most misleading thing a
  * chart of this data could do, since the whole point is that the two series
  * diverge.
  *
@@ -124,11 +124,11 @@ export function renderChart(opts: ChartOptions): string {
     ${bandEls}
     ${grid}
     ${xAxis}
+    <line class="c-cross" x1="0" x2="0" y1="${PAD.top}" y2="${PAD.top + plotH}" style="display:none"/>
     <path class="c-line" d="${line}" style="stroke:${color}"/>
     ${markerEls}
-    <line class="c-cross" x1="0" x2="0" y1="${PAD.top}" y2="${PAD.top + plotH}" style="display:none"/>
-    <circle class="c-dot" r="5" style="display:none;stroke:${color}"/>
     <rect class="c-hit" x="${PAD.left}" y="${PAD.top}" width="${plotW}" height="${plotH}" fill="transparent"/>
+    <circle class="c-dot" r="5" style="display:none;stroke:${color}"/>
   </svg>
   <div class="c-tip" hidden></div>
 </figure>`;
@@ -148,7 +148,7 @@ export interface LineSeries {
 /**
  * Two or more series on ONE shared axis.
  *
- * Legitimate here — and only here — because the series share a unit (dollars).
+ * Legitimate here, and only here, because the series share a unit (dollars).
  * That is the entire reason this comparison works: "what it costs" and "what you
  * can afford" are directly comparable, and the gap between them is the finding.
  * Two measures on different scales would still need two charts.
@@ -273,7 +273,7 @@ export interface StackColumn {
  * Part-to-whole across an ordered dimension: each column is one purchase-year
  * cohort, each segment a component of their monthly advantage.
  *
- * Segments carry a 2px surface gap so adjacent fills never touch — that gap is
+ * Segments carry a 2px surface gap so adjacent fills never touch. That gap is
  * what keeps the boundary readable for someone who can't separate the hues.
  */
 export function renderStackedColumns(opts: {

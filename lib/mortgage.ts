@@ -7,9 +7,9 @@
  * Two totals come out of this, and the difference between them is the entire
  * reason the project exists:
  *
- *   lenderMonthlyTotal — what underwriting counts and what a mortgage
+ *   lenderMonthlyTotal, what underwriting counts and what a mortgage
  *                        calculator shows you.
- *   trueMonthlyTotal   — what actually leaves your bank account.
+ *   trueMonthlyTotal, what actually leaves your bank account.
  */
 
 import { balanceAfter, monthLtvReaches, monthlyPayment, totalInterest } from "./amortization.ts";
@@ -89,7 +89,7 @@ export function deriveLoanFacts(input: ScenarioInput): LoanFacts {
     totalLoanAmount: baseLoanAmount + financedUpfrontFee,
     financedUpfrontFee,
     upfrontFeePaidInCash,
-    // LTV is measured on the base loan against purchase price — financed upfront
+    // LTV is measured on the base loan against purchase price, financed upfront
     // fees don't count against you for mortgage insurance pricing.
     ltv: price > 0 ? baseLoanAmount / price : 0,
     conformingLimit,
@@ -118,7 +118,7 @@ export function computeMortgageInsurance(input: ScenarioInput, loan: LoanFacts):
       endsAfterMonths: durationMonths,
       explanation:
         durationMonths === null
-          ? `FHA annual MIP of ${pct(rate)} for the life of the loan. Because you put down less than 10%, there is no equity level that removes it — the only way out is refinancing off FHA entirely.`
+          ? `FHA annual MIP of ${pct(rate)} for the life of the loan. Because you put down less than 10%, there is no equity level that removes it. The only way out is refinancing off FHA entirely.`
           : `FHA annual MIP of ${pct(rate)}, payable for 11 years because you put down 10% or more.`,
       sourceIds: ["hud-ml-2023-05"],
     };
@@ -156,7 +156,7 @@ export function computeMortgageInsurance(input: ScenarioInput, loan: LoanFacts):
         ? `You can request cancellation at 80% LTV around month ${requestAt} (${years(requestAt)} years). `
         : "") +
       (endsAfterMonths !== null
-        ? `It terminates automatically at 78% LTV around month ${endsAfterMonths} (${years(endsAfterMonths)} years) on the original schedule — appreciation does not count.`
+        ? `It terminates automatically at 78% LTV around month ${endsAfterMonths} (${years(endsAfterMonths)} years) on the original schedule, appreciation does not count.`
         : "It does not reach the 78% automatic termination point within the loan term."),
     sourceIds: ["pmi-rate-bands", "pmi-cancellation"],
   };
@@ -204,7 +204,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     confidence: usingCountyDefault ? "estimated" : "user",
     sourceIds: ["prop-13", "ca-county-tax-rates", ...(exemption ? (["ca-homeowners-exemption"] as const) : [])],
     warning: usingCountyDefault
-      ? `Typical rate for ${input.county} County, not your rate. Rates vary by tax rate area within a county — check your county assessor's parcel lookup.`
+      ? `Typical rate for ${input.county} County, not your rate. Rates vary by tax rate area within a county. Check your county assessor's parcel lookup.`
       : undefined,
   });
 
@@ -238,7 +238,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
       sourceIds: mi.sourceIds,
       warning:
         input.loanType === "fha" && mi.endsAfterMonths === null
-          ? "This never goes away — over 30 years it's the largest avoidable cost of an FHA loan."
+          ? "This never goes away, over 30 years it's the largest avoidable cost of an FHA loan."
           : undefined,
     });
   } else if (input.loanType === "va") {
@@ -276,7 +276,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     basis:
       input.melloRoosAnnual > 0
         ? `${money(input.melloRoosAnnual)}/year in CFD special tax, as entered.`
-        : "Entered as zero. Verify it — CFDs don't show on listing sites and are common in anything built after ~1982.",
+        : "Entered as zero. Verify it, CFDs don't show on listing sites and are common in anything built after ~1982.",
     confidence: "user",
     sourceIds: ["mello-roos"],
     warning:
@@ -416,7 +416,7 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
   const notes: string[] = [ceilingInfo.note];
   if (input.household.grossAnnualIncomes.length > 1) {
     notes.push(
-      `Both incomes count — and so does both people's debt. Two earners raise the ceiling; they don't halve the payment.`
+      `Both incomes count, and so does both people's debt. Two earners raise the ceiling; they don't halve the payment.`
     );
   }
 
@@ -445,7 +445,7 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
       required,
       passes: available >= required,
       explanation:
-        `VA requires ${money(required)}/month left over for a household of ${input.household.size} in the West region — ` +
+        `VA requires ${money(required)}/month left over for a household of ${input.household.size} in the West region, ` +
         `the highest minimums in the country. After an estimated ${money(taxes)} in taxes, ${money(housingPayment)} in housing, ` +
         `${money(input.household.monthlyDebts)} in other debt, and VA's fixed ${money(utilityAllowance)} utility allowance ` +
         `(${squareFeet.toLocaleString("en-US")} sq ft at $${VA_UTILITY_PER_SQFT}/sq ft), you would have ${money(available)}.`,
@@ -482,7 +482,7 @@ function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qua
 
   warnings.push(
     "Expect a supplemental property tax bill a few months after closing. When the county reassesses to your purchase price, it bills you " +
-      "the difference from the seller's old assessment, prorated for the rest of the fiscal year. Your impound account does not cover it — " +
+      "the difference from the seller's old assessment, prorated for the rest of the fiscal year. Your impound account does not cover it, " +
       "it arrives as a separate bill you pay out of pocket, and on a long-held California home it can be thousands."
   );
 
@@ -528,5 +528,5 @@ export function evaluateScenario(input: ScenarioInput): ScenarioResult {
   return { input, loan, lines, lenderMonthlyTotal, trueMonthlyTotal, cashToClose, qualification, warnings };
 }
 
-/** Remaining balance at a given month — exposed for equity and payoff views. */
+/** Remaining balance at a given month, exposed for equity and payoff views. */
 export { balanceAfter };

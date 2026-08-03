@@ -7,7 +7,7 @@ Tests, on identical purged walk-forward folds:
     v1 features        the original 12
     v2 features        30 features: accelerations, volatility, drawdown-from-peak,
                        cross-metro ranks, spreads, momentum x valuation interactions
-    v2 + lags          v2 plus 6/12/24-month lagged copies of the key series —
+    v2 + lags          v2 plus 6/12/24-month lagged copies of the key series,
                        a tabular stand-in for what a small recurrent net sees
     longer horizons    36, 48 and 60 months, in case the signal needs more room
 

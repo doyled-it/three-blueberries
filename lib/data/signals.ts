@@ -1,4 +1,4 @@
-// GENERATED FILE — do not edit by hand.
+// GENERATED FILE, do not edit by hand.
 // Regenerate with: npm run data:signals
 //
 // Sources (all FRED, public CSV endpoint, no API key):

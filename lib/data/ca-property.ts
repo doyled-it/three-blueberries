@@ -4,9 +4,9 @@
  * READ THIS BEFORE TRUSTING A NUMBER OUT OF THIS FILE.
  *
  * Property tax: the 1% base rate is statutory and exact (Prop 13). Everything
- * stacked on top — school bonds, infrastructure levies, transit measures — is
- * voter-approved and varies by tax rate area (TRA), which is finer-grained than
- * a county. Two houses a mile apart in the same county can differ. The per-county
+ * stacked on top is voter-approved: school bonds, infrastructure levies, transit
+ * measures. Those vary by tax rate area (TRA), which is finer-grained than a
+ * county. Two houses a mile apart in the same county can differ. The per-county
  * numbers below are typical values, not your value. Your county assessor's parcel
  * lookup has the real one and it takes two minutes to check.
  *
@@ -99,7 +99,7 @@ export function estimateInsuranceAnnual(purchasePrice: number): number {
  * Buyer closing costs as a fraction of purchase price, excluding the down
  * payment and any financed upfront loan fee. California buyers typically land
  * between 2% and 5%; escrow is customarily split with the seller in most of the
- * state. We default to the low-middle because the biggest single item — points —
+ * state. We default to the low-middle because the biggest single item, points,
  * is optional.
  */
 export const DEFAULT_CLOSING_COST_RATE = 0.025;

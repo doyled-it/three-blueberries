@@ -13,7 +13,7 @@ both have to be handled or the model will report skill it does not have:
    must be *purged*.
 
 Purging is what separates an honest walk-forward from a flattering one. With a
-36-month horizon it removes three years of the most recent — and most relevant —
+36-month horizon it removes three years of the most recent, and most relevant,
 training data from every fold, which is exactly why naive implementations skip it.
 """
 

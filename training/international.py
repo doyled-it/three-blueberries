@@ -4,7 +4,7 @@ Two things are different from the US-metro panel, and both matter:
 
 **Independent events.** Japan 1991, Finland/Sweden/Norway 1991-93, Asia 1997,
 Spain/Ireland/US 2008, and assorted national cycles in between. These are driven
-by different central banks, different credit regimes, and different timing —
+by different central banks, different credit regimes, and different timing,
 unlike 20 US metros that all broke in the same quarter for the same reason.
 
 **Credit.** The literature's top-ranked predictor, and the one the US panel

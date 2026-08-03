@@ -114,7 +114,7 @@ export default {
 
     if (url.pathname === "/api/rates") {
       const rates = await getRates(env);
-      // Let the browser hold it briefly too — no reason to re-ask on every nav.
+      // Let the browser hold it briefly too. No reason to re-ask on every nav.
       return json(rates, 200, 900);
     }
 
