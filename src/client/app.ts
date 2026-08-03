@@ -117,7 +117,8 @@ function readInput(): ScenarioInput {
 
   return {
     purchasePrice: num("purchasePrice", 900_000),
-    downPayment: { kind: "percent", value: num("downPaymentPercent", 20) / 100 },
+    // People know what they have, not what fraction of a price it is.
+    downPayment: { kind: "amount", value: num("downPaymentAmount", 0) },
     loanType,
     termYears: Number($<HTMLSelectElement>("termYears").value),
     interestRate: num("interestRate", 6.66) / 100,
@@ -181,6 +182,12 @@ function render(): void {
 
   // Program-specific fields only appear when they apply.
   $("va-fields").hidden = input.loanType !== "va";
+
+  const downAmount = input.downPayment.kind === "amount" ? input.downPayment.value : 0;
+  $("downPaymentPercentOut").textContent =
+    input.purchasePrice > 0
+      ? `${pct(Math.min(downAmount / input.purchasePrice, 1), 1)} of the price`
+      : "enter a price first";
 
   // A price of zero produces a table of $0 lines that looks like a broken app
   // rather than an empty one. Say what's missing instead.
@@ -627,7 +634,14 @@ function renderRentVsBuy(input: ScenarioInput): void {
   const holdYears = Number($<HTMLInputElement>("holdYears").value);
   $("holdYearsOut").textContent = `${holdYears} year${holdYears === 1 ? "" : "s"}`;
 
-  const downPercent = input.downPayment.kind === "percent" ? input.downPayment.value : 0.2;
+  // Derive the real fraction. Defaulting to 20% whenever the input was an amount
+  // silently ignored what the user actually typed.
+  const downPercent =
+    input.downPayment.kind === "percent"
+      ? input.downPayment.value
+      : input.purchasePrice > 0
+        ? Math.min(input.downPayment.value / input.purchasePrice, 1)
+        : 0;
   const sweepBase = {
     interestRate: input.interestRate,
     termYears: input.termYears,
@@ -837,7 +851,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // --- the savings treadmill ---
   const race = savingsRace({
     targetPrice: input.purchasePrice,
-    downPaymentPercent: input.downPayment.kind === "percent" ? input.downPayment.value : 0.2,
+    downPaymentPercent: downPercent,
     closingCostRate: 0.025,
     currentSavings: num("currentSavings", 0),
     monthlySavings: num("monthlySavings", 0),

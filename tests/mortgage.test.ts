@@ -278,3 +278,30 @@ test("paying the VA funding fee in cash moves it out of the loan and into cash t
   assert.equal(result.loan.totalLoanAmount, 900_000);
   assert.ok(result.cashToClose.lines.some((l) => l.key === "upfrontFee"));
 });
+
+test("REGRESSION: a down payment given as an amount is honoured, not assumed to be 20%", () => {
+  // Several downstream calculations previously defaulted to 20% whenever the
+  // input was an amount rather than a percentage, silently discarding what the
+  // user actually typed.
+  const price = 1_000_000;
+  for (const amount of [0, 50_000, 210_000, 350_000]) {
+    const byAmount = evaluateScenario(
+      scenario({ purchasePrice: price, downPayment: { kind: "amount", value: amount } })
+    );
+    const byPercent = evaluateScenario(
+      scenario({ purchasePrice: price, downPayment: { kind: "percent", value: amount / price } })
+    );
+    assert.ok(
+      Math.abs(byAmount.lenderMonthlyTotal - byPercent.lenderMonthlyTotal) < 0.01,
+      `an amount of ${amount} must match the equivalent percentage`
+    );
+    assert.ok(Math.abs(byAmount.loan.downPaymentAmount - amount) < 0.01);
+    assert.ok(Math.abs(byAmount.loan.downPaymentPercent - amount / price) < 1e-9);
+  }
+});
+
+test("a down payment larger than the price is clamped rather than producing a negative loan", () => {
+  const r = evaluateScenario(scenario({ purchasePrice: 500_000, downPayment: { kind: "amount", value: 900_000 } }));
+  assert.equal(r.loan.baseLoanAmount, 0);
+  assert.ok(r.loan.downPaymentAmount <= 500_000);
+});

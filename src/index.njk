@@ -47,8 +47,10 @@ description: The real monthly cost of buying a house in California, itemized and
         <option value="jumbo">Jumbo</option>
       </select>
 
-      <label for="downPaymentPercent">Down payment <span class="hint">percent</span></label>
-      <input id="downPaymentPercent" type="number" value="20" step="0.5" min="0" max="100" inputmode="decimal" />
+      <label for="downPaymentAmount">
+        Down payment <span class="hint" id="downPaymentPercentOut">20.0% of the price</span>
+      </label>
+      <input id="downPaymentAmount" type="text" class="money" value="180,000" inputmode="numeric" />
 
       <label for="interestRate">Interest rate <span class="hint">percent</span></label>
       <input id="interestRate" type="number" value="6.66" step="0.005" min="0" inputmode="decimal" />
