@@ -494,7 +494,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
   $("rentRatio").innerHTML = `
     <div class="stat stat--wide ${ratioVerdict.cls}">
       <span class="stat__label">Price to rent</span>
-      <span class="stat__value">${Number.isFinite(priceToRent) ? priceToRent.toFixed(1) + "x" : "—"}<span class="stat__unit"> ${ratioVerdict.label}</span></span>
+      <span class="stat__value">${Number.isFinite(priceToRent) ? priceToRent.toFixed(1) + "x" : "n/a"}<span class="stat__unit"> ${ratioVerdict.label}</span></span>
       <span class="stat__note">
         The purchase price divided by a year of your rent. Under 15 favours buying, over 20 favours renting, and it is
         the single strongest predictor of which way this comes out. Yours: ${money(input.purchasePrice)} against
