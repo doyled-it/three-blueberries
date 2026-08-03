@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  ASSUMPTION_SETS,
   breakevenByPrice,
   buyZone,
   compareRentVsBuy,
@@ -373,4 +374,51 @@ test("the ceiling reported for a rate matches an exact recomputation", () => {
   const exact = maxPriceForHoldPeriod(SWEEP, COSTS, 10, 0.2);
   const sampled = buyZone(SWEEP, COSTS, [SWEEP.interestRate], 10, 0.2)[0]!.maxPrice;
   assert.equal(exact, sampled, "the same rate must produce the same ceiling from either path");
+});
+
+// --- matched assumptions ---------------------------------------------------
+
+test("every assumption set draws both returns from the same period", () => {
+  for (const set of ASSUMPTION_SETS) {
+    assert.ok(set.basis.length > 60, `${set.id} must say where its numbers come from`);
+    assert.ok(set.investmentReturn > set.homeAppreciation, "equities have outrun housing in every period measured");
+    assert.ok(set.homeAppreciation > 0 && set.homeAppreciation < 0.12);
+    assert.ok(set.investmentReturn > 0 && set.investmentReturn < 0.2);
+  }
+});
+
+test("REGRESSION: mixing periods flatters buying, matching them does not", () => {
+  // The trap the presets exist to close. San Diego's 7% decade next to a
+  // century-long 10% equity average is not a comparison, it is a thumb on
+  // the scale.
+  const mixed = maxPriceForHoldPeriod({ ...SWEEP, homeAppreciation: 0.0701, investmentReturn: 0.1 }, COSTS, 10, 0.2)!;
+  const lastDecade = ASSUMPTION_SETS.find((a) => a.id === "last-decade")!;
+  const matched = maxPriceForHoldPeriod(
+    { ...SWEEP, homeAppreciation: lastDecade.homeAppreciation, investmentReturn: lastDecade.investmentReturn },
+    COSTS,
+    10,
+    0.2
+  )!;
+  assert.ok(mixed > matched, "the mismatched pairing must produce the more generous ceiling");
+});
+
+test("the answer is stable once the periods are matched, which is the real finding", () => {
+  const ceilings = ASSUMPTION_SETS.map(
+    (set) =>
+      maxPriceForHoldPeriod(
+        {
+          ...SWEEP,
+          homeAppreciation: set.homeAppreciation,
+          investmentReturn: set.investmentReturn,
+          rentGrowth: set.rentGrowth,
+        },
+        COSTS,
+        10,
+        0.2
+      ) ?? 0
+  );
+  const low = Math.min(...ceilings);
+  const high = Math.max(...ceilings);
+  assert.ok(low > 200_000, "every matched set should still support buying something");
+  assert.ok(high < low * 1.8, `matched sets should agree within a narrow band, got ${low} to ${high}`);
 });

@@ -30,13 +30,15 @@ import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/f
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import {
+  ASSUMPTION_SETS,
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
   buyZone,
   compareRentVsBuy,
   decide,
-  rateSensitivity,
   maxPriceForHoldPeriod,
+  rateSensitivity,
+  requiredRate,
   savingsRace,
   statutoryRentCap,
 } from "../../lib/rent-vs-buy.ts";
@@ -601,6 +603,24 @@ function renderRentVsBuy(input: ScenarioInput): void {
     `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
+  if (!$("assumptionSets").hasChildNodes()) {
+    $("assumptionSets").innerHTML = ASSUMPTION_SETS.map(
+      (a) => `<button type="button" class="preset" data-assumptions="${a.id}">${a.label}</button>`
+    ).join("");
+    for (const button of document.querySelectorAll<HTMLButtonElement>("[data-assumptions]")) {
+      button.addEventListener("click", () => {
+        const set = ASSUMPTION_SETS.find((a) => a.id === button.dataset["assumptions"])!;
+        $<HTMLInputElement>("appreciation").value = String(Math.round(set.homeAppreciation * 1000));
+        $<HTMLInputElement>("investReturn").value = String(Math.round(set.investmentReturn * 1000));
+        $<HTMLInputElement>("rentGrowth").value = String(Math.round(set.rentGrowth * 1000));
+        for (const b of document.querySelectorAll(".preset[data-assumptions]")) b.classList.remove("preset--on");
+        button.classList.add("preset--on");
+        $("assumptionBasis").textContent = set.basis;
+        renderRentVsBuy(readInput());
+      });
+    }
+  }
+
   // --- how long would you have to stay? ---
   const holdYears = Number($<HTMLInputElement>("holdYears").value);
   $("holdYearsOut").textContent = `${holdYears} year${holdYears === 1 ? "" : "s"}`;
@@ -755,15 +775,24 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // The ceiling DESCENDS as the rate rises, so the threshold is the LAST rate
   // whose ceiling still clears the price, not the first. Searching forward
   // returned the cheapest rate on the axis and reported it as the requirement.
-  const crossing = [...zone].reverse().find((z) => (z.maxPrice ?? 0) >= input.purchasePrice);
+  // Read the threshold from the exact solver, not off the 0.25% sampling grid.
+  // The grid version disagreed with the lever card by up to a tenth of a point.
+  const exactThreshold = requiredRate(sweepBase, scaling, input.purchasePrice, holdYears, Math.max(downPercent, 0.05));
+  const at45 = maxPriceForHoldPeriod(
+    { ...sweepBase, interestRate: 0.045 },
+    scaling,
+    holdYears,
+    Math.max(downPercent, 0.05)
+  );
   $("buyZoneNote").textContent =
     `Below the blue line, buying beats renting over ${holdYears} years. Above it, renting wins. ` +
-    (crossing
-      ? `${money(input.purchasePrice)} needs a rate at or under ${pct(crossing.rate, 2)}, against ${pct(input.interestRate)} today. `
-      : `${money(input.purchasePrice)} does not work at any rate down to 3%. `) +
-    `Every half point of rate is worth about ${money(Math.abs(sensitivity.perQuarterPoint) * 1)} of house, which is why rates move this ` +
-    `decision more than anything else, and why they are the one thing you can change after you buy.` +
-    (ceilingHere ? ` At today's rate your ceiling is ${money(ceilingHere)}.` : "");
+    (exactThreshold !== null && exactThreshold < 0.1
+      ? `${money(input.purchasePrice)} needs a rate at or under ${pct(exactThreshold, 2)}, against ${pct(input.interestRate)} today. `
+      : `${money(input.purchasePrice)} does not work at any rate this model covers. `) +
+    (ceilingHere ? `At today's rate your ceiling is ${money(ceilingHere)}. ` : "") +
+    `The curve is convex, so a single per-point figure misleads: the next half point down is worth about ` +
+    `${money(Math.abs(sensitivity.perQuarterPoint))}, but getting all the way to 4.5% is worth ` +
+    `${at45 && ceilingHere ? money(at45 - ceilingHere) : "considerably more"}. Rates are also the only input here you can change after you buy.`;
 
   // --- the decision ---
   const decision = decide({

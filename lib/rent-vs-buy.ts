@@ -760,6 +760,67 @@ export function rateSensitivity(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Matched assumption sets
+// ---------------------------------------------------------------------------
+
+export interface AssumptionSet {
+  id: string;
+  label: string;
+  homeAppreciation: number;
+  investmentReturn: number;
+  rentGrowth: number;
+  basis: string;
+}
+
+/**
+ * Appreciation and investment return have to be drawn from the SAME period, or
+ * the comparison is rigged without anyone intending it.
+ *
+ * The default trap: San Diego's last decade ran 7.0%, which looks like a strong
+ * case for buying until you notice the equity number sitting next to it is a
+ * century-long average. Over that same decade the S&P returned about 13% before
+ * dividends. Matching the periods is the difference between an argument and a
+ * comparison.
+ *
+ * The useful result is that once they ARE matched, the answer barely moves. Every
+ * set below lands within a narrow band, which is a far stronger conclusion than
+ * any single run.
+ */
+export const ASSUMPTION_SETS: AssumptionSet[] = [
+  {
+    id: "long-run",
+    label: "Long run",
+    homeAppreciation: 0.0543,
+    investmentReturn: 0.1,
+    rentGrowth: 0.035,
+    basis:
+      "San Diego housing since 1987 from Case-Shiller, against the long-run nominal total return on US equities of roughly 10%. Both measured over decades.",
+  },
+  {
+    id: "last-decade",
+    label: "Last decade",
+    homeAppreciation: 0.0701,
+    investmentReturn: 0.147,
+    rentGrowth: 0.05,
+    basis:
+      "Both from the last ten years: San Diego housing at 7.0%, the S&P 500 at about 13.2% before dividends and roughly 14.7% with them. A strong decade for housing was a far stronger one for stocks.",
+  },
+  {
+    id: "cautious",
+    label: "Cautious",
+    homeAppreciation: 0.029,
+    investmentReturn: 0.07,
+    rentGrowth: 0.023,
+    basis:
+      "San Diego's last twenty years, which include a full crash, against a deliberately conservative 7% on equities. Rent grows at the rate yours actually has.",
+  },
+];
+
+export function assumptionSet(id: string): AssumptionSet | undefined {
+  return ASSUMPTION_SETS.find((a) => a.id === id);
+}
+
 export const RENT_VS_BUY_DEFAULTS = DEFAULTS;
 
 export const RENT_VS_BUY_CAVEAT =
