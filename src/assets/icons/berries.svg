@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Three blueberries">
+  <title>Three blueberries</title>
+  <!--
+    Drawn rather than photographed, because a photo of fruit is mush at 16px.
+
+    Three rules make it survive at favicon size:
+      1. Only three shapes, all circles, in a triangle. The silhouette does the work.
+      2. Each berry gets a gap to its neighbours, cut with a stroke in the page
+         colour, so they stay countable when the whole icon is 16 pixels wide.
+      3. Three distinct tints, back to front, so depth reads even when detail does not.
+
+    The calyx stars and highlights vanish below about 32px and are there for the
+    larger sizes only. Nothing depends on them.
+  -->
+  <g stroke="#0c0a12" stroke-width="2.5">
+    <circle cx="22" cy="24" r="14.5" fill="#5b45a8" />
+    <circle cx="43" cy="26" r="13" fill="#7a62d2" />
+    <circle cx="32" cy="43" r="16" fill="#9b83e8" />
+  </g>
+
+  <!-- Highlights: one soft catchlight per berry, upper left. -->
+  <g fill="#ffffff" opacity="0.22">
+    <ellipse cx="17" cy="18" rx="4.5" ry="3.2" transform="rotate(-28 17 18)" />
+    <ellipse cx="39" cy="21" rx="4" ry="2.8" transform="rotate(-28 39 21)" />
+    <ellipse cx="26" cy="36" rx="5.2" ry="3.6" transform="rotate(-28 26 36)" />
+  </g>
+
+  <!-- Calyx: the star scar that makes a blueberry a blueberry. -->
+  <g fill="#2a1f4d">
+    <path d="M32 43 l2.6 -4.6 l1.1 4.1 l4.4 -1.4 l-2.7 3.6 l4.1 2.1 l-4.8 0.5 l1 4.2 l-3.8 -2.9 l-2.6 3.6 l-0.6 -4.5 l-4.6 1.2 l2.7 -3.6 l-3.9 -2.3 l4.8 -0.3 z" opacity="0.9" />
+    <circle cx="22" cy="24" r="2.6" opacity="0.55" />
+    <circle cx="43" cy="26" r="2.2" opacity="0.5" />
+  </g>
+</svg>

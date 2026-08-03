@@ -21,7 +21,8 @@
     "train": "uv run python -m training.train",
     "train:test": "uv run pytest -q",
     "data:international": "node scripts/fetch-international.mjs",
-    "data:financial": "node scripts/fetch-financial.mjs"
+    "data:financial": "node scripts/fetch-financial.mjs",
+    "build:favicon": "uv run --with pillow python scripts/make-favicon.py"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.5",

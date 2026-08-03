@@ -1,92 +1,101 @@
-"""Builds the favicon from the blueberry photo.
+"""Draws the favicon: three blueberries, as a cartoon rather than a photo.
 
-    uv run --with pillow python scripts/make-favicon.py <source-image>
+    uv run --with pillow python scripts/make-favicon.py
 
-Keys out the white studio background, trims to the fruit, and writes a set of
-square PNGs plus an ICO. Also emits a tiny inline SVG fallback matching the
-site's three dot mark, used when the photo is too small to read.
+The site ships src/assets/icons/berries.svg as the primary icon, which scales
+perfectly. This produces the PNG and ICO fallbacks by drawing the SAME shapes
+programmatically, so the two never drift apart.
+
+Why not the photograph: a photo of three blueberries on a white background is an
+indistinct purple blob at 16px. Detail that survives that size has to be drawn,
+not captured. Three rules do the work:
+
+  1. Three circles in a triangle. The silhouette carries the meaning.
+  2. A gap between each berry, cut in the page colour, so they stay countable.
+  3. Three tints back to front, so depth survives when detail does not.
 """
 
 from __future__ import annotations
 
-import sys
+import math
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw
 
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "src" / "assets" / "icons"
 SIZES = (16, 32, 48, 64, 128, 180, 192, 512)
 
-# Studio white is not pure white; anything brighter than this on all channels
-# and low saturation is background.
-WHITE_CUTOFF = 233
-SATURATION_CUTOFF = 26
+# Supersample, then downscale. Cheap antialiasing with no extra dependency.
+SS = 16
+CANVAS = 64
+
+PAGE = (12, 10, 18, 255)
+
+# (cx, cy, r, fill) in the 64x64 design space, painted back to front.
+BERRIES = [
+    (22, 24, 14.5, (91, 69, 168, 255)),
+    (43, 26, 13.0, (122, 98, 210, 255)),
+    (32, 43, 16.0, (155, 131, 232, 255)),
+]
+GAP = 2.5
 
 
-def key_out_white(img: Image.Image) -> Image.Image:
-    img = img.convert("RGBA")
-    pixels = img.load()
-    w, h = img.size
+def draw_icon(size: int) -> Image.Image:
+    px = CANVAS * SS
+    img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    s = lambda v: v * SS  # noqa: E731
 
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = pixels[x, y]
-            brightness = (r + g + b) / 3
-            saturation = max(r, g, b) - min(r, g, b)
-            if brightness > WHITE_CUTOFF and saturation < SATURATION_CUTOFF:
-                pixels[x, y] = (r, g, b, 0)
-            elif brightness > WHITE_CUTOFF - 22 and saturation < SATURATION_CUTOFF + 10:
-                # Feather the rim so the cutout doesn't look stamped.
-                fade = int(255 * (WHITE_CUTOFF - brightness) / 22)
-                pixels[x, y] = (r, g, b, max(0, min(255, fade)))
-    return img
+    def circle(cx, cy, r, fill):
+        d.ellipse([s(cx - r), s(cy - r), s(cx + r), s(cy + r)], fill=fill)
 
+    for cx, cy, r, fill in BERRIES:
+        # The gap is cut first, in the page colour, so the next berry reads as
+        # separate rather than merging into a blob.
+        circle(cx, cy, r + GAP, PAGE)
+        circle(cx, cy, r, fill)
 
-def square_crop(img: Image.Image, pad: float = 0.04) -> Image.Image:
-    """Trim to the visible fruit, then pad out to a square."""
-    bbox = img.getbbox()
-    if bbox:
-        img = img.crop(bbox)
-    w, h = img.size
-    side = int(max(w, h) * (1 + pad * 2))
-    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    canvas.paste(img, ((side - w) // 2, (side - h) // 2), img)
-    return canvas
+    # Highlights. Invisible below ~32px, which is fine; nothing depends on them.
+    if size >= 32:
+        hl = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        hd = ImageDraw.Draw(hl)
+        for (cx, cy, r, _), scale in zip(BERRIES, (0.31, 0.30, 0.33)):
+            ox, oy = cx - r * 0.36, cy - r * 0.42
+            rx, ry = r * scale, r * scale * 0.68
+            hd.ellipse([s(ox - rx), s(oy - ry), s(ox + rx), s(oy + ry)], fill=(255, 255, 255, 56))
+        img = Image.alpha_composite(img, hl)
+        d = ImageDraw.Draw(img)
+
+    # Calyx star on the front berry: the scar that makes it a blueberry.
+    if size >= 48:
+        cx, cy, r, _ = BERRIES[2]
+        points = []
+        for i in range(10):
+            angle = math.pi / 2 + i * math.pi / 5
+            radius = r * (0.44 if i % 2 == 0 else 0.19)
+            points.append((s(cx + radius * math.cos(angle)), s(cy - radius * math.sin(angle))))
+        d.polygon(points, fill=(42, 31, 77, 235))
+
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        raise SystemExit("usage: make-favicon.py <source-image>")
-
-    source = Path(sys.argv[1]).expanduser()
-    if not source.exists():
-        raise SystemExit(f"no such file: {source}")
-
     OUT.mkdir(parents=True, exist_ok=True)
 
-    img = Image.open(source)
-    print(f"source {img.size[0]}x{img.size[1]}")
-
-    keyed = key_out_white(img)
-    opaque = sum(1 for p in keyed.getdata() if p[3] > 0)
-    total = keyed.size[0] * keyed.size[1]
-    print(f"kept {opaque / total:.0%} of pixels after keying out the background")
-
-    squared = square_crop(keyed)
-    print(f"cropped to {squared.size[0]}x{squared.size[1]}")
-
     for size in SIZES:
-        # Small sizes get a touch of sharpening so the three berries stay legible.
-        resized = squared.resize((size, size), Image.LANCZOS)
-        if size <= 48:
-            resized = resized.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=2))
-        resized.save(OUT / f"icon-{size}.png")
+        draw_icon(size).save(OUT / f"icon-{size}.png")
     print(f"wrote {len(SIZES)} PNGs to {OUT.relative_to(REPO)}")
 
-    ico = squared.resize((256, 256), Image.LANCZOS)
-    ico.save(OUT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+    base = draw_icon(256)
+    base.save(OUT / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
     print("wrote favicon.ico")
+
+    # Sanity: at 16px the three berries must still be three distinguishable
+    # regions, or the icon has failed at the only size that really matters.
+    tiny = draw_icon(16).convert("RGBA")
+    tints = {p[:3] for p in tiny.getdata() if p[3] > 140}
+    print(f"distinct tints at 16px: {len(tints)}")
 
 
 if __name__ == "__main__":
