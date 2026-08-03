@@ -202,6 +202,50 @@ export const SOURCES = {
     caveat:
       "No lender counts this and no calculator shows it, but the roof still ages. 1%/year is the usual rule; older homes run higher, newer builds lower in early years. We show it separately so it never gets confused with what you're required to pay.",
   },
+
+  "irs-rev-proc-2025-32": {
+    id: "irs-rev-proc-2025-32",
+    title: "Rev. Proc. 2025-32: 2026 inflation-adjusted amounts, standard deduction",
+    publisher: "Internal Revenue Service",
+    url: "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
+    asOf: "2025-10-09",
+    kind: "published",
+    caveat:
+      "$16,100 single, $32,200 married filing jointly for 2026. This is the floor itemising has to clear, so a household with two incomes needs twice as much deductible interest before the mortgage deduction is worth anything at all.",
+  },
+
+  "obbba-salt-cap": {
+    id: "obbba-salt-cap",
+    title: "One Big Beautiful Bill Act sec. 70120: state and local tax deduction cap",
+    publisher: "Public Law 119-21, via the IRS",
+    url: "https://www.irs.gov/newsroom/one-big-beautiful-bill-act-provisions",
+    asOf: "2025-07-04",
+    kind: "statutory",
+    caveat:
+      "$40,000 for 2025 rising 1% a year, so $40,400 in 2026, and it reverts to $10,000 after 2029. Above $505,000 of modified AGI the raise is clawed back at 30 cents on the dollar down to a $10,000 floor, which two California salaries reach without feeling wealthy.",
+  },
+
+  "cshpi-sdxrsa": {
+    id: "cshpi-sdxrsa",
+    title: "S&P CoreLogic Case-Shiller CA-San Diego Home Price Index (SDXRSA)",
+    publisher: "S&P Dow Jones Indices, via FRED",
+    url: "https://fred.stlouisfed.org/series/SDXRSA",
+    asOf: "monthly",
+    kind: "published",
+    caveat:
+      "A repeat-sales index, not a median. It tracks what the SAME houses resold for, which is the right way to measure price change and the wrong way to read a level. Anchoring it to a current price gives you the history of one representative house, not the history of the median listing.",
+  },
+
+  "car-median-price": {
+    id: "car-median-price",
+    title: "Median price of existing single-family homes, San Diego County",
+    publisher: "California Association of Realtors",
+    url: "https://www.car.org/marketdata/data/countysalesactivity",
+    asOf: "2026-01-01",
+    kind: "survey",
+    caveat:
+      "A median of what sold, so it moves with the mix of what sold, not only with prices. Used here only as the anchor that puts the Case-Shiller index into dollars. Every ratio on that panel is anchor-invariant; only the dollar axis moves if this is wrong.",
+  },
 } as const satisfies Record<string, Source>;
 
 export type SourceId = keyof typeof SOURCES;

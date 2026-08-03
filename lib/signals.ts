@@ -180,8 +180,18 @@ export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
       at2006Peak: at(PEAK_2006)?.priceToIncome ?? null,
       at2009Trough: at(TROUGH_2009)?.priceToIncome ?? null,
       lean: "bearish",
-      reading:
-        "Near the 2006 peak multiple. The 2009 trough took it back to ~6x, which is what a 40% decline looks like from here.",
+      // Derived, not written down. The trough multiple was hardcoded as "~6x",
+      // which was true at one anchor price and printed directly above a card
+      // showing a different number at any other.
+      reading: (() => {
+        const trough = at(TROUGH_2009)?.priceToIncome;
+        if (!trough) return "Near the 2006 peak multiple.";
+        const fall = 1 - trough / latest.priceToIncome;
+        return (
+          `Near the 2006 peak multiple. The 2009 trough took it back to ${trough.toFixed(1)}x, ` +
+          `which is what a ${(fall * 100).toFixed(0)}% decline looks like from here.`
+        );
+      })(),
     },
     {
       key: "supply",

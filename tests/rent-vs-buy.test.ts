@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 import {
   ASSUMPTION_SETS,
@@ -475,11 +476,29 @@ test("REGRESSION: tax relief is reported separately, not netted into the carryin
   assert.ok(r.firstYear.taxRelief > 0, "relief must be reported");
   const gross = (r.firstYear.carryingAndMaintenance / 12) * 12;
   assert.ok(gross > 20_000, "the carrying bucket must be gross of relief");
+  const f = r.firstYear;
   assert.ok(
     Math.abs(
-      r.firstYear.burned - (r.firstYear.interestPaid + r.firstYear.carryingAndMaintenance - r.firstYear.taxRelief)
+      f.burned - (f.closingCosts + f.interestPaid + f.carryingAndMaintenance + f.mortgageInsurance - f.taxRelief)
     ) < 1,
-    "burned must reconcile as interest plus carrying minus relief"
+    "burned must reconcile as closing plus interest plus carrying plus MI minus relief"
+  );
+});
+
+test("REGRESSION: year one burned agrees with the cumulative series it sits beside", () => {
+  // firstYear.burned had no mortgage insurance term and no closing costs, while
+  // years[0].buyMoneyBurned charged both, so one result object reported two
+  // different year-one figures and the panel showed whichever it happened to read.
+  const r = scenario({
+    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
+    otherItemizedDeductions: 25_000,
+    monthlyMortgageInsurance: 420,
+    mortgageInsuranceEndsMonth: null,
+  });
+  assert.ok(r.firstYear.mortgageInsurance > 0, "the MI must be reported");
+  assert.ok(
+    Math.abs(r.firstYear.burned - r.years[0]!.buyMoneyBurned) < 1,
+    `year one burn disagrees: ${r.firstYear.burned} against ${r.years[0]!.buyMoneyBurned}`
   );
 });
 
@@ -557,4 +576,61 @@ test("REGRESSION: mortgage insurance terminates and does not escalate", () => {
   const before = ends.years[8]!.monthlyOwnCost;
   const after = ends.years[10]!.monthlyOwnCost;
   assert.ok(after < before + 200, "cost should drop, or at least not carry MI, after termination");
+});
+
+// ---------------------------------------------------------------------------
+// The sliders and the named sets have to be able to express each other.
+// ---------------------------------------------------------------------------
+
+const markup = fs.readFileSync(new URL("../src/index.njk", import.meta.url), "utf8");
+
+const slider = (id: string) => {
+  const tag = markup.match(new RegExp(`<input id="${id}"[^>]*>`))![0];
+  const attr = (name: string) => Number(tag.match(new RegExp(`${name}="(-?\\d+)"`))![1]);
+  return { min: attr("min"), max: attr("max"), value: attr("value") };
+};
+
+test("REGRESSION: every named assumption set fits on its slider", () => {
+  // "Last decade" sets a 14.7% return against a slider that stopped at 12.0%,
+  // so choosing it silently ran 12% while the caption underneath said 14.7%,
+  // and the verdict flipped from never to year six on a number nobody typed.
+  const bounds = {
+    appreciation: slider("appreciation"),
+    investReturn: slider("investReturn"),
+    rentGrowth: slider("rentGrowth"),
+  };
+  for (const set of ASSUMPTION_SETS) {
+    const values = {
+      appreciation: Math.round(set.homeAppreciation * 1000),
+      investReturn: Math.round(set.investmentReturn * 1000),
+      rentGrowth: Math.round(set.rentGrowth * 1000),
+    };
+    for (const key of ["appreciation", "investReturn", "rentGrowth"] as const) {
+      const b = bounds[key];
+      assert.ok(
+        values[key] >= b.min && values[key] <= b.max,
+        `${set.id} ${key} of ${values[key] / 10}% is outside the slider (${b.min / 10}% to ${b.max / 10}%)`
+      );
+    }
+  }
+});
+
+test("REGRESSION: the page opens on a named set, not an unsourced hybrid", () => {
+  // Appreciation from one period and investment return from another is the
+  // exact mismatch the copy above the sliders warns about.
+  const opening = {
+    homeAppreciation: slider("appreciation").value / 1000,
+    investmentReturn: slider("investReturn").value / 1000,
+    rentGrowth: slider("rentGrowth").value / 1000,
+  };
+  const match = ASSUMPTION_SETS.find(
+    (s) =>
+      Math.abs(s.homeAppreciation - opening.homeAppreciation) < 0.001 &&
+      Math.abs(s.investmentReturn - opening.investmentReturn) < 0.001 &&
+      Math.abs(s.rentGrowth - opening.rentGrowth) < 0.001
+  );
+  assert.ok(
+    match,
+    `the shipped defaults (${opening.homeAppreciation}/${opening.investmentReturn}/${opening.rentGrowth}) match no named set`
+  );
 });

@@ -31,8 +31,19 @@ export interface MonthPoint {
  * The Case-Shiller index is unitless, so we anchor it to a real dollar figure at
  * the most recent reading. Everything else scales from there, which lets you read
  * "what would this same house have cost in 2009" directly in dollars.
+ *
+ * The anchor is the California Association of Realtors median price for an
+ * existing single-family home in San Diego County, June 2026, `car-median-price`
+ * in the source registry.
+ *
+ * Two things follow from that and both matter. The dollars on the chart are a
+ * repeat-sales index scaled by a median, so they describe ONE representative
+ * house through time, not the median listing in each year. And every ratio the
+ * panel reports (buying power lost, years of income, the purchasing ratio, the
+ * best and worst months) divides the anchor out, so it is unaffected by this
+ * number. Only the dollar axis and "the last month the math worked" move.
  */
-export const DEFAULT_ANCHOR_PRICE = 1_059_000;
+export const DEFAULT_ANCHOR_PRICE = 1_085_000;
 
 export function buildSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, downPercent = 0.2): MonthPoint[] {
   return SD_HISTORY.map((row: HistoryRow) => {

@@ -32,17 +32,24 @@ export interface BuyingPowerPoint {
   month: string;
   /** Multiplier that restates this month's dollars in today's money. */
   inflationFactor: number;
-  /** What the median home cost that month. */
-  medianPrice: number;
+  /**
+   * What the same house cost that month.
+   *
+   * NOT a median for that month. It is the Case-Shiller repeat-sales index,
+   * which tracks what the same houses resold for, anchored to today's median.
+   * That makes it a like-for-like price series rather than a mix-shifting one,
+   * and it is the reason the label everywhere says "the same house".
+   */
+  homePrice: number;
   /** What a median household could buy at 30% of income and that month's rate. */
   affordablePrice: number;
   income: number;
   rate: number;
-  /** affordablePrice / medianPrice. Above 1 means the median household could buy more than the median home. */
+  /** affordablePrice / homePrice. Above 1 means a median household could buy more than that house. */
   purchasingRatio: number;
-  /** Years of gross income the median home costs. */
+  /** Years of gross income the house costs. */
   yearsOfIncome: number;
-  /** How much short of the median home a median income falls. Negative means they can afford it. */
+  /** How much short of the house a median income falls. Negative means they can afford it. */
   shortfall: number;
 }
 
@@ -95,7 +102,7 @@ export function buyingPowerSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, inTodaysDo
   return SD_HISTORY.map(([month, index, ratePercent]) => {
     const rate = ratePercent / 100;
     const factor = inTodaysDollars ? inflationFactor(month) : 1;
-    const medianPrice = ((anchorPrice * index) / HISTORY_LATEST_INDEX) * factor;
+    const homePrice = ((anchorPrice * index) / HISTORY_LATEST_INDEX) * factor;
     const income = incomeForYear(month.slice(0, 4));
     const budget = (income / 12) * AFFORDABILITY_EFFORT;
     const affordablePrice = affordablePriceAt(budget, rate) * factor;
@@ -103,14 +110,14 @@ export function buyingPowerSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, inTodaysDo
     return {
       month,
       inflationFactor: factor,
-      medianPrice,
+      homePrice,
       affordablePrice,
       income: income * factor,
       rate,
       // Both sides carry the same factor, so these are unchanged either way.
-      purchasingRatio: affordablePrice / medianPrice,
-      yearsOfIncome: medianPrice / (income * factor),
-      shortfall: medianPrice - affordablePrice,
+      purchasingRatio: affordablePrice / homePrice,
+      yearsOfIncome: homePrice / (income * factor),
+      shortfall: homePrice - affordablePrice,
     };
   });
 }
@@ -120,7 +127,7 @@ export interface BuyingPowerVerdict {
   latest: BuyingPowerPoint;
   best: BuyingPowerPoint;
   worst: BuyingPowerPoint;
-  /** The last month a median household could afford the median home. */
+  /** The last month a median household could afford this house. */
   lastAffordableMonth: string | null;
   /** How much buying power has been lost since the start of the record, as a fraction. */
   powerLost: number;
@@ -161,11 +168,11 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
     powerLost,
     incomeNeededToday,
     headline:
-      `In ${first.month.slice(0, 4)} the median California household could afford ${first.purchasingRatio.toFixed(2)}x the median San Diego home. ` +
+      `In ${first.month.slice(0, 4)} the median California household could afford ${first.purchasingRatio.toFixed(2)}x a typical San Diego house. ` +
       `Today it is ${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone, not because prices rose, ` +
       `but because they rose ${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`,
     blueberries:
-      `The median home costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ${first.month.slice(0, 4)} it cost ` +
+      `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ${first.month.slice(0, 4)} it cost ` +
       `${first.yearsOfIncome.toFixed(1)} years. To buy the same house on the same terms your parents did, ` +
       `a household would need to earn ${money(incomeNeededToday)} instead of ${money(latest.income)}.`,
   };
@@ -173,6 +180,9 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
 
 /** Income series ends before the price series; the UI should say so. */
 export const BUYING_POWER_CAVEAT =
+  `The price line is the Case-Shiller repeat-sales index for San Diego, which tracks what the same houses resold for, ` +
+  `anchored to the current county median so it reads in dollars. So it is one representative house through time, ` +
+  `not the median listing of each year, and the anchor only moves the dollar axis: every ratio here divides it out. ` +
   `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR}, ` +
   `later months carry the last value forward, which if anything understates the gap. ` +
   `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +

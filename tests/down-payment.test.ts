@@ -175,3 +175,52 @@ test("crossing the 20% threshold from a low deposit does credit avoided PMI", ()
   const interestOnly = 200_000 * 0.0666 * 0.6;
   assert.ok(crossed.afterTaxInterestSaved > interestOnly, "PMI avoided must be counted on top of interest saved");
 });
+
+test("REGRESSION: a partial IRA draw grosses up at the marginal rate, not the average", () => {
+  // The exemption is a fixed $10,000, not a percentage, so averaging it over the
+  // whole balance and then grossing up charged it twice. The worked case
+  // overstated the withdrawal by $6,620 on a $20,000 target.
+  const raised = raiseCash([{ kind: "roth-earnings", label: "Roth earnings", balance: 200_000 }], 20_000);
+  assert.equal(raised.shortfall, 0);
+  assert.ok(Math.abs(raised.netRaised - 20_000) < 1, `netted ${raised.netRaised}`);
+
+  // 10,000 comes out clean; the rest is taxed at 41.3% plus a 10% penalty.
+  const expectedGross = 10_000 + 10_000 / (1 - (0.32 + 0.093 + 0.1));
+  assert.ok(
+    Math.abs(raised.drawn[0]!.gross - expectedGross) < 1,
+    `withdrew ${raised.drawn[0]!.gross}, should be ${expectedGross}`
+  );
+});
+
+test("REGRESSION: the $10,000 first-home exception is a lifetime limit, not per account", () => {
+  // Splitting one IRA into two entries used to change the answer by $5,130.
+  const one = raiseCash([{ kind: "roth-earnings", label: "IRA", balance: 20_000 }], 20_000);
+  const two = raiseCash(
+    [
+      { kind: "roth-earnings", label: "IRA A", balance: 10_000 },
+      { kind: "roth-earnings", label: "IRA B", balance: 10_000 },
+    ],
+    20_000
+  );
+  assert.ok(
+    Math.abs(one.totalFriction - two.totalFriction) < 1,
+    `same money, different friction: ${one.totalFriction} against ${two.totalFriction}`
+  );
+});
+
+test("every account kind nets what raiseCash says it will", () => {
+  // The gross-up and the net-out have to be exact inverses, or the totals lie.
+  const accounts: Account[] = [
+    { kind: "cash", label: "Savings", balance: 40_000 },
+    { kind: "taxable", label: "Brokerage", balance: 150_000, gainShare: 0.4 },
+    { kind: "roth-contributions", label: "Roth basis", balance: 30_000 },
+    { kind: "roth-earnings", label: "Roth growth", balance: 60_000 },
+    { kind: "traditional-retirement", label: "401k", balance: 300_000 },
+  ];
+  for (const target of [25_000, 120_000, 250_000]) {
+    const raised = raiseCash(accounts, target);
+    assert.ok(Math.abs(raised.netRaised - target) < 1, `target ${target} netted ${raised.netRaised}`);
+    const grossed = raised.drawn.reduce((s, d) => s + d.gross, 0);
+    assert.ok(Math.abs(grossed - raised.netRaised - raised.totalFriction) < 1, "friction must reconcile");
+  }
+});

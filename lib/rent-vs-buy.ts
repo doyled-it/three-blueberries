@@ -118,10 +118,15 @@ export interface RentVsBuyResult {
   firstYear: {
     interestPaid: number;
     principalPaid: number;
+    /** Tax, insurance, HOA, Mello-Roos and maintenance. Gross of relief, and MI is its own line. */
     carryingAndMaintenance: number;
+    /** Mortgage insurance paid in year one, zero once it has terminated. */
+    mortgageInsurance: number;
+    /** Paid once, at the start, and gone. A renter never pays it. */
+    closingCosts: number;
     /** Mortgage interest relief, reported separately rather than netted into a bucket. */
     taxRelief: number;
-    /** Owner money that built no equity. */
+    /** Owner money that built no equity. Equals years[0].buyMoneyBurned. */
     burned: number;
     rentPaid: number;
     /** Positive means the owner burned more than the renter did. */
@@ -263,8 +268,18 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   // Carrying stays GROSS of relief. Netting it here made the figure the UI
   // labels "tax, insurance and upkeep" disagree with the itemised payment panel
   // by an order of magnitude, and double-counted the relief in `burned`.
-  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance - (input.monthlyRentalIncome ?? 0)) * 12;
-  const burned1 = interest1 + carry1 - relief1;
+  //
+  // Mortgage insurance is in it, and rental income is NOT. The month loop and
+  // buyMoneyBurned both charge MI, so leaving it out here put two different
+  // year-one burns in one result object. Rental income is income, not a lower
+  // cost: netting it in made "money that buys nothing" quietly disagree with
+  // the cumulative series that does not net it.
+  const miYearOne = mi * (miEnds === null || miEnds === undefined ? 12 : Math.max(0, Math.min(12, miEnds)));
+  const carry1 = (input.monthlyCarryingCosts + input.monthlyMaintenance) * 12;
+  // Closing costs are the purest example of money that buys nothing: a renter
+  // never pays them and they are gone the day you sign. Including them is also
+  // what makes this equal years[0].buyMoneyBurned, which is asserted in tests.
+  const burned1 = interest1 + carry1 + miYearOne + input.closingCosts - relief1;
   const rent1 = input.monthlyRent * 12;
 
   let verdict: string;
@@ -289,6 +304,8 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
       interestPaid: interest1,
       principalPaid: principal1,
       carryingAndMaintenance: carry1,
+      mortgageInsurance: miYearOne,
+      closingCosts: input.closingCosts,
       taxRelief: relief1,
       burned: burned1,
       rentPaid: rent1,
@@ -478,14 +495,22 @@ export interface ScalingCosts {
    */
   mortgageInsuranceRate?: number;
   mortgageInsuranceEndsMonth?: number | null;
+  /**
+   * Up-front fees rolled into the balance, as a share of the base loan.
+   *
+   * A VA funding fee or FHA UFMIP is financed, so you amortize more than the
+   * price minus the deposit. The sweeps used price minus deposit while the
+   * itemised panel used the real balance, which is $21,500 on a $1M VA purchase.
+   */
+  financedFeeRate?: number;
 }
 
-type SweepBase = Omit<
+export type SweepBase = Omit<
   RentVsBuyInput,
   "purchasePrice" | "downPaymentAmount" | "loanAmount" | "closingCosts" | "monthlyCarryingCosts" | "monthlyMaintenance"
 >;
 
-function atPrice(
+export function atPrice(
   base: SweepBase,
   costs: ScalingCosts,
   price: number,
@@ -494,7 +519,7 @@ function atPrice(
   years?: number
 ) {
   const down = price * downPercent;
-  const loan = price - down;
+  const loan = (price - down) * (1 + (costs.financedFeeRate ?? 0));
   return compareRentVsBuy({
     ...base,
     purchasePrice: price,
@@ -605,7 +630,7 @@ function breakevenAt(
   extra: Partial<RentVsBuyInput> = {}
 ) {
   const down = price * downPercent;
-  const loan = price - down;
+  const loan = (price - down) * (1 + (costs.financedFeeRate ?? 0));
   return compareRentVsBuy({
     ...base,
     ...extra,
@@ -619,6 +644,16 @@ function breakevenAt(
     mortgageInsuranceEndsMonth: costs.mortgageInsuranceEndsMonth ?? null,
   }).breakevenYear;
 }
+
+/**
+ * The top of the rate search.
+ *
+ * A result at or above this is saturated, not solved: it means the price works
+ * at every rate the search covers. Callers have to say that rather than print
+ * the bound as though it were an answer, because "you need 14.97%" reads as a
+ * requirement when it is the opposite.
+ */
+export const RATE_SOLVER_CEILING = 0.15;
 
 /** The rate at which a given price starts to break even inside the horizon. */
 export function requiredRate(
@@ -636,7 +671,7 @@ export function requiredRate(
   // Lower rates are strictly better, so search for the highest rate that works.
   if (!works(0.001)) return null;
   let low = 0.001;
-  let high = 0.15;
+  let high = RATE_SOLVER_CEILING;
   while (high - low > 0.0005) {
     const mid = (low + high) / 2;
     if (works(mid)) low = mid;
@@ -716,7 +751,14 @@ export function decide(args: {
       key: "rate",
       label: "Interest rate",
       current: pct(base.interestRate),
-      needed: rateNeeded === null ? "no rate works" : pct(rateNeeded),
+      // Saturation is not a requirement. Printing the solver's own bound as
+      // "14.97%" reads as a demand for a rate nobody has been quoted since 1984.
+      needed:
+        rateNeeded === null
+          ? "no rate works"
+          : rateNeeded >= RATE_SOLVER_CEILING
+            ? "any rate works"
+            : pct(rateNeeded),
       // A rate you could plausibly refinance into within a few years.
       reachable: rateNeeded !== null && rateNeeded > base.interestRate - 0.025,
       note:

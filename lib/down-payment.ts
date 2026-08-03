@@ -64,7 +64,57 @@ export const TAX = {
   firstHomeIraExemption: 10_000,
 } as const;
 
-export function liquidationCost(account: Account): LiquidationCost {
+/**
+ * What a marginal dollar costs once any first-home exemption is spent.
+ *
+ * The average rate and the marginal rate differ for exactly one account kind,
+ * roth-earnings, because the $10,000 exemption is a fixed dollar allowance
+ * rather than a percentage. Grossing up a partial draw at the average rate
+ * charged the exemption twice and overstated the withdrawal by 22% in the
+ * worked case.
+ */
+function marginalFrictionRate(account: Account): number {
+  switch (account.kind) {
+    case "cash":
+    case "roth-contributions":
+      return 0;
+    case "taxable":
+      return (account.gainShare ?? 0) * (TAX.longTermCapitalGains + TAX.netInvestmentIncome + TAX.stateMarginal);
+    case "roth-earnings":
+    case "traditional-retirement":
+      return TAX.federalMarginal + TAX.stateMarginal + TAX.earlyWithdrawalPenalty;
+  }
+}
+
+/** Cash in hand from withdrawing `gross`, given what is left of the exemption. */
+export function netFromGross(account: Account, gross: number, exemptionRemaining = 0): number {
+  const rate = marginalFrictionRate(account);
+  if (account.kind !== "roth-earnings") return gross * (1 - rate);
+  const exempt = Math.min(gross, exemptionRemaining);
+  return exempt + (gross - exempt) * (1 - rate);
+}
+
+/** What you have to withdraw to end up with `net` in hand. The inverse of the above. */
+export function grossForNet(account: Account, net: number, exemptionRemaining = 0): number {
+  const rate = marginalFrictionRate(account);
+  if (account.kind !== "roth-earnings") return net / Math.max(1 - rate, 0.01);
+  if (net <= exemptionRemaining) return net;
+  return exemptionRemaining + (net - exemptionRemaining) / Math.max(1 - rate, 0.01);
+}
+
+/**
+ * The cost of liquidating a whole account.
+ *
+ * `exemptionRemaining` is the first-home IRA allowance still unspent. It is a
+ * LIFETIME limit, not a per-account one, so a caller draining two IRAs has to
+ * decrement it between them. Splitting one balance across two entries used to
+ * change the answer by $5,130, which is the sort of thing a reader would
+ * reasonably call a bug in their favour and then act on.
+ */
+export function liquidationCost(
+  account: Account,
+  exemptionRemaining: number = TAX.firstHomeIraExemption
+): LiquidationCost {
   const gainShare = account.gainShare ?? 0;
   const gain = account.balance * gainShare;
 
@@ -103,7 +153,7 @@ export function liquidationCost(account: Account): LiquidationCost {
       };
 
     case "roth-earnings": {
-      const exempt = Math.min(account.balance, TAX.firstHomeIraExemption);
+      const exempt = Math.min(account.balance, Math.max(exemptionRemaining, 0));
       const taxedPortion = account.balance - exempt;
       const rate = TAX.federalMarginal + TAX.stateMarginal;
       const tax = taxedPortion * rate;
@@ -151,15 +201,20 @@ export function raiseCash(
   const drawn: Array<{ account: Account; gross: number; net: number }> = [];
   let netRaised = 0;
   let totalFriction = 0;
+  // The first-home IRA allowance is a lifetime limit, so it is spent across the
+  // whole draw, not granted afresh to each account.
+  let exemptionLeft: number = TAX.firstHomeIraExemption;
 
-  for (const { a, cost } of ordered) {
+  for (const { a } of ordered) {
     if (netRaised >= target) break;
     const stillNeeded = target - netRaised;
-    // Gross up, because friction comes out of what you withdraw.
-    const grossNeeded = stillNeeded / Math.max(1 - cost.frictionRate, 0.01);
+    // Gross up at the MARGINAL rate, because friction comes out of what you
+    // withdraw and the exemption only applies to the first dollars of it.
+    const grossNeeded = grossForNet(a, stillNeeded, exemptionLeft);
     const gross = Math.min(a.balance, grossNeeded);
-    const net = gross * (1 - cost.frictionRate);
     if (gross <= 0) continue;
+    const net = netFromGross(a, gross, exemptionLeft);
+    if (a.kind === "roth-earnings") exemptionLeft = Math.max(0, exemptionLeft - Math.min(gross, exemptionLeft));
     drawn.push({ account: a, gross, net });
     netRaised += net;
     totalFriction += gross - net;

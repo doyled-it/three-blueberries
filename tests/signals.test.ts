@@ -165,3 +165,26 @@ test("the underlying data files are present and current", () => {
   assert.ok(NEW_HOME_SUPPLY.length > 400);
   assert.ok(NEW_HOME_SUPPLY[NEW_HOME_SUPPLY.length - 1]![0] >= "2026-01");
 });
+
+test("REGRESSION: the 2009 trough multiple is derived, not written into the prose", () => {
+  // It used to read "took it back to ~6x", which was true at one anchor price
+  // and printed directly above a card showing a different number at any other.
+  for (const anchor of [600_000, 1_085_000, 1_800_000]) {
+    const reading = crashSignals(anchor).readings.find((r) => r.key === "priceToIncome")!;
+    const trough = reading.at2009Trough!;
+    assert.ok(
+      reading.reading.includes(`${trough.toFixed(1)}x`),
+      `prose says "${reading.reading}" but the card shows ${trough.toFixed(1)}x`
+    );
+  }
+});
+
+test("the decline implied by the 2009 trough is the same whatever the anchor", () => {
+  // Every ratio on this panel divides the anchor out. If one of them stops
+  // doing that, the panel has started making a claim about one buyer's house.
+  const decline = (anchor: number) => {
+    const r = crashSignals(anchor).readings.find((x) => x.key === "priceToIncome")!;
+    return 1 - r.at2009Trough! / r.now!;
+  };
+  assert.ok(Math.abs(decline(600_000) - decline(1_800_000)) < 1e-9);
+});

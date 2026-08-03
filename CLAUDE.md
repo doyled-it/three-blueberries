@@ -72,11 +72,13 @@ lib/                    the engine, pure TypeScript, no DOM, no I/O
   amortization.ts       payment / balance / schedule / LTV milestones
   mortgage.ts           evaluateScenario(), the heart
   affordability.ts      the engine run backwards (binary search on price)
+  scenario-bridge.ts    THE ONLY join between a scenario and rent-vs-buy. See below.
   data/
     sources.ts          THE CITATION REGISTRY, every number traces here
     ca-loan-limits.ts   GENERATED from FHFA. Do not hand-edit.
     programs.ts         VA funding fee, FHA MIP, PMI bands, DTI ceilings, residual income
     ca-property.ts      Prop 13, county tax rates, insurance + closing cost defaults
+    federal-tax.ts      standard deduction by filing status, SALT cap and its phase-out
 src/
   client/app.ts         browser wiring; bundled by esbuild to src/assets/js/
   index.njk             the form + result panels
@@ -94,7 +96,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           44 tests, no watch mode needed, runs in ~100ms
+npm test           228 tests, no watch mode needed, runs in ~250ms
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -147,6 +149,33 @@ reached. **If you can't write that sentence, don't ship the number.** The UI ren
   used is still the conforming one. Fix this before trusting max-price answers near the limit.
 - **The supplemental tax bill warning fires on every scenario.** It is not modeled numerically
   because that requires the seller's old assessed value, which we don't have. Do not fake it.
+
+### The bridge, and why it exists
+
+`lib/scenario-bridge.ts` is the only code allowed to turn a `ScenarioResult` into rent-vs-buy
+inputs. Everything downstream, the itemised comparison and every price sweep, comes out of one
+`bridgeScenario()` call.
+
+This is not tidiness. Two adversarial audits found the same class of bug four separate times:
+the browser layer built the itemised path and the sweep path in two blocks of code, and they
+drifted. Mortgage insurance was added to one and not the other. Closing costs were real on one
+side and a flat 2.5% on the other. The financed VA funding fee was in one loan balance and not
+the other. The page told you the same house passed and failed, in two cards inches apart, with
+every test green, because the tests pinned the engine and nothing pinned the join.
+
+`tests/scenario-bridge.test.ts` now asserts the two paths agree to the dollar across every loan
+type and deposit band. **If you add a cost, add it to the bridge**, and the test fails until it
+reaches both sides.
+
+Two related rules the bridge enforces:
+
+- **Scaling rates are derived as residuals of the real itemisation, not recomputed.** The
+  homeowners' exemption is a fixed dollar credit, so it belongs in `fixedMonthly`. Deriving it
+  makes the agreement exact rather than close.
+- **`requiredRate()` returns the HIGHEST rate that still works, and `null` is the only failure.**
+  It is not a threshold. Reading it as one put "works at any rate" and "works at no rate" in the
+  same branch, and printed the failure sentence for both. A result at or above `RATE_SOLVER_CEILING`
+  is saturation, not an answer; say so rather than printing "you need 14.97%".
 
 ---
 

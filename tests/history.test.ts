@@ -452,8 +452,8 @@ test("old dollars really were worth more, so the adjustment does something", () 
   const real = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, true);
   const nominal = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, false);
   // 1987 prices should roughly triple when restated in today's money.
-  const factor = real[0]!.medianPrice / nominal[0]!.medianPrice;
+  const factor = real[0]!.homePrice / nominal[0]!.homePrice;
   assert.ok(factor > 2.5 && factor < 3.5, `expected roughly 3x, got ${factor.toFixed(2)}`);
   // And the latest month should be essentially unchanged.
-  assert.ok(Math.abs(real.at(-1)!.medianPrice / nominal.at(-1)!.medianPrice - 1) < 0.02);
+  assert.ok(Math.abs(real.at(-1)!.homePrice / nominal.at(-1)!.homePrice - 1) < 0.02);
 });

@@ -5,7 +5,7 @@
  * call is for the current mortgage rate.
  */
 
-import { computeMortgageInsurance, evaluateScenario } from "../../lib/mortgage.ts";
+import { evaluateScenario } from "../../lib/mortgage.ts";
 import { maxAffordablePrice } from "../../lib/affordability.ts";
 import { CA_COUNTIES } from "../../lib/data/ca-loan-limits.ts";
 import {
@@ -30,10 +30,9 @@ import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/f
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
-import { countyTaxRate, estimateInsuranceAnnual } from "../../lib/data/ca-property.ts";
 import {
   ASSUMPTION_SETS,
-  DEFAULT_MARGINAL_TAX_RATE,
+  RATE_SOLVER_CEILING,
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
   buyZone,
@@ -45,6 +44,7 @@ import {
   savingsRace,
   statutoryRentCap,
 } from "../../lib/rent-vs-buy.ts";
+import { bridgeScenario } from "../../lib/scenario-bridge.ts";
 import {
   attachChartHover,
   attachStackHover,
@@ -210,12 +210,12 @@ function render(): void {
   $("breakdown").innerHTML =
     lenderLines.map((l) => renderLine(l, false)).join("") +
     `<div class="subtotal">
-       <span>Lender total <em>&mdash; what a mortgage calculator shows you</em></span>
+       <span>Lender total, <em>what a mortgage calculator shows you</em></span>
        <strong>${money(result.lenderMonthlyTotal)}/mo</strong>
      </div>` +
     extraLines.map((l) => renderLine(l, true)).join("") +
     `<div class="total">
-       <span>True monthly cost <em>&mdash; what actually leaves your account</em></span>
+       <span>True monthly cost, <em>what actually leaves your account</em></span>
        <strong>${money(result.trueMonthlyTotal)}/mo</strong>
      </div>`;
 
@@ -268,8 +268,13 @@ function render(): void {
   // claim derived from a demo default, and the one-shot guard froze it there.
   renderBuyingPower();
   renderCohort(input);
+  // The history panel is about YOUR house: what this same house would have cost
+  // in 2009. The crash signals are about the market, and every one of them is
+  // read against the 2006 peak and the 2009 bottom, so they have to stand on the
+  // same anchor those readings do. Feeding them the form's price reported the
+  // burden of one buyer's house as the condition of the whole market.
   renderHistory(input.purchasePrice);
-  renderSignals(input.purchasePrice);
+  renderSignals(DEFAULT_ANCHOR_PRICE);
   renderInstruments();
   renderForecast();
   renderPresets();
@@ -377,7 +382,7 @@ function renderCohort(input: ScenarioInput): void {
   }
 
   const refiNote = c.refinancedMonth
-    ? ` and refinanced their remaining balance to ${pct(c.effectiveRate)} in ${c.refinancedMonth}. The cheapest month on record`
+    ? ` and refinanced their remaining balance to ${pct(c.effectiveRate)} in ${longMonth(c.refinancedMonth)}. The cheapest month on record`
     : ` at ${pct(c.rateThen)}, too late to catch the 2020-21 refinance window`;
 
   $("cohort").innerHTML = `
@@ -501,7 +506,7 @@ function renderHistory(anchorPrice: number): void {
         <span class="stat__value">${status.percentOffRecentPeak.toFixed(1)}%<span class="stat__unit"> off peak</span></span>
         <span class="stat__note">
           ${status.consecutiveDeclines} consecutive monthly ${status.consecutiveDeclines === 1 ? "decline" : "declines"}
-          through ${status.month}. Real, but small. The 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
+          through ${longMonth(status.month)}. Real, but small. The 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
         </span>
       </div>
     </div>`;
@@ -516,35 +521,56 @@ function renderHistory(anchorPrice: number): void {
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/**
- * When conventional mortgage insurance stops, in months. FHA under 10% down runs
- * for the life of the loan, so it returns null.
- */
-function mortgageInsuranceEnds(input: ScenarioInput, result: ReturnType<typeof evaluateScenario>): number | null {
-  if (input.loanType === "va") return 0;
-  const mi = computeMortgageInsurance(input, result.loan);
-  return mi ? mi.endsAfterMonths : 0;
-}
+const LONG_MONTH_NAMES = [
+  "",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
-const CARRYING_KEYS = ["propertyTax", "homeownersInsurance", "mortgageInsurance", "hoa", "melloRoos"];
+/** "2013-04" is a database key. A reader wants "April 2013". */
+function longMonth(month: string): string {
+  const [year, m] = month.split("-");
+  const name = LONG_MONTH_NAMES[Number(m)];
+  return name ? `${name} ${year}` : month;
+}
 
 function renderRentVsBuy(input: ScenarioInput): void {
   const result = evaluateScenario(input);
-  // Mortgage insurance is handled separately now, because it terminates and does
-  // not escalate with property values.
-  const carrying = result.lines
-    .filter((l) => CARRYING_KEYS.includes(l.key) && l.key !== "mortgageInsurance")
-    .reduce((sum, l) => sum + l.monthly, 0);
-  const maintenance = result.lines.find((l) => l.key === "maintenanceReserve")?.monthly ?? 0;
 
   const rent = num("currentRent", 2750);
   const appreciation = Number($<HTMLInputElement>("appreciation").value) / 1000;
   const investReturn = Number($<HTMLInputElement>("investReturn").value) / 1000;
   const rentGrowth = Number($<HTMLInputElement>("rentGrowth").value) / 1000;
+  // Income the buyer has ruled out is not income. Reading the checkbox here,
+  // rather than only at the decision panel, is what stops the ceiling card and
+  // the verdict beside it from modelling two different houses.
+  const excludeRental = $<HTMLInputElement>("excludeRental").checked;
+  const rentalIncome = excludeRental ? 0 : num("rentalIncome", 0);
 
   $("appreciationOut").textContent = pct(appreciation, 1);
   $("investReturnOut").textContent = pct(investReturn, 1);
   $("rentGrowthOut").textContent = pct(rentGrowth, 1);
+
+  // One derivation feeds the itemised comparison and every price sweep, so a
+  // cost cannot reach one and miss the other. See lib/scenario-bridge.ts.
+  const bridge = bridgeScenario(input, result, {
+    monthlyRent: rent,
+    homeAppreciation: appreciation,
+    rentGrowth,
+    investmentReturn: investReturn,
+    monthlyRentalIncome: rentalIncome,
+  });
+  const { base: sweepBase, costs: scaling, downPercent, closingCostRate } = bridge;
 
   const priceToRent = rent > 0 ? input.purchasePrice / (rent * 12) : Infinity;
   const ratioVerdict =
@@ -565,30 +591,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
       </span>
     </div>`;
 
-  const r = compareRentVsBuy({
-    purchasePrice: input.purchasePrice,
-    downPaymentAmount: result.loan.downPaymentAmount,
-    closingCosts: Math.max(result.cashToClose.total - result.loan.downPaymentAmount, 0),
-    loanAmount: result.loan.totalLoanAmount,
-    interestRate: input.interestRate,
-    termYears: input.termYears,
-    monthlyCarryingCosts: carrying,
-    monthlyMaintenance: maintenance,
-    monthlyRent: rent,
-    homeAppreciation: appreciation,
-    rentGrowth,
-    investmentReturn: investReturn,
-    propertyTaxGrowth: 0.02,
-    sellingCostRate: 0.06,
-    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
-    // State income tax plus property tax, the deductions already in play before
-    // any mortgage interest is counted.
-    otherItemizedDeductions: Math.min(
-      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
-        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
-      40_400
-    ),
-  });
+  const r = compareRentVsBuy(bridge.itemised);
 
   const f = r.firstYear;
   $("burnCompare").innerHTML = `
@@ -596,8 +599,9 @@ function renderRentVsBuy(input: ScenarioInput): void {
       <span class="stat__label">Owning, money that buys nothing</span>
       <span class="stat__value">${money(f.burned)}</span>
       <span class="stat__note">
-        ${money(f.interestPaid)} interest, ${money(f.carryingAndMaintenance)} tax, insurance and upkeep, less
-        ${money(f.taxRelief)} of mortgage interest relief. None of the rest is equity.
+        ${money(f.closingCosts)} closing costs, ${money(f.interestPaid)} interest,
+        ${money(f.carryingAndMaintenance)} tax, insurance and upkeep${f.mortgageInsurance > 0 ? `, ${money(f.mortgageInsurance)} mortgage insurance` : ""},
+        less ${money(f.taxRelief)} of mortgage interest relief. None of it is equity.
       </span>
     </div>
     <div class="stat">
@@ -663,9 +667,16 @@ function renderRentVsBuy(input: ScenarioInput): void {
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
   if (!$("assumptionSets").hasChildNodes()) {
+    // The page used to open on 5.4% / 7.0% / 3.5%, which is long-run housing
+    // paired with a conservative equity number and matches no named set. That is
+    // precisely the mismatched-period rigging the paragraph above warns about,
+    // in the default state, so it opens on a named set instead.
+    const opening = ASSUMPTION_SETS[0]!;
     $("assumptionSets").innerHTML = ASSUMPTION_SETS.map(
-      (a) => `<button type="button" class="preset" data-assumptions="${a.id}">${a.label}</button>`
+      (a) =>
+        `<button type="button" class="preset${a.id === opening.id ? " preset--on" : ""}" data-assumptions="${a.id}">${a.label}</button>`
     ).join("");
+    $("assumptionBasis").textContent = opening.basis;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-assumptions]")) {
       button.addEventListener("click", () => {
         const set = ASSUMPTION_SETS.find((a) => a.id === button.dataset["assumptions"])!;
@@ -684,74 +695,10 @@ function renderRentVsBuy(input: ScenarioInput): void {
   const holdYears = Number($<HTMLInputElement>("holdYears").value);
   $("holdYearsOut").textContent = `${holdYears} year${holdYears === 1 ? "" : "s"}`;
 
-  // Derive the real fraction. Defaulting to 20% whenever the input was an amount
-  // silently ignored what the user actually typed.
-  const downPercent =
-    input.downPayment.kind === "percent"
-      ? input.downPayment.value
-      : input.purchasePrice > 0
-        ? Math.min(input.downPayment.value / input.purchasePrice, 1)
-        : 0;
-  const sweepBase = {
-    interestRate: input.interestRate,
-    termYears: input.termYears,
-    monthlyRent: rent,
-    homeAppreciation: appreciation,
-    rentGrowth,
-    investmentReturn: investReturn,
-    propertyTaxGrowth: 0.02,
-    sellingCostRate: 0.06,
-    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
-    // State income tax plus property tax, the deductions already in play before
-    // any mortgage interest is counted.
-    otherItemizedDeductions: Math.min(
-      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
-        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
-      40_400
-    ),
-  };
-  // Costs that scale with price have to be recomputed per price, or a cheap
-  // house gets charged an expensive house's taxes.
-  const miLine = result.lines.find((l) => l.key === "mortgageInsurance");
-  const miMonthly = miLine?.monthly ?? 0;
-  const scaling = {
-    carryingRate: input.propertyTaxRate ?? countyTaxRate(input.county),
-    maintenanceRate: input.maintenanceRate ?? 0.01,
-    fixedMonthly:
-      (input.insuranceAnnual ?? estimateInsuranceAnnual(input.purchasePrice)) / 12 +
-      input.hoaMonthly +
-      input.melloRoosAnnual / 12,
-    // The sweeps used to omit mortgage insurance entirely while the itemised
-    // panel included it, so the same house could pass one and fail the other.
-    mortgageInsuranceRate: result.loan.totalLoanAmount > 0 ? (miMonthly * 12) / result.loan.totalLoanAmount : 0,
-    mortgageInsuranceEndsMonth: mortgageInsuranceEnds(input, result),
-  };
-
-  const maxPrice = maxPriceForHoldPeriod(sweepBase, scaling, holdYears, downPercent);
-  const thisHouse = compareRentVsBuy({
-    purchasePrice: input.purchasePrice,
-    downPaymentAmount: result.loan.downPaymentAmount,
-    closingCosts: Math.max(result.cashToClose.total - result.loan.downPaymentAmount, 0),
-    loanAmount: result.loan.totalLoanAmount,
-    interestRate: input.interestRate,
-    termYears: input.termYears,
-    monthlyCarryingCosts: carrying,
-    monthlyMaintenance: maintenance,
-    monthlyRent: rent,
-    homeAppreciation: appreciation,
-    rentGrowth,
-    investmentReturn: investReturn,
-    propertyTaxGrowth: 0.02,
-    sellingCostRate: 0.06,
-    marginalTaxRate: DEFAULT_MARGINAL_TAX_RATE,
-    // State income tax plus property tax, the deductions already in play before
-    // any mortgage interest is counted.
-    otherItemizedDeductions: Math.min(
-      input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0) * 0.07 +
-        input.purchasePrice * (input.propertyTaxRate ?? countyTaxRate(input.county)),
-      40_400
-    ),
-  });
+  const maxPrice = maxPriceForHoldPeriod(sweepBase, scaling, holdYears, downPercent, closingCostRate);
+  // The same comparison the panel above ran. It used to be a second, separately
+  // written call, which is exactly how the two drifted apart.
+  const thisHouse = r;
   const worksForYou = thisHouse.breakevenYear !== null && thisHouse.breakevenYear <= holdYears;
 
   $("holdVerdict").innerHTML = `
@@ -777,13 +724,13 @@ function renderRentVsBuy(input: ScenarioInput): void {
     </div>
     <div class="stat">
       <span class="stat__label">Rate is the biggest lever</span>
-      <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent) ?? 0)}</span>
+      <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent, closingCostRate) ?? 0)}</span>
       <span class="stat__note">What you could pay at 4.5% instead of ${pct(input.interestRate)}, same horizon. Rates move your budget more than anything else here.</span>
     </div>`;
 
   const prices: number[] = [];
   for (let p = 300_000; p <= 1_600_000; p += 50_000) prices.push(p);
-  const curve = breakevenByPrice(sweepBase, scaling, prices, downPercent);
+  const curve = breakevenByPrice(sweepBase, scaling, prices, downPercent, closingCostRate);
   const CAP_YEARS = 31;
 
   $("breakevenChart").innerHTML = renderMultiLine({
@@ -810,8 +757,8 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // --- the buy zone: what the rate actually decides ---
   const rates: number[] = [];
   for (let rate = 0.03; rate <= 0.1001; rate += 0.0025) rates.push(rate);
-  const zone = buyZone(sweepBase, scaling, rates, holdYears, downPercent);
-  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, downPercent);
+  const zone = buyZone(sweepBase, scaling, rates, holdYears, downPercent, closingCostRate);
+  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, downPercent, closingCostRate);
 
   // Use the exact ceiling at the actual rate. Reading it off the nearest sampled
   // point on the curve produced a figure that disagreed with the stat card above.
@@ -868,13 +815,24 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // returned the cheapest rate on the axis and reported it as the requirement.
   // Read the threshold from the exact solver, not off the 0.25% sampling grid.
   // The grid version disagreed with the lever card by up to a tenth of a point.
-  const exactThreshold = requiredRate(sweepBase, scaling, input.purchasePrice, holdYears, downPercent);
-  const at45 = maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent);
+  const exactThreshold = requiredRate(sweepBase, scaling, input.purchasePrice, holdYears, downPercent, closingCostRate);
+  const at45 = maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent, closingCostRate);
+  // requiredRate returns the HIGHEST rate that still works, so null is the only
+  // failure. Testing it against 10% as though it were a threshold put the
+  // strongest possible pass, a house that works even at 15%, in the same branch
+  // as the houses that work at no rate at all, and printed the failure sentence
+  // for both. It fired on every price under about $735,000 on the defaults.
+  const rateClause =
+    exactThreshold === null
+      ? `${money(input.purchasePrice)} does not work at any rate, not even a free loan. `
+      : exactThreshold >= RATE_SOLVER_CEILING
+        ? `${money(input.purchasePrice)} works at any rate you could realistically be quoted. `
+        : exactThreshold >= input.interestRate
+          ? `${money(input.purchasePrice)} works at today's ${pct(input.interestRate)}, with room up to ${pct(exactThreshold, 2)}. `
+          : `${money(input.purchasePrice)} needs a rate at or under ${pct(exactThreshold, 2)}, against ${pct(input.interestRate)} today. `;
   $("buyZoneNote").textContent =
     `Below the blue line, buying beats renting over ${holdYears} years. Above it, renting wins. ` +
-    (exactThreshold !== null && exactThreshold < 0.1
-      ? `${money(input.purchasePrice)} needs a rate at or under ${pct(exactThreshold, 2)}, against ${pct(input.interestRate)} today. `
-      : `${money(input.purchasePrice)} does not work at any rate this model covers. `) +
+    rateClause +
     (ceilingHere ? `At today's rate your ceiling is ${money(ceilingHere)}. ` : "") +
     `The curve is convex, so a single per-point figure misleads: the next half point down is worth about ` +
     `${money(Math.abs(sensitivity.perQuarterPoint))}, but getting all the way to 4.5% is worth ` +
@@ -882,12 +840,13 @@ function renderRentVsBuy(input: ScenarioInput): void {
 
   // --- the decision ---
   const decision = decide({
-    base: { ...sweepBase, monthlyRentalIncome: num("rentalIncome", 0) },
+    base: sweepBase,
     costs: scaling,
     price: input.purchasePrice,
     holdYears,
-    downPercent: downPercent,
-    excludeRentalIncome: $<HTMLInputElement>("excludeRental").checked,
+    downPercent,
+    closingCostRate,
+    excludeRentalIncome: excludeRental,
   });
 
   $("decisionVerdict").textContent = decision.verdict;
@@ -920,7 +879,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
   const race = savingsRace({
     targetPrice: input.purchasePrice,
     downPaymentPercent: downPercent,
-    closingCostRate: 0.025,
+    closingCostRate,
     currentSavings: num("currentSavings", 0),
     monthlySavings: num("monthlySavings", 0),
     savingsReturn: 0.045,
@@ -968,9 +927,9 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
     series: [
       {
         key: "price",
-        label: `What the median home cost${unit}`,
+        label: `What the same house cost${unit}`,
         color: SERIES_PRICE,
-        points: series.map((p) => ({ month: p.month, value: p.medianPrice })),
+        points: series.map((p) => ({ month: p.month, value: p.homePrice })),
       },
       {
         key: "afford",
@@ -984,7 +943,8 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
     markers: v.lastAffordableMonth
       ? [{ seriesKey: "price", month: v.lastAffordableMonth, label: "last month it worked" }]
       : [],
-    description: "Median San Diego home price against what a median California household could afford, 1987 to today.",
+    description:
+      "What one San Diego house cost through time, against what a median California household could afford, 1987 to today.",
   });
 
   if (!buyingPowerWired) {
@@ -999,9 +959,9 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
       [
         {
           key: "price",
-          label: "Median home",
+          label: "The same house",
           color: SERIES_PRICE,
-          points: series.map((p) => ({ month: p.month, value: p.medianPrice })),
+          points: series.map((p) => ({ month: p.month, value: p.homePrice })),
         },
         {
           key: "afford",
@@ -1020,7 +980,7 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
   $("buyingPower").innerHTML = `
     <div class="stat stat--wide">
       <span class="stat__label">The last month the math worked</span>
-      <span class="stat__value">${v.lastAffordableMonth ?? "never"}</span>
+      <span class="stat__value">${v.lastAffordableMonth ? longMonth(v.lastAffordableMonth) : "never"}</span>
       <span class="stat__note">${v.blueberries}</span>
     </div>
     <div class="stat">
@@ -1035,18 +995,22 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
     </div>
     <div class="stat">
       <span class="stat__label">Best it ever got</span>
-      <span class="stat__value">${v.best.purchasingRatio.toFixed(2)}x<span class="stat__unit"> in ${v.best.month}</span></span>
-      <span class="stat__note">Worst was ${v.worst.purchasingRatio.toFixed(2)}x in ${v.worst.month}. Today: ${v.latest.purchasingRatio.toFixed(2)}x.</span>
+      <span class="stat__value">${v.best.purchasingRatio.toFixed(2)}x<span class="stat__unit"> in ${longMonth(v.best.month)}</span></span>
+      <span class="stat__note">Worst was ${v.worst.purchasingRatio.toFixed(2)}x in ${longMonth(v.worst.month)}. Today: ${v.latest.purchasingRatio.toFixed(2)}x.</span>
     </div>`;
 
   $("buyingPowerCaveat").textContent = BUYING_POWER_CAVEAT;
 }
 
-let signalsRendered = false;
+let lastSignalsAnchor: number | null = null;
 
 function renderSignals(anchorPrice: number): void {
-  if (signalsRendered) return;
-  signalsRendered = true;
+  // Keyed on the anchor, like renderHistory. A one-shot flag froze the burden
+  // figures at first paint while the charts above them redrew on every
+  // keystroke, so the panel could report 54% of median income against a payment
+  // chart showing a different house entirely.
+  if (lastSignalsAnchor === anchorPrice) return;
+  lastSignalsAnchor = anchorPrice;
 
   const verdict = worstTimeToBuy(anchorPrice);
   $("worstTime").textContent = verdict.answer;
@@ -1162,7 +1126,7 @@ function renderForecast(): void {
     .map(
       (r) => `
       <div class="stat stat--fail">
-        <span class="stat__label">${r.horizon}-month call &mdash; do not act on this</span>
+        <span class="stat__label">${r.horizon}-month call: do not act on this</span>
         <span class="stat__value">${(r.current.gradientBoosting * 100).toFixed(1)}%<span class="stat__unit"> price change</span></span>
         <span class="stat__note">
           Crash probability ${(r.current.crashProbabilityGbm * 100).toFixed(0)}%.
