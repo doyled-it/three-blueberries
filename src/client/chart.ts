@@ -175,8 +175,10 @@ export function renderMultiLine(opts: {
   description: string;
   /** Shade the vertical gap between the first two series. */
   shadeGap?: boolean;
+  /** Override the time-derived x axis, for charts plotted against something else. */
+  xTicks?: Array<{ index: number; label: string }>;
 }): string {
-  const { series, format, markers = [], description, shadeGap = false } = opts;
+  const { series, format, markers = [], description, shadeGap = false, xTicks } = opts;
   const H = opts.height ?? 240;
   if (!series.length || !series[0]!.points.length) return "";
 
@@ -196,12 +198,17 @@ export function renderMultiLine(opts: {
     )
     .join("");
 
-  const years = series[0]!.points
-    .map((p, i) => ({ year: p.month.slice(0, 4), i }))
-    .filter((p) => Number(p.year) % 5 === 0 && p.i > 0 && series[0]!.points[p.i - 1]!.month.slice(0, 4) !== p.year);
-  const xAxis = years
-    .map((p) => `<text class="c-axis" x="${x(p.i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${p.year}</text>`)
-    .join("");
+  const xAxis = xTicks
+    ? xTicks
+        .map(
+          (t) => `<text class="c-axis" x="${x(t.index).toFixed(1)}" y="${H - 8}" text-anchor="middle">${t.label}</text>`
+        )
+        .join("")
+    : series[0]!.points
+        .map((p, i) => ({ year: p.month.slice(0, 4), i }))
+        .filter((p) => Number(p.year) % 5 === 0 && p.i > 0 && series[0]!.points[p.i - 1]!.month.slice(0, 4) !== p.year)
+        .map((p) => `<text class="c-axis" x="${x(p.i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${p.year}</text>`)
+        .join("");
 
   // The gap between cost and capacity is the story, so fill it.
   let gapFill = "";

@@ -29,7 +29,14 @@ import { crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signa
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
-import { RENT_VS_BUY_CAVEAT, compareRentVsBuy, savingsRace } from "../../lib/rent-vs-buy.ts";
+import {
+  RENT_VS_BUY_CAVEAT,
+  breakevenByPrice,
+  compareRentVsBuy,
+  maxPriceForHoldPeriod,
+  savingsRace,
+  statutoryRentCap,
+} from "../../lib/rent-vs-buy.ts";
 import {
   attachChartHover,
   attachStackHover,
@@ -591,6 +598,107 @@ function renderRentVsBuy(input: ScenarioInput): void {
     `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
+  // --- how long would you have to stay? ---
+  const holdYears = Number($<HTMLInputElement>("holdYears").value);
+  $("holdYearsOut").textContent = `${holdYears} year${holdYears === 1 ? "" : "s"}`;
+
+  const downPercent = input.downPayment.kind === "percent" ? input.downPayment.value : 0.2;
+  const sweepBase = {
+    interestRate: input.interestRate,
+    termYears: input.termYears,
+    monthlyRent: rent,
+    homeAppreciation: appreciation,
+    rentGrowth,
+    investmentReturn: investReturn,
+    propertyTaxGrowth: 0.02,
+    sellingCostRate: 0.06,
+  };
+  // Costs that scale with price have to be recomputed per price, or a cheap
+  // house gets charged an expensive house's taxes.
+  const scaling = {
+    carryingRate: input.propertyTaxRate ?? 0.0115,
+    maintenanceRate: input.maintenanceRate ?? 0.01,
+    fixedMonthly: (input.insuranceAnnual ?? 2000) / 12 + input.hoaMonthly + input.melloRoosAnnual / 12,
+  };
+
+  const maxPrice = maxPriceForHoldPeriod(sweepBase, scaling, holdYears, Math.max(downPercent, 0.05));
+  const thisHouse = compareRentVsBuy({
+    purchasePrice: input.purchasePrice,
+    downPaymentAmount: result.loan.downPaymentAmount,
+    closingCosts: Math.max(result.cashToClose.total - result.loan.downPaymentAmount, 0),
+    loanAmount: result.loan.totalLoanAmount,
+    interestRate: input.interestRate,
+    termYears: input.termYears,
+    monthlyCarryingCosts: carrying,
+    monthlyMaintenance: maintenance,
+    monthlyRent: rent,
+    homeAppreciation: appreciation,
+    rentGrowth,
+    investmentReturn: investReturn,
+    propertyTaxGrowth: 0.02,
+    sellingCostRate: 0.06,
+  });
+  const worksForYou = thisHouse.breakevenYear !== null && thisHouse.breakevenYear <= holdYears;
+
+  $("holdVerdict").innerHTML = `
+    <div class="stat ${maxPrice ? "stat--pass" : "stat--fail"}">
+      <span class="stat__label">Staying ${holdYears} years, pay at most</span>
+      <span class="stat__value">${maxPrice ? money(maxPrice) : "nothing"}</span>
+      <span class="stat__note">${
+        maxPrice
+          ? `A price-to-rent of ${(maxPrice / (rent * 12)).toFixed(1)}x. Above that, renting wins over your horizon.`
+          : "At this rent and these assumptions, no price breaks even inside your horizon."
+      }</span>
+    </div>
+    <div class="stat ${worksForYou ? "stat--pass" : "stat--fail"}">
+      <span class="stat__label">This house at ${money(input.purchasePrice)}</span>
+      <span class="stat__value">${thisHouse.breakevenYear ? `${thisHouse.breakevenYear} yr` : "never"}</span>
+      <span class="stat__note">${
+        thisHouse.breakevenYear
+          ? worksForYou
+            ? `Breaks even inside your ${holdYears} years. Selling earlier loses money against renting.`
+            : `Breaks even in year ${thisHouse.breakevenYear}, which is longer than you plan to stay.`
+          : "Never catches up within 30 years at this price and rent."
+      }</span>
+    </div>
+    <div class="stat">
+      <span class="stat__label">Rate is the biggest lever</span>
+      <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, Math.max(downPercent, 0.05)) ?? 0)}</span>
+      <span class="stat__note">What you could pay at 4.5% instead of ${pct(input.interestRate)}, same horizon. Rates move your budget more than anything else here.</span>
+    </div>`;
+
+  const prices: number[] = [];
+  for (let p = 300_000; p <= 1_600_000; p += 50_000) prices.push(p);
+  const curve = breakevenByPrice(sweepBase, scaling, prices, Math.max(downPercent, 0.05));
+  const CAP_YEARS = 31;
+
+  $("breakevenChart").innerHTML = renderMultiLine({
+    series: [
+      {
+        key: "hold",
+        label: "Years you must stay before owning wins",
+        color: SERIES_PRICE,
+        points: curve.map((c, i) => ({ month: String(i), value: c.breakevenYear ?? CAP_YEARS })),
+      },
+      {
+        key: "horizon",
+        label: `Your horizon (${holdYears} years)`,
+        color: SERIES_PAYMENT,
+        points: curve.map((c, i) => ({ month: String(i), value: holdYears })),
+      },
+    ],
+    format: (n) => (n >= CAP_YEARS ? "never" : `${Math.round(n)}y`),
+    xTicks: curve.map((c, i) => ({ index: i, label: `$${Math.round(c.value / 1000)}k` })).filter((_, i) => i % 5 === 0),
+    description: "Years you must own before buying beats renting, by purchase price.",
+    height: 210,
+  });
+
+  $("rentCapNote").textContent =
+    `Where the blue line sits below the orange one, buying wins over your horizon. California caps annual rent ` +
+    `increases at ${pct(statutoryRentCap(), 1)} for San Diego under AB 1482 (5% plus regional CPI, never above 10%), ` +
+    `but that is a ceiling, not a forecast: most sitting tenants see far less, and single-family homes, condos not ` +
+    `owned by a corporation, and anything built in the last 15 years are exempt entirely.`;
+
   // --- the savings treadmill ---
   const race = savingsRace({
     targetPrice: input.purchasePrice,
@@ -1017,7 +1125,7 @@ function init(): void {
   }
 
   // The history panel's own controls re-render only the sections they affect.
-  for (const id of ["appreciation", "investReturn", "rentGrowth"]) {
+  for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => renderRentVsBuy(readInput()));
   }
 

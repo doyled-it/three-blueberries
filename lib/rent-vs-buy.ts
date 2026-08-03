@@ -300,6 +300,162 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
   };
 }
 
+// ---------------------------------------------------------------------------
+// California's rent cap
+// ---------------------------------------------------------------------------
+
+/**
+ * AB 1482, the Tenant Protection Act: annual increases are capped at 5% plus
+ * regional CPI, never above 10%. San Diego's ceiling for August 2026 through
+ * July 2027 is 8.2%.
+ *
+ * Two things matter about this and both cut against over-relying on it.
+ *
+ * It is a CEILING, not a forecast. Most rents rise far slower than the cap, so
+ * using 8.2% as an assumed growth rate wildly overstates what a sitting tenant
+ * actually faces.
+ *
+ * And the exemptions are broad: single-family homes and condos not owned by a
+ * corporation are exempt if the lease said so, and anything built in the last
+ * 15 years is exempt outright. Plenty of renters are not covered at all.
+ */
+export const AB_1482 = {
+  base: 0.05,
+  hardCeiling: 0.1,
+  /** San Diego regional CPI component for the 2026-27 year. */
+  sanDiegoCpi: 0.032,
+  sanDiegoCap: 0.082,
+} as const;
+
+export function statutoryRentCap(regionalCpi = AB_1482.sanDiegoCpi): number {
+  return Math.min(AB_1482.base + regionalCpi, AB_1482.hardCeiling);
+}
+
+// ---------------------------------------------------------------------------
+// The decision surface: how long must you stay?
+// ---------------------------------------------------------------------------
+
+export interface BreakevenPoint {
+  /** The variable being swept. */
+  value: number;
+  priceToRent: number;
+  /** Years you must hold before owning beats renting. Null means never, within the horizon. */
+  breakevenYear: number | null;
+}
+
+/**
+ * Breakeven holding period across a range of purchase prices, holding rent and
+ * everything else fixed.
+ *
+ * This is the question that actually matters: not "should I buy" in the abstract,
+ * but "how long would I have to stay for this to have been worth it, and am I
+ * going to be here that long." Selling before the crossover means you would have
+ * been wealthier renting, because transaction costs and front-loaded interest
+ * have not been earned back yet.
+ */
+/**
+ * Costs that scale with the price of the house, expressed as annual rates.
+ *
+ * A price sweep has to recompute these per price. Holding them fixed charges a
+ * $500k house the property tax of a $1.2M one, which makes every price look
+ * equally bad and hides the actual crossover.
+ */
+export interface ScalingCosts {
+  /** Property tax plus anything else proportional to value, annual. */
+  carryingRate: number;
+  /** Maintenance reserve, annual. */
+  maintenanceRate: number;
+  /** Costs that do NOT scale, such as an insurance floor or HOA, monthly. */
+  fixedMonthly: number;
+}
+
+type SweepBase = Omit<
+  RentVsBuyInput,
+  "purchasePrice" | "downPaymentAmount" | "loanAmount" | "closingCosts" | "monthlyCarryingCosts" | "monthlyMaintenance"
+>;
+
+function atPrice(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  downPercent: number,
+  closingCostRate: number,
+  years?: number
+) {
+  const down = price * downPercent;
+  return compareRentVsBuy({
+    ...base,
+    purchasePrice: price,
+    downPaymentAmount: down,
+    loanAmount: price - down,
+    closingCosts: price * closingCostRate,
+    monthlyCarryingCosts: (price * costs.carryingRate) / 12 + costs.fixedMonthly,
+    monthlyMaintenance: (price * costs.maintenanceRate) / 12,
+    ...(years ? { years } : {}),
+  });
+}
+
+export function breakevenByPrice(
+  base: SweepBase,
+  costs: ScalingCosts,
+  prices: number[],
+  downPercent: number,
+  closingCostRate = 0.025
+): BreakevenPoint[] {
+  return prices.map((price) => ({
+    value: price,
+    priceToRent: price / (base.monthlyRent * 12),
+    breakevenYear: atPrice(base, costs, price, downPercent, closingCostRate).breakevenYear,
+  }));
+}
+
+/** The same sweep across interest rates, holding the price fixed. */
+export function breakevenByRate(base: RentVsBuyInput, rates: number[]): BreakevenPoint[] {
+  return rates.map((interestRate) => {
+    const result = compareRentVsBuy({ ...base, interestRate });
+    return {
+      value: interestRate,
+      priceToRent: base.purchasePrice / (base.monthlyRent * 12),
+      breakevenYear: result.breakevenYear,
+    };
+  });
+}
+
+/**
+ * The most you should pay, given how long you actually intend to stay.
+ *
+ * Binary search on price: the breakeven period lengthens monotonically as price
+ * rises, so there is a single crossing.
+ */
+export function maxPriceForHoldPeriod(
+  base: SweepBase,
+  costs: ScalingCosts,
+  holdYears: number,
+  downPercent: number,
+  closingCostRate = 0.025,
+  bounds: { low?: number; high?: number } = {}
+): number | null {
+  const low0 = bounds.low ?? 100_000;
+  const high0 = bounds.high ?? 5_000_000;
+
+  const worksAt = (price: number): boolean => {
+    const result = atPrice(base, costs, price, downPercent, closingCostRate, Math.max(holdYears, 1));
+    return result.breakevenYear !== null && result.breakevenYear <= holdYears;
+  };
+
+  if (!worksAt(low0)) return null;
+  if (worksAt(high0)) return high0;
+
+  let low = low0;
+  let high = high0;
+  while (high - low > 5_000) {
+    const mid = (low + high) / 2;
+    if (worksAt(mid)) low = mid;
+    else high = mid;
+  }
+  return Math.floor(low / 10_000) * 10_000;
+}
+
 export const RENT_VS_BUY_DEFAULTS = DEFAULTS;
 
 export const RENT_VS_BUY_CAVEAT =

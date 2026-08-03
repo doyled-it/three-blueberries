@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { compareRentVsBuy, savingsRace } from "../lib/rent-vs-buy.ts";
+import {
+  breakevenByPrice,
+  compareRentVsBuy,
+  maxPriceForHoldPeriod,
+  savingsRace,
+  statutoryRentCap,
+} from "../lib/rent-vs-buy.ts";
 
 /** A $1.2M North Park house against $2,750 rent: a 36x price-to-rent ratio. */
 function scenario(overrides: Partial<Parameters<typeof compareRentVsBuy>[0]> = {}) {
@@ -129,4 +135,72 @@ test("a zero-down loan still needs closing costs saved", () => {
     homeAppreciation: 0.035,
   });
   assert.ok(race.cashNeededToday > 20_000, "VA at zero down is not zero cash");
+});
+
+// --- the decision surface --------------------------------------------------
+
+const COSTS = { carryingRate: 0.0115, maintenanceRate: 0.01, fixedMonthly: 190 };
+const SWEEP = {
+  interestRate: 0.0666,
+  termYears: 30,
+  monthlyRent: 2_995,
+  homeAppreciation: 0.0543,
+  rentGrowth: 0.023,
+  investmentReturn: 0.07,
+  propertyTaxGrowth: 0.02,
+  sellingCostRate: 0.06,
+};
+
+test("REGRESSION: a price sweep scales carrying costs with the price", () => {
+  // Holding tax and maintenance fixed while sweeping price charges a $400k house
+  // the taxes of a $1.2M one, which makes every price look equally hopeless and
+  // hides the crossover entirely.
+  const curve = breakevenByPrice(SWEEP, COSTS, [400_000, 1_200_000], 0.2);
+  assert.ok(curve[0]!.breakevenYear !== null, "a cheap house must break even at some point");
+  assert.equal(curve[1]!.breakevenYear, null, "an expensive one at this rent should not");
+});
+
+test("the required holding period lengthens monotonically with price", () => {
+  const prices = [400_000, 500_000, 600_000, 700_000, 800_000];
+  const curve = breakevenByPrice(SWEEP, COSTS, prices, 0.2);
+  const years = curve.map((c) => c.breakevenYear ?? 999);
+  for (let i = 1; i < years.length; i++) {
+    assert.ok(years[i]! >= years[i - 1]!, `breakeven should not shorten as price rises (at ${prices[i]})`);
+  }
+});
+
+test("the max price you should pay rises as your horizon lengthens, then plateaus", () => {
+  const short = maxPriceForHoldPeriod(SWEEP, COSTS, 3, 0.2)!;
+  const medium = maxPriceForHoldPeriod(SWEEP, COSTS, 10, 0.2)!;
+  const long = maxPriceForHoldPeriod(SWEEP, COSTS, 30, 0.2)!;
+  assert.ok(medium > short, "staying longer should let you pay more");
+  assert.ok(long >= medium);
+  // Past roughly 15 years the constraint is price-to-rent, not patience.
+  assert.ok(long < medium * 1.3, "holding period has sharply diminishing returns");
+});
+
+test("the interest rate moves the budget more than the horizon does", () => {
+  const cheap = maxPriceForHoldPeriod({ ...SWEEP, interestRate: 0.03 }, COSTS, 10, 0.2)!;
+  const dear = maxPriceForHoldPeriod({ ...SWEEP, interestRate: 0.08 }, COSTS, 10, 0.2)!;
+  assert.ok(cheap > dear * 2, "3% versus 8% should more than double what you can justify paying");
+});
+
+test("faster rent growth justifies paying more", () => {
+  const slow = maxPriceForHoldPeriod({ ...SWEEP, rentGrowth: 0.023 }, COSTS, 10, 0.2)!;
+  const atCap = maxPriceForHoldPeriod({ ...SWEEP, rentGrowth: statutoryRentCap() }, COSTS, 10, 0.2)!;
+  assert.ok(atCap > slow, "if rent will run away from you, owning is worth more");
+});
+
+test("California's rent cap is a formula, not a guess", () => {
+  // 5% plus regional CPI, never above 10%.
+  assert.ok(Math.abs(statutoryRentCap(0.032) - 0.082) < 1e-9, "San Diego 2026-27 should be 8.2%");
+  assert.equal(statutoryRentCap(0.09), 0.1, "the hard ceiling is 10%");
+  assert.equal(statutoryRentCap(0), 0.05, "the floor is the 5% base");
+});
+
+test("selling before breakeven means you lost against renting", () => {
+  const r = scenario({ purchasePrice: 600_000, downPaymentAmount: 120_000, loanAmount: 480_000, monthlyRent: 2_995 });
+  if (r.breakevenYear === null || r.breakevenYear < 2) return;
+  const before = r.years[r.breakevenYear - 2]!;
+  assert.ok(before.buyNetWorth < before.rentNetWorth, "the year before breakeven, renting is still ahead");
 });
