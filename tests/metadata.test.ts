@@ -212,3 +212,23 @@ test("the IndexNow key file is served and matches the key that will be submitted
   const contents = fs.readFileSync(path.join(root, "_site", keyFiles[0]!), "utf8").trim();
   assert.equal(contents, key, "the file must contain the key and nothing else");
 });
+
+test("REGRESSION: reading measures are absolute, not a multiple of the font size", () => {
+  // `ch` is a fraction of the CURRENT font size, so a 0.82rem footnote capped at
+  // 78ch rendered NARROWER than a 0.92rem paragraph capped at 88ch. Prose blocks
+  // that should have looked like a set ended at four different widths between
+  // 43% and 69% of the column, while uncapped notes beside them ran the full
+  // 100%. A measure has to mean the same distance wherever it is used.
+  const css = fs.readFileSync(path.join(root, "src", "assets", "css", "main.css"), "utf8");
+  const chCaps = [...css.matchAll(/max-width:\s*[\d.]+ch/g)];
+  assert.equal(chCaps.length, 0, `max-width in ch: ${chCaps.map((m) => m[0]).join(", ")}`);
+
+  const measure = Number(css.match(/--measure:\s*([\d.]+)rem/)![1]!);
+  assert.ok(measure >= 45, `${measure}rem strands prose in a 980px column`);
+
+  // And every prose block shares the one measure rather than inventing its own.
+  for (const selector of [".hero__sub", ".panel__sub", ".field-note", ".site-footer__terms", ".warnings"]) {
+    const block = css.match(new RegExp(`\\${selector} \\{([^}]*)\\}`))![1]!;
+    assert.match(block, /max-width: var\(--measure\)/, `${selector} does not use the shared measure`);
+  }
+});
