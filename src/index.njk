@@ -217,9 +217,11 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <div class="grid grid--tight">
     <div>
-      <label for="appreciation">Home appreciation <output id="appreciationOut">5.4%</output>/yr</label>
-      <input id="appreciation" type="range" min="0" max="90" value="54" step="1" />
-      <p class="field-note">San Diego ran 5.4%/yr since 1987, 2.9% over the last 20 years, 7.0% over the last 10.</p>
+      <label for="appreciation">Home appreciation <output id="appreciationOut">6.5%</output>/yr</label>
+      <!-- Goes NEGATIVE on purpose. Butte's last twenty years run at -1.4%/yr, and
+           a floor of zero would have clamped that preset silently to 0% while the
+           caption underneath said -1.4%. -->
+      <input id="appreciation" type="range" min="-30" max="90" value="65" step="1" />
     </div>
     <div>
       <label for="investReturn">

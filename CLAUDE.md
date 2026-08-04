@@ -253,14 +253,11 @@ real ones, 34 on a statewide fallback that warns it is one), the AB 1482 rent ce
 regions, not one number), and everything downstream of those.
 
 **Does not, and cannot:** the price history, the cohort panel, the crash signals, and the
-thesis panel. Case-Shiller publishes repeat-sales indexes for three California metros, not 58
-counties, and this site is built on San Diego's.
+thesis panel. Every one of them now uses the reader's own county.
 
-That limit is stated on the page rather than in a comment. `countyScopeNote()` puts a note above
-every San-Diego-sourced panel naming the reader's county and how well it transfers, with a
-measured correlation (LA r = 0.94, Bay Area r = 0.89 on year-on-year change, against 0.72 for the
-best out-of-state metro). The test recomputes those from `data/panel.json` rather than trusting
-the constant.
+`countyScope()` states the RESOLUTION on the page rather than apologising for showing the wrong
+place: quarterly for a county inside a metro, annual for a rural one, and where the chained index
+has its seam.
 
 **When adding anything county-dependent, do not hardcode a San Diego constant as a fallback.**
 Two panels had `?? 0.0115` where they meant `?? countyTaxRate(county)`, which is invisible: it
@@ -319,9 +316,9 @@ Secrets are never in `wrangler.toml`. `npx wrangler secret put FRED_API_KEY`
 
 ## 6a. The history modules
 
-`lib/data/history.ts` is GENERATED (`npm run data:history`), 473 months of Case-Shiller
-San Diego (SDXRSA) joined to Freddie Mac's 30-year average, from FRED's public `fredgraph.csv`
-endpoint, which needs no API key.
+`lib/data/history.ts` is GENERATED (`npm run data:history`) and holds a price series for every
+California county: metro quarterly where one exists, county annual otherwise, joined to Freddie
+Mac's 30-year average. See section 5 for the sources and the 1991 splice.
 
 - `lib/history.ts`, drawdown detection, the payment-over-time series, and `evaluateWaiting()`,
   which answers "should I wait for a crash" including the costs waiting advocates leave out

@@ -32,11 +32,16 @@ actually buy it, should you, what happens if you wait for a crash, why everyone
 else seems to manage, and why it is this hard. It also ships a housing forecaster
 that does not work, displayed underneath its own track record, on purpose.
 
+Everything follows the county you pick, including fifty years of that county's own
+price history. The sharpest thing it found: **the better a California county pays,
+the less affordable its housing** (r = +0.71). Affordability did not leave the
+state, it relocated to where the work is not.
+
 ## Running it
 
 ```
 npm install
-npm test          # 243 tests, ~250ms, no framework
+npm test          # 261 tests, under a second, no framework
 npm run dev       # eleventy on :8080 (no /api, the rate fetch falls back)
 npm run typecheck
 npm run build
@@ -79,7 +84,7 @@ date and an honest `kind`. Several data files are generated rather than typed:
 ```
 npm run data:loan-limits   # FHFA conforming limits, annually each November
 npm run data:insurance     # California FAIR Plan by county, quarterly
-npm run data:history       # Case-Shiller San Diego + Freddie Mac rates
+npm run data:history       # FHFA by county + Zillow anchors + Census income
 npm run data:panel         # 20 metros, for the forecaster
 ```
 
@@ -113,15 +118,18 @@ data files, which come from other people and carry their own terms:
 | Mortgage rates | Freddie Mac PMMS via FRED | free to use with attribution |
 | FAIR Plan by county | California FAIR Plan | published public statistics |
 | Housing units | California Dept of Finance | US state government work |
-| **Case-Shiller indexes** | **S&P Dow Jones Indices via FRED** | **see below** |
+| House price history | FHFA (metro + county) | US government work, public domain |
+| Price anchors | Zillow ZHVI | free, non-commercial, attribution |
+| County incomes | Census SAIPE | US government work, public domain |
+| **Forecaster panel** | **S&P Case-Shiller via FRED** | **see below** |
 
-`lib/data/history.ts` and `data/panel.json` contain S&P CoreLogic Case-Shiller
-index values. S&P's terms state that reproduction in any form is prohibited
-without their prior written permission, and FRED is explicit that making a series
-available through their API is not that permission. Non-commercial use of this
-kind is routinely granted, and it can be requested from `index_services@spdji.com`,
-but **it has not been requested here yet.**
+`data/panel.json` contains S&P CoreLogic Case-Shiller index values for 20 metros.
+It is the offline training input for the forecaster and is not displayed. S&P's
+terms state that reproduction in any form is prohibited without their prior
+written permission, and FRED is explicit that making a series available through
+their API is not that permission. Permission has not been requested.
 
-If that matters to you, the fix is not difficult: the FHFA House Price Index
-covers the same metros, is a US government work with no such restriction, and
-`scripts/fetch-history.mjs` is the only thing that would need to change.
+The site itself no longer touches it. Everything shown to a reader comes from
+FHFA, Zillow and the Census, none of which need anyone's permission. The same
+move would work for the panel: FHFA covers those metros too, and the forecaster's
+conclusion is that it does not work, which a coarser input would not change.

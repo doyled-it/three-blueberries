@@ -14,6 +14,7 @@ import {
   requiredRate,
   maxPriceForHoldPeriod,
   savingsRace,
+  assumptionSets,
   statutoryRentCap,
   AB_1482,
   RENT_CAP_REGIONS,
@@ -409,10 +410,14 @@ test("the ceiling reported for a rate matches an exact recomputation", () => {
 // --- matched assumptions ---------------------------------------------------
 
 test("every assumption set draws both returns from the same period", () => {
-  for (const set of ASSUMPTION_SETS) {
+  // Every county's sets, not just the default one's, since they are computed
+  // from each county's own record now.
+  for (const set of CA_COUNTIES.flatMap((c) => assumptionSets(c))) {
     assert.ok(set.basis.length > 60, `${set.id} must say where its numbers come from`);
     assert.ok(set.investmentReturn > set.homeAppreciation, "equities have outrun housing in every period measured");
-    assert.ok(set.homeAppreciation > 0 && set.homeAppreciation < 0.12);
+    // Appreciation can be NEGATIVE. Butte's last twenty years run at -1.4%, and
+    // pretending otherwise is how the slider came to clamp it silently to zero.
+    assert.ok(set.homeAppreciation > -0.05 && set.homeAppreciation < 0.12, `${set.id}: ${set.homeAppreciation}`);
     assert.ok(set.investmentReturn > 0 && set.investmentReturn < 0.2);
   }
 });
@@ -617,7 +622,7 @@ const slider = (id: string) => {
   return { min: attr("min"), max: attr("max"), value: attr("value") };
 };
 
-test("REGRESSION: every named assumption set fits on its slider", () => {
+test("REGRESSION: every named assumption set fits on its slider, in every county", () => {
   // "Last decade" sets a 14.7% return against a slider that stopped at 12.0%,
   // so choosing it silently ran 12% while the caption underneath said 14.7%,
   // and the verdict flipped from never to year six on a number nobody typed.
@@ -626,7 +631,11 @@ test("REGRESSION: every named assumption set fits on its slider", () => {
     investReturn: slider("investReturn"),
     rentGrowth: slider("rentGrowth"),
   };
-  for (const set of ASSUMPTION_SETS) {
+  // Not just the default county's: the sets are computed per county now, and
+  // Butte's twenty-year appreciation is NEGATIVE, which a slider flooring at
+  // zero would have clamped to 0% while the caption said -1.4%.
+  const everySet = CA_COUNTIES.flatMap((c) => assumptionSets(c));
+  for (const set of everySet) {
     const values = {
       appreciation: Math.round(set.homeAppreciation * 1000),
       investReturn: Math.round(set.investmentReturn * 1000),

@@ -18,6 +18,8 @@
  */
 
 import { balanceAfter, monthlyPayment } from "./amortization.ts";
+import { DEFAULT_COUNTY, historyFor } from "./data/history.ts";
+import type { CaCounty } from "./data/ca-loan-limits.ts";
 
 export interface RentVsBuyInput {
   purchasePrice: number;
@@ -924,35 +926,77 @@ export interface AssumptionSet {
  * set below lands within a narrow band, which is a far stronger conclusion than
  * any single run.
  */
-export const ASSUMPTION_SETS: AssumptionSet[] = [
-  {
-    id: "long-run",
-    label: "Long run",
-    homeAppreciation: 0.0543,
-    investmentReturn: 0.1,
-    rentGrowth: 0.035,
-    basis:
-      "California housing since the 1970s from the FHFA index, against the long-run nominal total return on US equities of roughly 10%. Both measured over decades.",
-  },
-  {
-    id: "last-decade",
-    label: "Last decade",
-    homeAppreciation: 0.0701,
-    investmentReturn: 0.147,
-    rentGrowth: 0.05,
-    basis:
-      "Both from the last ten years: San Diego housing at 7.0%, the S&P 500 at about 13.2% before dividends and roughly 14.7% with them. A strong decade for housing was a far stronger one for stocks.",
-  },
-  {
-    id: "cautious",
-    label: "Cautious",
-    homeAppreciation: 0.029,
-    investmentReturn: 0.07,
-    rentGrowth: 0.023,
-    basis:
-      "San Diego's last twenty years, which include a full crash, against a deliberately conservative 7% on equities. Rent grows at the rate yours actually has.",
-  },
-];
+/**
+ * Annualised appreciation for a county over the last `years`, from its own
+ * record, or over the whole record when `years` is null.
+ *
+ * These used to be three hardcoded San Diego figures shown to all 58 counties,
+ * complete with a caption saying "San Diego ran 5.4%/yr" to somebody buying in
+ * Fresno. The appreciation you should assume is your own county's, and now that
+ * every county has a history there is no reason to guess with someone else's.
+ */
+function annualisedAppreciation(county: CaCounty, years: number | null): number {
+  const { rows, stepMonths } = historyFor(county);
+  const last = rows[rows.length - 1]!;
+  const wantedRows = years === null ? rows.length : Math.round((years * 12) / stepMonths) + 1;
+  const from = rows[Math.max(0, rows.length - wantedRows)]!;
+  const spanYears = ((rows.length - 1 - rows.indexOf(from)) * stepMonths) / 12;
+  if (spanYears <= 0 || from[1] <= 0) return 0;
+  return Math.pow(last[1] / from[1], 1 / spanYears) - 1;
+}
+
+/**
+ * The three assumption sets, computed for the reader's county.
+ *
+ * Appreciation and investment return must come from the SAME period or the
+ * comparison is rigged without anyone meaning to rig it, which is why these
+ * travel as sets rather than as three independent sliders.
+ */
+export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet[] {
+  const { rows } = historyFor(county);
+  const startYear = rows[0]![0].slice(0, 4);
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+  const longRun = annualisedAppreciation(county, null);
+  const decade = annualisedAppreciation(county, 10);
+  const twenty = annualisedAppreciation(county, 20);
+
+  return [
+    {
+      id: "long-run",
+      label: "Long run",
+      homeAppreciation: longRun,
+      investmentReturn: 0.1,
+      rentGrowth: 0.035,
+      basis:
+        `${county} County housing since ${startYear} ran ${pct(longRun)} a year, against the long-run nominal ` +
+        `total return on US equities of roughly 10%. Both measured over decades.`,
+    },
+    {
+      id: "last-decade",
+      label: "Last decade",
+      homeAppreciation: decade,
+      investmentReturn: 0.147,
+      rentGrowth: 0.05,
+      basis:
+        `Both from the last ten years: ${county} housing at ${pct(decade)}, the S&P 500 at about 13.2% before ` +
+        `dividends and roughly 14.7% with them. A strong decade for housing was a far stronger one for stocks.`,
+    },
+    {
+      id: "cautious",
+      label: "Cautious",
+      homeAppreciation: twenty,
+      investmentReturn: 0.07,
+      rentGrowth: 0.023,
+      basis:
+        `${county}'s last twenty years, which include a full crash, at ${pct(twenty)}, against a deliberately ` +
+        `conservative 7% on equities. Rent grows at the rate yours actually has.`,
+    },
+  ];
+}
+
+/** The default county's sets, for anything that has no county to hand. */
+export const ASSUMPTION_SETS: AssumptionSet[] = assumptionSets();
 
 export function assumptionSet(id: string): AssumptionSet | undefined {
   return ASSUMPTION_SETS.find((a) => a.id === id);

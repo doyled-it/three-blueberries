@@ -8,15 +8,15 @@
  *
  * So rather than plot prices, this plots two lines that share a unit:
  *
- *   1. What the median home actually cost.
- *   2. What the median household could have afforded that month, derived from
- *      their income, the prevailing mortgage rate, and a fixed 30% share of
- *      gross income spent on housing.
+ *   1. What the same house in this county actually cost.
+ *   2. What the median household could have afforded then, derived from their
+ *      income, the prevailing mortgage rate, and a fixed 30% share of gross
+ *      income spent on housing.
  *
  * Holding the *effort* constant at 30% of income and letting the affordable
  * price float is what isolates buying power. Where the two lines cross is the
- * moment a median household stopped being able to buy a median home, and the
- * gap between them afterwards is the size of the problem in dollars.
+ * moment a median household stopped being able to buy that house, and the gap
+ * between them afterwards is the size of the problem in dollars.
  */
 
 import { monthlyPayment } from "./amortization.ts";

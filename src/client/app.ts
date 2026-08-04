@@ -41,7 +41,7 @@ import { countyTaxRate } from "../../lib/data/ca-property.ts";
 import { countyScope } from "../../lib/county-scope.ts";
 import { WHERE_IT_WORKS_CAVEAT, allStandings, countyStanding, payTrap } from "../../lib/where-it-works.ts";
 import {
-  ASSUMPTION_SETS,
+  assumptionSets,
   RATE_SOLVER_CEILING,
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
@@ -447,10 +447,9 @@ function renderCohort(input: ScenarioInput): void {
 /**
  * Say whose history this is, when it is not the reader's.
  *
- * The calculator follows the county selector everywhere it can. The history
- * cannot: Case-Shiller indexes three California metros, not 58 counties. A
- * buyer in Fresno reading "the last month the math worked was March 2013"
- * deserves to know whose math, on the panel, not in a footnote.
+ * The history follows the county now, so this explains RESOLUTION rather than
+ * apologising: quarterly for a county inside a metro, annual for a rural one,
+ * and where the chained index has its seam.
  */
 function renderCountyScope(county: CaCounty): void {
   const { note } = countyScope(county);
@@ -488,7 +487,7 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
 
   $("history").innerHTML = `
     <div class="chart-block">
-      <h4>What the same house cost <span class="chart-sub">shaded: the two declines over 10% since 1987</span></h4>
+      <h4>What the same house cost <span class="chart-sub">shaded: every decline over 10% on record</span></h4>
       ${renderChart({
         points: pricePoints,
         color: SERIES_PRICE,
@@ -517,7 +516,7 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
     </div>
     <div class="stats">
       <div class="stat">
-        <span class="stat__label">Declines over 10% since 1987</span>
+        <span class="stat__label">Declines over 10% on record</span>
         <span class="stat__value">${ctx.declines.length}<span class="stat__unit"> in ${ctx.yearsOfData} years</span></span>
         <span class="stat__note">${ctx.declines
           .map((d) => `${d.peakMonth.slice(0, 4)}–${d.troughMonth.slice(0, 4)}: ${d.depthPercent.toFixed(0)}%`)
@@ -677,20 +676,22 @@ function renderRentVsBuy(input: ScenarioInput): void {
     `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
-  if (!$("assumptionSets").hasChildNodes()) {
+  if ($("assumptionSets").dataset["county"] !== input.county) {
+    $("assumptionSets").dataset["county"] = input.county;
     // The page used to open on 5.4% / 7.0% / 3.5%, which is long-run housing
     // paired with a conservative equity number and matches no named set. That is
     // precisely the mismatched-period rigging the paragraph above warns about,
     // in the default state, so it opens on a named set instead.
-    const opening = ASSUMPTION_SETS[0]!;
-    $("assumptionSets").innerHTML = ASSUMPTION_SETS.map(
+    const sets = assumptionSets(input.county);
+    const opening = sets[0]!;
+    $("assumptionSets").innerHTML = sets.map(
       (a) =>
         `<button type="button" class="preset${a.id === opening.id ? " preset--on" : ""}" data-assumptions="${a.id}">${a.label}</button>`
     ).join("");
     $("assumptionBasis").textContent = opening.basis;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-assumptions]")) {
       button.addEventListener("click", () => {
-        const set = ASSUMPTION_SETS.find((a) => a.id === button.dataset["assumptions"])!;
+        const set = assumptionSets(readInput().county).find((a) => a.id === button.dataset["assumptions"])!;
         $<HTMLInputElement>("appreciation").value = String(Math.round(set.homeAppreciation * 1000));
         $<HTMLInputElement>("investReturn").value = String(Math.round(set.investmentReturn * 1000));
         $<HTMLInputElement>("rentGrowth").value = String(Math.round(set.rentGrowth * 1000));
@@ -930,7 +931,7 @@ let lastBuyingPowerCounty: CaCounty | null = null;
 
 function renderBuyingPower(county: CaCounty): void {
   lastBuyingPowerCounty = county;
-  // Over 39 years a nominal chart is dominated by inflation, which makes both
+  // Over four decades a nominal chart is dominated by inflation, which makes both
   // lines look like they exploded and hides what actually changed. Real dollars
   // are the default. The ratio and "last month it worked" are inflation-neutral,
   // so no headline figure moves either way.
