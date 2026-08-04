@@ -1,6 +1,6 @@
 /**
- * Forty years of San Diego housing history, and what it can and cannot tell you
- * about waiting for a crash.
+ * Thirty-five years of San Diego housing history, and what it can and cannot
+ * tell you about waiting for a crash.
  *
  * The central lesson buried in this data: **price is not payment**. A buyer at
  * the 2021 peak paid about the same monthly as a buyer at the 2006 peak, because
@@ -8,13 +8,13 @@
  * often enough that "wait for prices to fall" and "wait for it to get cheaper"
  * are different bets.
  *
- * The second lesson: San Diego has had exactly two declines over 10% in 39 years.
+ * The second lesson: San Diego has had exactly two declines over 10% on record.
  * That's not a sample you can forecast from. Everything here is history, not
  * prediction, and the UI says so.
  */
 
 import { monthlyPayment } from "./amortization.ts";
-import { HISTORY_LATEST_INDEX, SD_HISTORY, type HistoryRow } from "./data/history.ts";
+import { HISTORY_LATEST_INDEX, HISTORY_STEP_MONTHS, SD_HISTORY, type HistoryRow } from "./data/history.ts";
 
 export interface MonthPoint {
   month: string;
@@ -28,7 +28,7 @@ export interface MonthPoint {
 }
 
 /**
- * The Case-Shiller index is unitless, so we anchor it to a real dollar figure at
+ * The FHFA index is unitless, so we anchor it to a real dollar figure at
  * the most recent reading. Everything else scales from there, which lets you read
  * "what would this same house have cost in 2009" directly in dollars.
  *
@@ -130,16 +130,20 @@ export interface CurrentStatus {
   recentPeakMonth: string;
   recentPeakIndex: number;
   percentOffRecentPeak: number;
-  /** Consecutive months of decline ending at the latest reading. */
+  /** Consecutive readings of decline ending at the latest one. Quarters, not months. */
   consecutiveDeclines: number;
-  /** Latest 12 months, oldest first, for a sparkline. */
+  /** The latest year of readings, oldest first, for a sparkline. */
   trailing12: ReadonlyArray<{ month: string; index: number; changePercent: number }>;
 }
 
 export function currentStatus(lookbackMonths = 36): CurrentStatus {
   const rows = SD_HISTORY;
   const latest = rows[rows.length - 1]!;
-  const window = rows.slice(Math.max(0, rows.length - lookbackMonths));
+  // Rows are quarters, so a window measured in MONTHS has to be converted. This
+  // used to slice `lookbackMonths` rows, which quietly became a nine-year
+  // lookback the moment the series stopped being monthly.
+  const lookbackRows = Math.max(1, Math.round(lookbackMonths / HISTORY_STEP_MONTHS));
+  const window = rows.slice(Math.max(0, rows.length - lookbackRows));
 
   let peak = window[0]!;
   for (const r of window) if (r[1] > peak[1]) peak = r;
@@ -150,8 +154,9 @@ export function currentStatus(lookbackMonths = 36): CurrentStatus {
     else break;
   }
 
-  const trailing12 = rows.slice(-12).map((r, i, arr) => {
-    const prevIndex = i === 0 ? rows[rows.length - 13]?.[1] : arr[i - 1]![1];
+  const trailingRows = Math.max(1, Math.round(12 / HISTORY_STEP_MONTHS));
+  const trailing12 = rows.slice(-trailingRows).map((r, i, arr) => {
+    const prevIndex = i === 0 ? rows[rows.length - trailingRows - 1]?.[1] : arr[i - 1]![1];
     return {
       month: r[0],
       index: r[1],
@@ -438,7 +443,9 @@ export function historicalContext() {
   const extremes = paymentExtremes();
 
   return {
-    yearsOfData: Math.round(SD_HISTORY.length / 12),
+    // Rows are quarters, not months, since the move to FHFA. Dividing the row
+    // count by 12 turned 35 years of record into a claim of 12.
+    yearsOfData: Math.round((SD_HISTORY.length * HISTORY_STEP_MONTHS) / 12),
     declines: drops,
     worst,
     status,

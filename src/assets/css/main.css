@@ -37,8 +37,15 @@
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Reading measure, used only where a block is pure prose. */
-  --measure: 68ch;
+  /* Reading measures, in rem rather than ch.
+     ch is a fraction of the CURRENT font size, so a 0.82rem footnote with a
+     78ch cap rendered NARROWER than a 0.92rem paragraph with an 88ch cap: the
+     smaller the type, the shorter the line. Blocks that should have looked
+     like a set ended at four different widths, none of them full. rem is
+     absolute, so a measure means the same distance everywhere. */
+  --measure: 52rem;
+  /* For prose nested inside a component, where the indent already narrows it. */
+  --measure-tight: 42rem;
 }
 
 * {
@@ -130,7 +137,7 @@ a:hover {
   color: var(--berry-bright);
 }
 .hero__sub {
-  max-width: 62ch;
+  max-width: var(--measure);
   margin: 22px 0 0;
   color: var(--ink-2);
   font-size: 1.02rem;
@@ -173,7 +180,7 @@ a:hover {
   box-shadow: 0 0 12px var(--berry);
 }
 .panel__sub {
-  max-width: 88ch;
+  max-width: var(--measure);
   margin: 0 0 24px;
   color: var(--ink-3);
   font-size: 0.92rem;
@@ -301,6 +308,7 @@ input::placeholder {
 }
 .field-note {
   margin: 8px 0 0;
+  max-width: var(--measure);
   color: var(--ink-4);
   font-size: 0.78rem;
   line-height: 1.55;
@@ -361,7 +369,7 @@ input::placeholder {
 }
 .line__detail {
   padding: 2px 2px 18px 28px;
-  max-width: var(--measure);
+  max-width: var(--measure-tight);
 }
 .line__basis {
   margin: 0 0 10px;
@@ -505,6 +513,7 @@ input::placeholder {
 
 .notes,
 .warnings {
+  max-width: var(--measure);
   margin: 18px 0 0;
   padding-left: 0;
   list-style: none;
@@ -533,6 +542,7 @@ input::placeholder {
 }
 
 .verdict {
+  max-width: var(--measure);
   margin: 20px 0 0;
   padding: 15px 18px;
   background: var(--panel);
@@ -994,7 +1004,7 @@ input[type="range"] {
   font-size: 0.82rem;
 }
 .site-footer__terms {
-  max-width: 78ch;
+  max-width: var(--measure);
   margin: 0;
 }
 
@@ -1015,7 +1025,7 @@ input[type="range"] {
   margin-top: 14px;
 }
 .site-footer__credit {
-  max-width: 62ch;
+  max-width: var(--measure);
   margin: 0;
   color: var(--ink-3);
 }
@@ -1305,6 +1315,7 @@ input[type="range"] {
    stated where it can be acted on, rather than buried in a caveat block. */
 .scope-note {
   margin: 0 0 20px;
+  max-width: var(--measure);
   padding: 12px 14px;
   border-left: 2px solid var(--berry);
   background: var(--panel-2);

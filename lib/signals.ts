@@ -17,7 +17,7 @@
  */
 
 import { monthlyPayment } from "./amortization.ts";
-import { HISTORY_LATEST_INDEX, SD_HISTORY } from "./data/history.ts";
+import { HISTORY_LATEST_INDEX, HISTORY_STEP_MONTHS, SD_HISTORY } from "./data/history.ts";
 import {
   CA_MEDIAN_INCOME,
   MORTGAGE_DELINQUENCY,
@@ -109,8 +109,8 @@ export function worstTimeToBuy(anchorPrice = DEFAULT_ANCHOR_PRICE): WorstTimeVer
 
   const answer =
     rank === 1
-      ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive month to buy in the ${series.length} months on record.`
-      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, which is worse than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of all months since ${series[0]!.month.slice(0, 4)}. The actual worst was ${worstEver.month}, at ${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The median month in this record was ${pct(median)}, roughly half what you'd pay now.`;
+      ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive quarter to buy in the ${series.length} quarters on record.`
+      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, which is worse than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of all quarters since ${series[0]!.month.slice(0, 4)}. The actual worst was ${worstEver.month}, at ${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The median quarter in this record was ${pct(median)}, roughly half what you'd pay now.`;
 
   return {
     latest,
@@ -143,8 +143,35 @@ export interface SignalReading {
   caveat?: string;
 }
 
-const PEAK_2006 = "2006-03";
-const TROUGH_2009 = "2009-05";
+/**
+ * The 2006 peak and the 2009 trough, found in the data rather than written down.
+ *
+ * They used to be two hardcoded month strings. That survived exactly as long as
+ * the series was monthly: moving to FHFA's quarterly index deleted both months
+ * from the record, and `at()` started returning undefined for the comparison
+ * every reading on this panel is built around. Deriving them also means a data
+ * revision moves the anchor instead of silently mismatching it.
+ */
+function extremeBetween(
+  series: readonly { month: string; index: number }[],
+  from: string,
+  to: string,
+  pick: "max" | "min"
+): string {
+  const window = series.filter((p) => p.month >= from && p.month <= to);
+  if (window.length === 0) throw new Error(`No history between ${from} and ${to}`);
+  const best = window.reduce((a, b) =>
+    pick === "max" ? (b.index > a.index ? b : a) : b.index < a.index ? b : a
+  );
+  return best.month;
+}
+
+const INDEX_SERIES = SD_HISTORY.map(([month, index]) => ({ month, index }));
+
+/** Highest reading of the bubble, searched across the years it could have been in. */
+export const PEAK_2006 = extremeBetween(INDEX_SERIES, "2005-01", "2007-12", "max");
+/** Lowest reading of the bust that followed it. */
+export const TROUGH_2009 = extremeBetween(INDEX_SERIES, "2009-01", "2012-12", "min");
 
 export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
   readings: SignalReading[];
@@ -258,7 +285,7 @@ export interface Correlation {
   r: number;
   /** Raw overlapping-window count. */
   observations: number;
-  /** observations / windowMonths, the honest sample size. */
+  /** Non-overlapping windows: the honest sample size, not the overlapping count. */
   effectiveObservations: number;
   strength: "strong" | "moderate" | "weak";
 }
@@ -272,10 +299,15 @@ export interface Correlation {
 export function leadingIndicators(windowMonths = 24, anchorPrice = DEFAULT_ANCHOR_PRICE): Correlation[] {
   const series = burdenSeries(anchorPrice);
 
+  // The window is in MONTHS; the series is in quarters. Indexing the array by
+  // windowMonths treated a 24-month horizon as 24 quarters, six years, which
+  // silently changed which indicator looked strongest.
+  const windowRows = Math.max(1, Math.round(windowMonths / HISTORY_STEP_MONTHS));
+
   const samples: Array<{ change: number; values: Record<string, number | null> }> = [];
-  for (let i = 0; i + windowMonths < series.length; i++) {
+  for (let i = 0; i + windowRows < series.length; i++) {
     const now = series[i]!;
-    const later = series[i + windowMonths]!;
+    const later = series[i + windowRows]!;
     samples.push({
       change: (later.price - now.price) / now.price,
       values: {
@@ -319,7 +351,9 @@ export function leadingIndicators(windowMonths = 24, anchorPrice = DEFAULT_ANCHO
       label: labels[key]!,
       r,
       observations: n,
-      effectiveObservations: Math.round(n / windowMonths),
+      // Non-overlapping windows, which is the honest sample size. n counts ROWS
+      // now, so it divides by the window in rows, not in months.
+      effectiveObservations: Math.round(n / windowRows),
       strength: Math.abs(r) > 0.5 ? "strong" : Math.abs(r) > 0.3 ? "moderate" : "weak",
     };
   });

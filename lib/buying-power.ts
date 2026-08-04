@@ -35,8 +35,8 @@ export interface BuyingPowerPoint {
   /**
    * What the same house cost that month.
    *
-   * NOT a median for that month. It is the Case-Shiller repeat-sales index,
-   * which tracks what the same houses resold for, anchored to today's median.
+   * NOT a median for that quarter. It is the FHFA repeat-sales index, which
+   * tracks what the same houses resold for, anchored to today's median.
    * That makes it a like-for-like price series rather than a mix-shifting one,
    * and it is the reason the label everywhere says "the same house".
    */
@@ -180,7 +180,8 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
 
 /** Income series ends before the price series; the UI should say so. */
 export const BUYING_POWER_CAVEAT =
-  `The price line is the Case-Shiller repeat-sales index for San Diego, which tracks what the same houses resold for, ` +
+  `The price line is the FHFA expanded-data repeat-sales index for San Diego, quarterly, which tracks what the same ` +
+  `houses resold for, ` +
   `anchored to the current county median so it reads in dollars. So it is one representative house through time, ` +
   `not the median listing of each year, and the anchor only moves the dollar axis: every ratio here divides it out. ` +
   `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR}, ` +
