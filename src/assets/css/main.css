@@ -998,18 +998,21 @@ input[type="range"] {
   margin: 0;
 }
 
-/* The byline is a SENTENCE, so it is laid out as text. It was a flex container,
-   which turns every run between the elements into its own flex item and applies
-   the gap to each, stranding the comma a clear space away from the name. */
+/* Two things went wrong here and both are worth remembering.
+   The byline is a SENTENCE, so it is laid out as text. It used to be a flex
+   container, and a flex container makes an anonymous item out of every text run
+   between its element children, then applies the gap to each, which stranded the
+   comma a clear space away from the name.
+   And it had a border-top of its own. The last panel already draws a rule above
+   the footer, so a second one under the terms line split this into what read as
+   two separate footers. */
 .site-footer__by {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 14px 32px;
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--rule-soft);
+  margin-top: 14px;
 }
 .site-footer__credit {
   max-width: 62ch;

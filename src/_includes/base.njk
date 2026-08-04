@@ -68,6 +68,7 @@
             "isAccessibleForFree": true,
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
             "sameAs": ["{{ site.repo.url }}"],
+            "license": "{{ site.repo.license.url }}",
             "author": { "@id": "{{ site.author.url }}/#person" },
             "publisher": { "@id": "{{ site.author.url }}/#person" },
             "featureList": [
@@ -109,11 +110,13 @@
         <div class="site-footer__by">
           <p class="site-footer__credit">
             Built by <a href="{{ site.author.url }}" rel="author">{{ site.author.name }}</a>, who wanted this to
-            exist and could not find it. Free, no ads, nothing sold, and the arithmetic is
-            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">open for anyone to check</a>.
+            exist and could not find it. Free, no ads, nothing sold. The whole thing is
+            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">open source</a> under the
+            <a href="{{ site.repo.license.url }}" rel="license noopener" target="_blank">{{ site.repo.license.name }}</a>,
+            so anyone can check the arithmetic, and anything built on it has to stay open too.
           </p>
           <nav class="site-footer__links" aria-label="Elsewhere">
-            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">Source</a>
+            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">Source on GitHub</a>
             <a href="{{ site.author.support }}" rel="noopener" target="_blank">Buy me a coffee</a>
           </nav>
         </div>

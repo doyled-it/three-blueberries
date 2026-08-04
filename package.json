@@ -1,6 +1,13 @@
 {
   "name": "three-blueberries",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "author": "Michael Doyle (https://doyled-it.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doyled-it/three-blueberries.git"
+  },
+  "homepage": "https://blueberries.doyled-it.com",
   "private": true,
   "type": "module",
   "description": "What a house in California actually costs you every month, with every number shown and sourced.",

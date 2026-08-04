@@ -26,6 +26,14 @@ export default {
   // whose arithmetic anybody can go and check.
   repo: {
     url: "https://github.com/doyled-it/three-blueberries",
+    // AGPL rather than GPL because almost nobody DISTRIBUTES a web app, they
+    // run it on a server and hand you HTML. Plain GPL says nothing about that;
+    // AGPL is the one that reaches a modified version running as a website.
+    license: {
+      name: "AGPL-3.0",
+      spdx: "AGPL-3.0-only",
+      url: "https://www.gnu.org/licenses/agpl-3.0.html",
+    },
   },
   // Bumped by hand when the content changes materially, not on every deploy.
   updated: "2026-08-04",

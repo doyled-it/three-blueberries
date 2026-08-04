@@ -350,6 +350,23 @@ the pre-registered criteria, that changes. Nothing else does.
 
 ---
 
+## 7a. Licensing
+
+**AGPL-3.0-only**, in `LICENSE`, fetched verbatim from gnu.org. Chosen over GPL because
+almost nobody distributes a web app: they run it on a server and hand you HTML, which plain
+GPL says nothing about. AGPL section 13 is the clause that reaches a modified version running
+as a website.
+
+**The AGPL covers the code, not the data.** `lib/data/history.ts` and `data/panel.json`
+contain S&P CoreLogic Case-Shiller index values, and S&P prohibits reproduction without prior
+written permission; FRED states explicitly that API access is not that permission. Permission
+has NOT been requested. If it needs solving, the FHFA House Price Index covers the same metros
+as a US government work with no such restriction, and `scripts/fetch-history.mjs` is the only
+file that would change. Everything else in `lib/data/` is a government work or published
+public statistics. The README carries the table.
+
+---
+
 ## 8. Tone
 
 The owner swears, hates being marketed to, and wants the number that is true rather than the

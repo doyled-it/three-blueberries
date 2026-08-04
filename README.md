@@ -91,5 +91,37 @@ that must never come back.
 
 ## Licence
 
-Not yet chosen. Non-commercial, no ads, no lead capture. That last part is the
-entire point.
+**GNU Affero General Public License v3.0.** See [`LICENSE`](LICENSE).
+
+Plain GPL would not have been enough. Almost nobody distributes a web app; they
+run it on a server and hand you HTML, and plain GPL says nothing about that. AGPL
+does: **if you run a modified version of this where other people can reach it,
+you have to publish your changes under the same licence.**
+
+So: fork it, learn from it, run it, sell nothing on it. But a version of this
+with a lead-capture form bolted on has to ship its source too, and then everyone
+can see the form.
+
+### The data is not mine to license
+
+The AGPL covers the code in this repository. It does not and cannot cover the
+data files, which come from other people and carry their own terms:
+
+| Data | Source | Terms |
+| --- | --- | --- |
+| Conforming loan limits | FHFA | US government work, public domain |
+| Mortgage rates | Freddie Mac PMMS via FRED | free to use with attribution |
+| FAIR Plan by county | California FAIR Plan | published public statistics |
+| Housing units | California Dept of Finance | US state government work |
+| **Case-Shiller indexes** | **S&P Dow Jones Indices via FRED** | **see below** |
+
+`lib/data/history.ts` and `data/panel.json` contain S&P CoreLogic Case-Shiller
+index values. S&P's terms state that reproduction in any form is prohibited
+without their prior written permission, and FRED is explicit that making a series
+available through their API is not that permission. Non-commercial use of this
+kind is routinely granted, and it can be requested from `index_services@spdji.com`,
+but **it has not been requested here yet.**
+
+If that matters to you, the fix is not difficult: the FHFA House Price Index
+covers the same metros, is a US government work with no such restriction, and
+`scripts/fetch-history.mjs` is the only thing that would need to change.

@@ -110,6 +110,30 @@ test("the footer credits its author and links the source and the tip jar", () =>
   assert.match(footer, /github\.com\/doyled-it\/three-blueberries/);
   // Anything opening a new tab needs this, or the new page can reach back.
   assert.match(footer, /rel="noopener"/);
+
+  // The licence is a promise to the reader as much as a legal notice, so it is
+  // stated on the page, not only in a file nobody opens.
+  assert.match(footer, /AGPL-3\.0/);
+  assert.match(footer, /rel="license noopener"/);
+});
+
+test("the licence is AGPL everywhere it is declared, and the text is really AGPL", () => {
+  // GPL would not have covered this. Almost nobody distributes a web app, they
+  // run it on a server, and only AGPL reaches a modified version doing that.
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { license: string };
+  assert.equal(pkg.license, "AGPL-3.0-only");
+
+  const licence = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
+  assert.match(licence, /GNU AFFERO GENERAL PUBLIC LICENSE/);
+  assert.match(licence, /Version 3, 19 November 2007/);
+  // Section 13 is the whole reason for choosing it: it is the network clause.
+  assert.match(licence, /13\. Remote Network Interaction/);
+  assert.ok(licence.split("\n").length > 600, "the full text, not a summary");
+
+  const block = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!;
+  const data = JSON.parse(block) as { "@graph": Array<Record<string, unknown>> };
+  const app = data["@graph"].find((n) => n["@type"] === "WebApplication")!;
+  assert.match(String(app["license"]), /agpl-3\.0/);
 });
 
 test("REGRESSION: the byline is laid out as a sentence, not as flex items", () => {
