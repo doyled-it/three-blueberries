@@ -30,6 +30,8 @@ import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/f
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
+import { countyTaxRate } from "../../lib/data/ca-property.ts";
+import { countyScopeNote } from "../../lib/county-scope.ts";
 import {
   ASSUMPTION_SETS,
   RATE_SOLVER_CEILING,
@@ -41,6 +43,7 @@ import {
   maxPriceForHoldPeriod,
   rateSensitivity,
   requiredRate,
+  rentCapRegionFor,
   savingsRace,
   statutoryRentCap,
 } from "../../lib/rent-vs-buy.ts";
@@ -268,6 +271,7 @@ function render(): void {
   // claim derived from a demo default, and the one-shot guard froze it there.
   renderBuyingPower();
   renderCohort(input);
+  renderCountyScope(input.county);
   // The history panel is about YOUR house: what this same house would have cost
   // in 2009. The crash signals are about the market, and every one of them is
   // read against the 2006 peak and the 2009 bottom, so they have to stand on the
@@ -311,7 +315,7 @@ function renderCohort(input: ScenarioInput): void {
     currentPrice: input.purchasePrice,
     currentRate: input.interestRate,
     downPercent: 0.2,
-    propertyTaxRate: input.propertyTaxRate ?? 0.0115,
+    propertyTaxRate: input.propertyTaxRate ?? countyTaxRate(input.county),
   };
 
   const lastYear = Number(BEST_REFI.month.slice(0, 4)) + 4;
@@ -427,6 +431,22 @@ function renderCohort(input: ScenarioInput): void {
 // ---------------------------------------------------------------------------
 // "Should you wait for the crash?"
 // ---------------------------------------------------------------------------
+
+/**
+ * Say whose history this is, when it is not the reader's.
+ *
+ * The calculator follows the county selector everywhere it can. The history
+ * cannot: Case-Shiller indexes three California metros, not 58 counties. A
+ * buyer in Fresno reading "the last month the math worked was March 2013"
+ * deserves to know whose math, on the panel, not in a footnote.
+ */
+function renderCountyScope(county: CaCounty): void {
+  const note = countyScopeNote(county);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-county-scope]")) {
+    el.textContent = note ?? "";
+    el.hidden = note === null;
+  }
+}
 
 let lastHistoryAnchor: number | null = null;
 
@@ -869,11 +889,15 @@ function renderRentVsBuy(input: ScenarioInput): void {
     })
     .join("");
 
+  // The cap turns on the CPI region the property is in, not on the state, so it
+  // has to follow the county selector like everything else in this panel.
+  const capRegion = rentCapRegionFor(input.county);
   $("rentCapNote").textContent =
     `Where the blue line sits below the orange one, buying wins over your horizon. California caps annual rent ` +
-    `increases at ${pct(statutoryRentCap(), 1)} for San Diego under AB 1482 (5% plus regional CPI, never above 10%), ` +
-    `but that is a ceiling, not a forecast: most sitting tenants see far less, and single-family homes, condos not ` +
-    `owned by a corporation, and anything built in the last 15 years are exempt entirely.`;
+    `increases at ${pct(statutoryRentCap(input.county), 1)} in ${input.county} County under AB 1482 ` +
+    `(5% plus the CPI for ${capRegion.label}, never above 10%), but that is a ceiling, not a forecast: most ` +
+    `sitting tenants see far less, and single-family homes, condos not owned by a corporation, and anything built ` +
+    `in the last 15 years are exempt entirely.`;
 
   // --- the savings treadmill ---
   const race = savingsRace({
@@ -1228,7 +1252,7 @@ function renderWaiting(input: ScenarioInput): void {
     rateAtBottom,
     monthlyRent: num("waitRent", 0),
     monthlySavings: num("waitSavings", 0),
-    propertyTaxRate: input.propertyTaxRate ?? 0.0115,
+    propertyTaxRate: input.propertyTaxRate ?? countyTaxRate(input.county),
   });
 
   const better = r.monthlySaving > 0;
@@ -1331,7 +1355,10 @@ function init(): void {
         renderCohort(current);
       } else {
         // Moving a slider means you're no longer on a named historical scenario.
-        for (const b of document.querySelectorAll(".preset")) b.classList.remove("preset--on");
+        // Only the crash presets. The bare `.preset` selector also matched the
+        // assumption-set buttons in the panel above, so dragging a crash slider
+        // cleared a selection in a different section.
+        for (const b of document.querySelectorAll(".preset[data-preset]")) b.classList.remove("preset--on");
         $("presetBasis").textContent = "Your own assumptions, not a historical scenario.";
         renderWaiting(current);
       }

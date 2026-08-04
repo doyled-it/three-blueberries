@@ -15,7 +15,11 @@ import {
   maxPriceForHoldPeriod,
   savingsRace,
   statutoryRentCap,
+  AB_1482,
+  RENT_CAP_REGIONS,
+  rentCapRegionFor,
 } from "../lib/rent-vs-buy.ts";
+import { CA_COUNTIES } from "../lib/data/ca-loan-limits.ts";
 
 /** A $1.2M North Park house against $2,750 rent: a 36x price-to-rent ratio. */
 function scenario(overrides: Partial<Parameters<typeof compareRentVsBuy>[0]> = {}) {
@@ -195,15 +199,38 @@ test("the interest rate moves the budget more than the horizon does", () => {
 
 test("faster rent growth justifies paying more", () => {
   const slow = maxPriceForHoldPeriod({ ...SWEEP, rentGrowth: 0.023 }, COSTS, 10, 0.2)!;
-  const atCap = maxPriceForHoldPeriod({ ...SWEEP, rentGrowth: statutoryRentCap() }, COSTS, 10, 0.2)!;
+  const atCap = maxPriceForHoldPeriod({ ...SWEEP, rentGrowth: statutoryRentCap("San Diego") }, COSTS, 10, 0.2)!;
   assert.ok(atCap > slow, "if rent will run away from you, owning is worth more");
 });
 
 test("California's rent cap is a formula, not a guess", () => {
-  // 5% plus regional CPI, never above 10%.
-  assert.ok(Math.abs(statutoryRentCap(0.032) - 0.082) < 1e-9, "San Diego 2026-27 should be 8.2%");
-  assert.equal(statutoryRentCap(0.09), 0.1, "the hard ceiling is 10%");
-  assert.equal(statutoryRentCap(0), 0.05, "the floor is the 5% base");
+  // 5% plus REGIONAL CPI, never above 10%. The region is the point: a figure
+  // that is right in San Diego is wrong everywhere the statute names separately.
+  assert.ok(Math.abs(statutoryRentCap("San Diego") - 0.082) < 1e-9, "San Diego 2026-27 should be 8.2%");
+  assert.ok(Math.abs(statutoryRentCap("Los Angeles") - 0.087) < 1e-9, "LA and Orange should be 8.7%");
+  assert.ok(Math.abs(statutoryRentCap("Riverside") - 0.081) < 1e-9, "the Inland Empire should be 8.1%");
+  assert.ok(Math.abs(statutoryRentCap("Alameda") - 0.088) < 1e-9, "the Bay Area should be 8.8%");
+  assert.ok(Math.abs(statutoryRentCap("Fresno") - 0.086) < 1e-9, "counties with no BLS index take the state CPI");
+
+  // The hard ceiling and the base still bound it, whatever the CPI does.
+  for (const county of CA_COUNTIES) {
+    const cap = statutoryRentCap(county);
+    assert.ok(cap >= AB_1482.base && cap <= AB_1482.hardCeiling, `${county} is outside 5% to 10%`);
+  }
+});
+
+test("REGRESSION: every county resolves to exactly one rent-cap region", () => {
+  // A county listed in two regions, or a region naming a county that does not
+  // exist, would silently hand somebody the wrong statutory ceiling.
+  const named = RENT_CAP_REGIONS.flatMap((r) => r.counties);
+  assert.equal(new Set(named).size, named.length, "a county appears in two regions");
+  for (const county of named) {
+    assert.ok(CA_COUNTIES.includes(county), `${county} is not a California county`);
+  }
+  for (const county of CA_COUNTIES) {
+    const region = rentCapRegionFor(county);
+    assert.ok(region.cpi > 0 && region.cpi < 0.2, `${county} has an implausible CPI`);
+  }
 });
 
 test("selling before breakeven means you lost against renting", () => {

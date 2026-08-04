@@ -225,6 +225,17 @@ export const SOURCES = {
       "$40,000 for 2025 rising 1% a year, so $40,400 in 2026, and it reverts to $10,000 after 2029. Above $505,000 of modified AGI the raise is clawed back at 30 cents on the dollar down to a $10,000 floor, which two California salaries reach without feeling wealthy.",
   },
 
+  "ab-1482-cpi": {
+    id: "ab-1482-cpi",
+    title: "Tenant Protection Act (AB 1482) rent cap, regional CPI for August 2026 through July 2027",
+    publisher: "California Civil Code 1947.12, on BLS and DIR cost-of-living indexes",
+    url: "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1947.12",
+    asOf: "2026-08-01",
+    kind: "statutory",
+    caveat:
+      "The formula is statutory; the CPI component is not one number. The statute uses the index for the region the property is in, so the ceiling is 8.7% in Los Angeles and Orange, 8.8% in the five Bay Area counties BLS indexes, 8.2% in San Diego, 8.1% in the Inland Empire, and 8.6% everywhere else on the California CPI. It resets every August. And it is a ceiling, not a forecast: single-family homes and condos not corporately owned can be exempt, and anything built in the last 15 years is exempt outright.",
+  },
+
   "cshpi-sdxrsa": {
     id: "cshpi-sdxrsa",
     title: "S&P CoreLogic Case-Shiller CA-San Diego Home Price Index (SDXRSA)",

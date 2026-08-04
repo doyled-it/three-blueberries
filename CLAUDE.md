@@ -78,7 +78,9 @@ lib/                    the engine, pure TypeScript, no DOM, no I/O
     ca-loan-limits.ts   GENERATED from FHFA. Do not hand-edit.
     programs.ts         VA funding fee, FHA MIP, PMI bands, DTI ceilings, residual income
     ca-property.ts      Prop 13, county tax rates, insurance + closing cost defaults
+    ca-rent-cap.ts      AB 1482 by CPI region, because the cap is not one number
     federal-tax.ts      standard deduction by filing status, SALT cap and its phase-out
+  county-scope.ts       what the county selector does NOT change, said out loud
 src/
   client/app.ts         browser wiring; bundled by esbuild to src/assets/js/
   index.njk             the form + result panels
@@ -96,7 +98,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           228 tests, no watch mode needed, runs in ~250ms
+npm test           236 tests, no watch mode needed, runs in ~250ms
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -149,6 +151,30 @@ reached. **If you can't write that sentence, don't ship the number.** The UI ren
   used is still the conforming one. Fix this before trusting max-price answers near the limit.
 - **The supplemental tax bill warning fires on every scenario.** It is not modeled numerically
   because that requires the seller's old assessed value, which we don't have. Do not fake it.
+
+### All 58 counties, and the line between them
+
+The county selector is at the top of the form, so everything reachable from it has to be
+county-aware, and `tests/counties.test.ts` runs all 58 through the engine, the affordability
+search and the whole rent-versus-buy surface.
+
+**Follows the county:** the conforming loan limit (FHFA, all 58), the property tax rate (24
+real ones, 34 on a statewide fallback that warns it is one), the AB 1482 rent ceiling (five CPI
+regions, not one number), and everything downstream of those.
+
+**Does not, and cannot:** the price history, the cohort panel, the crash signals, and the
+thesis panel. Case-Shiller publishes repeat-sales indexes for three California metros, not 58
+counties, and this site is built on San Diego's.
+
+That limit is stated on the page rather than in a comment. `countyScopeNote()` puts a note above
+every San-Diego-sourced panel naming the reader's county and how well it transfers, with a
+measured correlation (LA r = 0.94, Bay Area r = 0.89 on year-on-year change, against 0.72 for the
+best out-of-state metro). The test recomputes those from `data/panel.json` rather than trusting
+the constant.
+
+**When adding anything county-dependent, do not hardcode a San Diego constant as a fallback.**
+Two panels had `?? 0.0115` where they meant `?? countyTaxRate(county)`, which is invisible: it
+produces a plausible number for Fresno rather than an error.
 
 ### The bridge, and why it exists
 

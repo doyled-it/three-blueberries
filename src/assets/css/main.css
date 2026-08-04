@@ -1251,3 +1251,15 @@ input[type="range"] {
 .panel {
   scroll-margin-top: 24px;
 }
+
+/* Whose data this is, shown only when it is not the reader's county. A limit
+   stated where it can be acted on, rather than buried in a caveat block. */
+.scope-note {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--berry);
+  background: var(--panel-2);
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}

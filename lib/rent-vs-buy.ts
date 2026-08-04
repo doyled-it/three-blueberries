@@ -422,32 +422,10 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
 // California's rent cap
 // ---------------------------------------------------------------------------
 
-/**
- * AB 1482, the Tenant Protection Act: annual increases are capped at 5% plus
- * regional CPI, never above 10%. San Diego's ceiling for August 2026 through
- * July 2027 is 8.2%.
- *
- * Two things matter about this and both cut against over-relying on it.
- *
- * It is a CEILING, not a forecast. Most rents rise far slower than the cap, so
- * using 8.2% as an assumed growth rate wildly overstates what a sitting tenant
- * actually faces.
- *
- * And the exemptions are broad: single-family homes and condos not owned by a
- * corporation are exempt if the lease said so, and anything built in the last
- * 15 years is exempt outright. Plenty of renters are not covered at all.
- */
-export const AB_1482 = {
-  base: 0.05,
-  hardCeiling: 0.1,
-  /** San Diego regional CPI component for the 2026-27 year. */
-  sanDiegoCpi: 0.032,
-  sanDiegoCap: 0.082,
-} as const;
-
-export function statutoryRentCap(regionalCpi: number = AB_1482.sanDiegoCpi): number {
-  return Math.min(AB_1482.base + regionalCpi, AB_1482.hardCeiling);
-}
+// AB 1482 lives in lib/data/ca-rent-cap.ts, because the cap is not one number:
+// it turns on the CPI region the property sits in, and a figure that is right
+// in San Diego is wrong by seven tenths of a point in Alameda.
+export { AB_1482, RENT_CAP_REGIONS, rentCapRegionFor, statutoryRentCap } from "./data/ca-rent-cap.ts";
 
 // ---------------------------------------------------------------------------
 // The decision surface: how long must you stay?
