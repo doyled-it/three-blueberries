@@ -17,7 +17,8 @@
  */
 
 import { monthlyPayment } from "./amortization.ts";
-import { HISTORY_LATEST_INDEX, SD_HISTORY } from "./data/history.ts";
+import { DEFAULT_COUNTY, historyFor } from "./data/history.ts";
+import type { CaCounty } from "./data/ca-loan-limits.ts";
 import {
   CA_MEDIAN_INCOME,
   MORTGAGE_DELINQUENCY,
@@ -37,13 +38,33 @@ function asOf(series: readonly SignalRow[], month: string): number | null {
   return best ? best[1] : null;
 }
 
+/**
+ * The income series runs 1984 to 2024. Carry the NEAREST end outward rather than
+ * always the last value: dividing a 1975 house price by a 2024 income produced a
+ * 3% burden and made 1975 the best time to buy in history, which is an artefact.
+ *
+ * Past the end, holding income flat overstates the burden slightly, which is the
+ * conservative direction.
+ */
 const incomeForYear = (year: string): number => {
   const exact = CA_MEDIAN_INCOME.find((r) => r[0].startsWith(year));
   if (exact) return exact[1];
-  // Past the end of the series, carry the last value forward. Conservative:
-  // incomes kept rising, so holding them flat overstates the burden slightly.
+  // Past the END of the series only. Holding income flat overstates the burden
+  // slightly, which is the conservative direction.
   return CA_MEDIAN_INCOME[CA_MEDIAN_INCOME.length - 1]![1];
 };
+
+/**
+ * The first year median income is actually measured.
+ *
+ * The price series now reaches back to 1975 but the income series starts in
+ * 1984, and every figure on these panels is a RATIO of the two. Backfilling
+ * income made a 1975 house look like 13% of income and crowned it the best time
+ * to buy in history, which is an artefact of the backfill and nothing else. So
+ * the affordability panels start where the income data starts. The price and
+ * payment charts still show the full record, because those need no income.
+ */
+const INCOME_STARTS = CA_MEDIAN_INCOME[0]![0].slice(0, 4);
 
 export interface BurdenPoint {
   month: string;
@@ -64,22 +85,31 @@ export interface BurdenPoint {
  * This is the honest way to ask "is now the worst time ever", price alone
  * ignores rates, and rates alone ignore price.
  */
-export function burdenSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, downPercent = 0.2): BurdenPoint[] {
-  return SD_HISTORY.map(([month, index, ratePercent]) => {
-    const rate = ratePercent / 100;
-    const price = (anchorPrice * index) / HISTORY_LATEST_INDEX;
-    const income = incomeForYear(month.slice(0, 4));
-    const payment = monthlyPayment(price * (1 - downPercent), rate, 30);
-    return {
-      month,
-      price,
-      rate,
-      income,
-      payment,
-      paymentToIncome: (payment * 12) / income,
-      priceToIncome: price / income,
-    };
-  });
+export function burdenSeries(
+  county: CaCounty = DEFAULT_COUNTY,
+  anchorPrice?: number,
+  downPercent = 0.2
+): BurdenPoint[] {
+  const { rows, anchorPrice: countyAnchor } = historyFor(county);
+  const anchor = anchorPrice ?? countyAnchor;
+  const latestIndex = rows[rows.length - 1]![1];
+  return rows
+    .filter(([month]) => month.slice(0, 4) >= INCOME_STARTS)
+    .map(([month, index, ratePercent]) => {
+      const rate = ratePercent / 100;
+      const price = (anchor * index) / latestIndex;
+      const income = incomeForYear(month.slice(0, 4));
+      const payment = monthlyPayment(price * (1 - downPercent), rate, 30);
+      return {
+        month,
+        price,
+        rate,
+        income,
+        payment,
+        paymentToIncome: (payment * 12) / income,
+        priceToIncome: price / income,
+      };
+    });
 }
 
 export interface WorstTimeVerdict {
@@ -96,8 +126,8 @@ export interface WorstTimeVerdict {
   answer: string;
 }
 
-export function worstTimeToBuy(anchorPrice = DEFAULT_ANCHOR_PRICE): WorstTimeVerdict {
-  const series = burdenSeries(anchorPrice);
+export function worstTimeToBuy(county: CaCounty = DEFAULT_COUNTY, anchorPrice?: number): WorstTimeVerdict {
+  const series = burdenSeries(county, anchorPrice);
   const latest = series[series.length - 1]!;
   const sorted = [...series].sort((a, b) => b.paymentToIncome - a.paymentToIncome);
   const rank = sorted.findIndex((p) => p.month === latest.month) + 1;
@@ -143,17 +173,59 @@ export interface SignalReading {
   caveat?: string;
 }
 
-const PEAK_2006 = "2006-03";
-const TROUGH_2009 = "2009-05";
+/**
+ * The bubble peak and the bust trough, found in each county's data rather than
+ * written down as two month strings.
+ *
+ * Hardcoding them survived only as long as one county and one frequency. A
+ * quarterly series has no "2009-05" in it at all, and Fresno did not peak in the
+ * same month as San Diego. Deriving also means a data revision moves the anchor
+ * instead of silently mismatching it.
+ */
+function extremeBetween(
+  series: readonly { month: string; index: number }[],
+  from: string,
+  to: string,
+  pick: "max" | "min"
+): string {
+  const window = series.filter((p) => p.month >= from && p.month <= to);
+  if (window.length === 0) throw new Error(`No history between ${from} and ${to}`);
+  return window.reduce((a, b) => (pick === "max" ? (b.index > a.index ? b : a) : b.index < a.index ? b : a)).month;
+}
 
-export function crashSignals(anchorPrice = DEFAULT_ANCHOR_PRICE): {
+/** Highest reading of the bubble in this county, searched across the years it could be in. */
+export function peakOfBubble(county: CaCounty = DEFAULT_COUNTY): string {
+  return extremeBetween(
+    historyFor(county).rows.map(([month, index]) => ({ month, index })),
+    "2005-01",
+    "2007-12",
+    "max"
+  );
+}
+
+/** Lowest reading of the bust that followed it. */
+export function troughOfBust(county: CaCounty = DEFAULT_COUNTY): string {
+  return extremeBetween(
+    historyFor(county).rows.map(([month, index]) => ({ month, index })),
+    "2008-01",
+    "2013-12",
+    "min"
+  );
+}
+
+export function crashSignals(
+  county: CaCounty = DEFAULT_COUNTY,
+  anchorPrice?: number
+): {
   readings: SignalReading[];
   summary: string;
   caveats: string[];
 } {
-  const series = burdenSeries(anchorPrice);
+  const series = burdenSeries(county, anchorPrice);
   const latest = series[series.length - 1]!;
   const at = (month: string) => series.find((p) => p.month === month);
+  const PEAK_2006 = peakOfBubble(county);
+  const TROUGH_2009 = troughOfBust(county);
 
   const nowMonth = latest.month;
   const supplyNow = asOf(NEW_HOME_SUPPLY, nowMonth);
@@ -269,13 +341,22 @@ export interface Correlation {
  * Reported alongside `effectiveObservations` precisely so nobody quotes the
  * inflated n. See the module header.
  */
-export function leadingIndicators(windowMonths = 24, anchorPrice = DEFAULT_ANCHOR_PRICE): Correlation[] {
-  const series = burdenSeries(anchorPrice);
+export function leadingIndicators(
+  windowMonths = 24,
+  county: CaCounty = DEFAULT_COUNTY,
+  anchorPrice?: number
+): Correlation[] {
+  const series = burdenSeries(county, anchorPrice);
 
   const samples: Array<{ change: number; values: Record<string, number | null> }> = [];
-  for (let i = 0; i + windowMonths < series.length; i++) {
+  // The window is in MONTHS; the series is in quarters or years. Indexing the
+  // array by windowMonths treated a 24-month horizon as 24 quarters, six years,
+  // which silently changed which indicator looked strongest.
+  const windowRows = Math.max(1, Math.round(windowMonths / historyFor(county).stepMonths));
+
+  for (let i = 0; i + windowRows < series.length; i++) {
     const now = series[i]!;
-    const later = series[i + windowMonths]!;
+    const later = series[i + windowRows]!;
     samples.push({
       change: (later.price - now.price) / now.price,
       values: {
@@ -319,7 +400,9 @@ export function leadingIndicators(windowMonths = 24, anchorPrice = DEFAULT_ANCHO
       label: labels[key]!,
       r,
       observations: n,
-      effectiveObservations: Math.round(n / windowMonths),
+      // Non-overlapping windows, the honest sample size. n counts ROWS, so it
+      // divides by the window in rows rather than in months.
+      effectiveObservations: Math.round(n / windowRows),
       strength: Math.abs(r) > 0.5 ? "strong" : Math.abs(r) > 0.3 ? "moderate" : "weak",
     };
   });

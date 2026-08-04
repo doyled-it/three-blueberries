@@ -258,27 +258,28 @@ export const SOURCES = {
       "The formula is statutory; the CPI component is not one number. The statute uses the index for the region the property is in, so the ceiling is 8.7% in Los Angeles and Orange, 8.8% in the five Bay Area counties BLS indexes, 8.2% in San Diego, 8.1% in the Inland Empire, and 8.6% everywhere else on the California CPI. It resets every August. And it is a ceiling, not a forecast: single-family homes and condos not corporately owned can be exempt, and anything built in the last 15 years is exempt outright.",
   },
 
-  "cshpi-sdxrsa": {
-    id: "cshpi-sdxrsa",
-    title: "S&P CoreLogic Case-Shiller CA-San Diego Home Price Index (SDXRSA)",
-    publisher: "S&P Dow Jones Indices, via FRED",
-    url: "https://fred.stlouisfed.org/series/SDXRSA",
-    asOf: "monthly",
+  "fhfa-hpi": {
+    id: "fhfa-hpi",
+    title: "House Price Index: metro quarterly and county annual",
+    publisher: "Federal Housing Finance Agency",
+    url: "https://www.fhfa.gov/data/hpi/datasets",
+    asOf: "quarterly",
     kind: "published",
     caveat:
-      "A repeat-sales index, not a median. It tracks what the SAME houses resold for, which is the right way to measure price change and the wrong way to read a level. Anchoring it to a current price gives you the history of one representative house, not the history of the median listing.",
+      "A repeat-sales index, not a median: it tracks what the SAME houses resold for, which is the right way to measure price change and the wrong way to read a level. Covers 28 California metros quarterly and all 58 counties annually, which is why the history follows your county rather than showing everyone San Diego. A US government work, so it can be redistributed freely, unlike Case-Shiller which this replaced. Each metro series splices FHFA's longer all-transactions index onto the more accurate expanded-data one at 1991; the two disagree by a couple of points a year, so the earliest stretch is the shape of what happened rather than a precise measurement.",
   },
 
-  "car-median-price": {
-    id: "car-median-price",
-    title: "Median price of existing single-family homes, San Diego County",
-    publisher: "California Association of Realtors",
-    url: "https://www.car.org/marketdata/data/countysalesactivity",
-    asOf: "2026-01-01",
+  "zillow-zhvi": {
+    id: "zillow-zhvi",
+    title: "Zillow Home Value Index, single-family, by county",
+    publisher: "Zillow Research",
+    url: "https://www.zillow.com/research/data/",
+    asOf: "monthly",
     kind: "survey",
     caveat:
-      "A median of what sold, so it moves with the mix of what sold, not only with prices. Used here only as the anchor that puts the Case-Shiller index into dollars. Every ratio on that panel is anchor-invariant; only the dollar axis moves if this is wrong.",
+      "The typical value of a single-family home in the middle third of the market, not a median of what happened to sell, so it is steadier than a transaction median in the small counties. Used only as the dollar anchor that turns FHFA's unitless index into prices; every ratio on those panels divides it out. Free for non-commercial use with attribution.",
   },
+
 } as const satisfies Record<string, Source>;
 
 export type SourceId = keyof typeof SOURCES;

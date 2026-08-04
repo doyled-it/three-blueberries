@@ -5,7 +5,8 @@ import fs from "node:fs";
 import { CA_COUNTIES, conformingLimitFor, type CaCounty } from "../lib/data/ca-loan-limits.ts";
 import { countyTaxRate, hasCountySpecificTaxRate, DEFAULT_COUNTY_TAX_RATE } from "../lib/data/ca-property.ts";
 import { statutoryRentCap } from "../lib/data/ca-rent-cap.ts";
-import { METRO_CORRELATION, countyScopeNote } from "../lib/county-scope.ts";
+import { countyScope } from "../lib/county-scope.ts";
+import { buyingPowerVerdict } from "../lib/buying-power.ts";
 import { evaluateScenario } from "../lib/mortgage.ts";
 import { maxAffordablePrice } from "../lib/affordability.ts";
 import { bridgeScenario } from "../lib/scenario-bridge.ts";
@@ -119,75 +120,57 @@ test("REGRESSION: the rent cap follows the county, since it is a regional figure
   assert.notEqual(statutoryRentCap("Alameda"), statutoryRentCap("San Diego"));
 });
 
-test("the county scope note appears for every county except the one the data is from", () => {
-  assert.equal(countyScopeNote("San Diego"), null, "no note is needed when the data is yours");
-  for (const county of CA_COUNTIES.filter((c) => c !== "San Diego")) {
-    const note = countyScopeNote(county)!;
-    assert.ok(note, `${county} has no scope note`);
-    assert.ok(note.includes(county), `${county}'s note does not name it`);
-    assert.match(note, /San Diego/, `${county}'s note does not say whose data this is`);
+test("every county gets its own price history, at the finest resolution that exists", () => {
+  // The whole point of the selector. Every county used to be shown San Diego's
+  // past with a note apologising for it.
+  const places = new Set<string>();
+  for (const county of CA_COUNTIES) {
+    const scope = countyScope(county);
+    assert.ok(scope.note.includes(county), `${county}'s note does not name it`);
+    assert.ok([3, 12].includes(scope.stepMonths), `${county}: odd step ${scope.stepMonths}`);
+    assert.ok(scope.place.length > 0, `${county} has no place name`);
+    places.add(scope.place);
   }
+  // Not one series wearing 58 hats.
+  assert.ok(places.size >= 40, `only ${places.size} distinct series across 58 counties`);
+  assert.ok(!countyScope("Fresno").note.includes("San Diego"), "Fresno must not be told about San Diego");
 });
 
-test("REGRESSION: the quoted metro correlations are the measured ones", () => {
-  // They are stated on the page as a reason to trust the shape of San Diego's
-  // history elsewhere in California. Recompute them from the panel rather than
-  // trusting a number somebody typed once.
-  const panel = JSON.parse(fs.readFileSync(new URL("../data/panel.json", import.meta.url), "utf8")) as {
-    metros: Record<string, { name: string; series: [string, number][] }>;
-  };
+test("a metro county gets quarterly data and a rural one gets annual", () => {
+  const metro = countyScope("San Diego");
+  assert.equal(metro.stepMonths, 3);
+  assert.match(metro.note, /quarterly/);
+  assert.ok(metro.spliceMonth, "a metro series is chained, and the note should say so");
+  assert.match(metro.note, /seam/);
 
-  const yearOnYear = (series: [string, number][]) => {
-    const byMonth = new Map(series);
-    const out = new Map<string, number>();
-    for (const [month, value] of series) {
-      const [y, m] = month.split("-");
-      const previous = byMonth.get(`${Number(y) - 1}-${m}`);
-      if (previous) out.set(month, value / previous - 1);
-    }
-    return out;
-  };
+  const rural = countyScope("Sierra");
+  assert.equal(rural.stepMonths, 12);
+  assert.match(rural.note, /annual/);
+  assert.match(rural.note, /not inside a metropolitan area/);
+});
 
-  const pearson = (a: Map<string, number>, b: Map<string, number>) => {
-    const months = [...a.keys()].filter((m) => b.has(m));
-    const xs = months.map((m) => a.get(m)!);
-    const ys = months.map((m) => b.get(m)!);
-    const mean = (v: number[]) => v.reduce((s, n) => s + n, 0) / v.length;
-    const mx = mean(xs);
-    const my = mean(ys);
-    let num = 0;
-    let dx = 0;
-    let dy = 0;
-    for (let i = 0; i < xs.length; i++) {
-      num += (xs[i]! - mx) * (ys[i]! - my);
-      dx += (xs[i]! - mx) ** 2;
-      dy += (ys[i]! - my) ** 2;
-    }
-    return { r: num / Math.sqrt(dx * dy), n: months.length };
-  };
+test("REGRESSION: the buying-power verdict knows which way the number went", () => {
+  // It only knew how to say "gone". Buying power is down 23% in San Diego and UP
+  // 27% in Fresno, so half the state was being told "-27% of buying power gone".
+  const falling = buyingPowerVerdict("San Diego");
+  assert.ok(falling.powerLost > 0);
+  assert.match(falling.headline, /buying power gone/);
 
-  const sd = yearOnYear(panel.metros["SDXRSA"]!.series);
-  const la = pearson(sd, yearOnYear(panel.metros["LXXRSA"]!.series));
-  const sf = pearson(sd, yearOnYear(panel.metros["SFXRSA"]!.series));
+  const rising = buyingPowerVerdict("Fresno");
+  assert.ok(rising.powerLost < 0, "Fresno incomes have kept up with Fresno prices");
+  assert.ok(!/gone/.test(rising.headline), `printed a loss for a county that gained: ${rising.headline}`);
+  assert.match(rising.headline, /MORE/);
+  assert.ok(!/-\d/.test(rising.headline), "no negative percentages in prose");
+});
 
-  assert.ok(
-    Math.abs(la.r - METRO_CORRELATION.losAngeles) < 0.01,
-    `Los Angeles measures ${la.r.toFixed(3)}, the page says ${METRO_CORRELATION.losAngeles}`
-  );
-  assert.ok(
-    Math.abs(sf.r - METRO_CORRELATION.sanFrancisco) < 0.01,
-    `San Francisco measures ${sf.r.toFixed(3)}, the page says ${METRO_CORRELATION.sanFrancisco}`
-  );
-  assert.ok(
-    Math.abs(la.n - METRO_CORRELATION.observations) <= 12,
-    `${la.n} observations, the page says ${METRO_CORRELATION.observations}`
-  );
-
-  // And the California claim needs the contrast: these are not just "housing
-  // correlates with housing".
-  const elsewhere = ["SEXRSA", "NYXRSA", "CHXRSA", "PHXRSA"].map((k) => pearson(sd, yearOnYear(panel.metros[k]!.series)).r);
-  assert.ok(
-    Math.max(...elsewhere) < la.r - 0.15,
-    "the California metros must be meaningfully closer than out-of-state ones"
-  );
+test("every county produces a complete, finite buying-power verdict", () => {
+  for (const county of CA_COUNTIES) {
+    const v = buyingPowerVerdict(county);
+    assert.ok(Number.isFinite(v.powerLost), `${county}: powerLost is ${v.powerLost}`);
+    assert.ok(v.headline.length > 80, `${county}: headline too short`);
+    assert.ok(v.latest.yearsOfIncome > 0 && v.latest.yearsOfIncome < 40, `${county}: implausible years of income`);
+    // The place name has to appear, or the reader cannot tell whose market it is.
+    const { place } = countyScope(county);
+    assert.ok(v.headline.includes(place), `${county}: headline does not name ${place}`);
+  }
 });

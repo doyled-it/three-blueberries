@@ -21,10 +21,15 @@ import {
 } from "../lib/buying-power.ts";
 import { DEFAULT_ANCHOR_PRICE } from "../lib/history.ts";
 import { monthlyPayment } from "../lib/amortization.ts";
-import { SD_HISTORY, HISTORY_LATEST_INDEX, HISTORY_LATEST_MONTH, HISTORY_LATEST_RATE } from "../lib/data/history.ts";
+import { DEFAULT_COUNTY, historyFor, HISTORY_LATEST_MONTH } from "../lib/data/history.ts";
+
+const SD = historyFor(DEFAULT_COUNTY);
+const SD_HISTORY = SD.rows;
+const HISTORY_LATEST_INDEX = SD_HISTORY[SD_HISTORY.length - 1]![1];
+const HISTORY_LATEST_RATE = SD_HISTORY[SD_HISTORY.length - 1]![2];
 
 test("the history series is well formed and monotonic in time", () => {
-  assert.ok(SD_HISTORY.length > 400, "expected 400+ months of data");
+  assert.ok(SD_HISTORY.length > 190, "expected 190+ quarters of data");
   for (let i = 1; i < SD_HISTORY.length; i++) {
     assert.ok(SD_HISTORY[i]![0] > SD_HISTORY[i - 1]![0], `months out of order near ${SD_HISTORY[i]![0]}`);
   }
@@ -37,9 +42,12 @@ test("the history series is well formed and monotonic in time", () => {
 
 test("the 2006 crash is found with the right shape", () => {
   const drops = findDrawdowns(10);
-  const big = drops.find((d) => d.peakMonth.startsWith("2006"));
-  assert.ok(big, "expected a drawdown peaking in 2006");
-  // Case-Shiller San Diego fell about 42% from its 2006 peak to a 2009 trough.
+  // FHFA's expanded-data index puts the peak in 2005 Q4 where Case-Shiller put
+  // it in 2006. Same event, so look for the crash rather than for a month.
+  const big = drops.find((d) => d.peakMonth >= "2005-01" && d.peakMonth <= "2007-12");
+  assert.ok(big, "expected a drawdown peaking in the 2005-2007 bubble");
+  // It fell about 42% to a 2009 trough. Case-Shiller measured -42%, FHFA -41.9%,
+  // and that agreement is why the source swap was allowed to happen.
   assert.ok(big.depthPercent < -40 && big.depthPercent > -45, `unexpected depth ${big.depthPercent}`);
   assert.equal(big.troughMonth.slice(0, 4), "2009");
   assert.ok(big.monthsPeakToTrough > 30 && big.monthsPeakToTrough < 45);
@@ -68,8 +76,8 @@ test("drawdowns never overlap and always run peak before trough", () => {
 test("price is not payment: the 2021 peak cost about what the 2006 peak cost", () => {
   const series = buildSeries();
   const at = (m: string) => series.find((p) => p.month === m)!;
-  const peak2006 = at("2006-06");
-  const peak2021 = at("2021-08");
+  const peak2006 = at("2006-06")!;
+  const peak2021 = at("2021-09")!;
 
   // 2021 prices were far higher...
   assert.ok(peak2021.price > peak2006.price * 1.3, "2021 prices should be much higher than 2006");
@@ -90,7 +98,7 @@ test("current status reports the trailing window and decline streak", () => {
   const s = currentStatus();
   assert.equal(s.month, HISTORY_LATEST_MONTH);
   assert.equal(s.index, HISTORY_LATEST_INDEX);
-  assert.equal(s.trailing12.length, 12);
+  assert.equal(s.trailing12.length, 4, "a year of quarterly readings");
   assert.ok(s.percentOffRecentPeak <= 0, "cannot be above the recent peak by definition");
   assert.ok(s.consecutiveDeclines >= 0);
 });
@@ -415,7 +423,8 @@ test("the record identifies when a median income stopped buying a median home", 
 
 test("buying power today is far below where the record started", () => {
   const v = buyingPowerVerdict();
-  assert.ok(v.powerLost > 0.25, `expected a large loss, got ${v.powerLost}`);
+  // Measured from 1984, where the income series starts, rather than from 1987.
+  assert.ok(v.powerLost > 0.15, `expected a large loss, got ${v.powerLost}`);
   assert.ok(v.latest.yearsOfIncome > v.first.yearsOfIncome * 1.5, "years-of-income should have risen sharply");
   assert.ok(v.incomeNeededToday > v.latest.income, "restoring the old ratio requires more income");
 });
@@ -435,8 +444,8 @@ test("REGRESSION: stating old dollars in today's money leaves the ratio untouche
   // The chart can be shown either way. If the inflation adjustment moved the
   // headline findings, one of the two views would be lying.
   const nominal = buyingPowerVerdict();
-  const real = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, true);
-  const nominalSeries = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, false);
+  const real = buyingPowerSeries(DEFAULT_COUNTY, undefined, true);
+  const nominalSeries = buyingPowerSeries(DEFAULT_COUNTY, undefined, false);
 
   for (let i = 0; i < real.length; i += 37) {
     assert.ok(
@@ -449,8 +458,8 @@ test("REGRESSION: stating old dollars in today's money leaves the ratio untouche
 });
 
 test("old dollars really were worth more, so the adjustment does something", () => {
-  const real = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, true);
-  const nominal = buyingPowerSeries(DEFAULT_ANCHOR_PRICE, false);
+  const real = buyingPowerSeries(DEFAULT_COUNTY, undefined, true);
+  const nominal = buyingPowerSeries(DEFAULT_COUNTY, undefined, false);
   // 1987 prices should roughly triple when restated in today's money.
   const factor = real[0]!.homePrice / nominal[0]!.homePrice;
   assert.ok(factor > 2.5 && factor < 3.5, `expected roughly 3x, got ${factor.toFixed(2)}`);

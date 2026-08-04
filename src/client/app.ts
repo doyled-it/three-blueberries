@@ -31,7 +31,7 @@ import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
 import { countyTaxRate } from "../../lib/data/ca-property.ts";
-import { countyScopeNote } from "../../lib/county-scope.ts";
+import { countyScope } from "../../lib/county-scope.ts";
 import {
   ASSUMPTION_SETS,
   RATE_SOLVER_CEILING,
@@ -269,7 +269,7 @@ function render(): void {
   // The thesis panel is a claim about the median San Diego home, so it must use
   // the project's own anchor. Passing the form's price made it a market-level
   // claim derived from a demo default, and the one-shot guard froze it there.
-  renderBuyingPower();
+  renderBuyingPower(input.county);
   renderCohort(input);
   renderCountyScope(input.county);
   // The history panel is about YOUR house: what this same house would have cost
@@ -277,8 +277,12 @@ function render(): void {
   // read against the 2006 peak and the 2009 bottom, so they have to stand on the
   // same anchor those readings do. Feeding them the form's price reported the
   // burden of one buyer's house as the condition of the whole market.
-  renderHistory(input.purchasePrice);
-  renderSignals(DEFAULT_ANCHOR_PRICE);
+  renderHistory(input.county, input.purchasePrice);
+  // The crash signals are a MARKET claim, read against this county's own bubble
+  // peak and bust trough, so they take the county's typical price rather than
+  // this buyer's. Feeding them the form price reported one house's burden as the
+  // condition of a whole market.
+  renderSignals(input.county);
   renderInstruments();
   renderForecast();
   renderPresets();
@@ -441,25 +445,26 @@ function renderCohort(input: ScenarioInput): void {
  * deserves to know whose math, on the panel, not in a footnote.
  */
 function renderCountyScope(county: CaCounty): void {
-  const note = countyScopeNote(county);
+  const { note } = countyScope(county);
   for (const el of document.querySelectorAll<HTMLElement>("[data-county-scope]")) {
-    el.textContent = note ?? "";
-    el.hidden = note === null;
+    el.textContent = note;
+    el.hidden = false;
   }
 }
 
-let lastHistoryAnchor: number | null = null;
+let lastHistoryAnchor: string | null = null;
 
-function renderHistory(anchorPrice: number): void {
+function renderHistory(county: CaCounty, anchorPrice: number): void {
   // Keyed on the anchor rather than a one-shot flag, so editing the price
   // actually redraws instead of leaving a stale chart on screen.
-  if (lastHistoryAnchor === anchorPrice) return;
-  lastHistoryAnchor = anchorPrice;
+  const key = `${county}:${anchorPrice}`;
+  if (lastHistoryAnchor === key) return;
+  lastHistoryAnchor = key;
 
-  const series = buildSeries(anchorPrice, 0.2);
-  const drops = findDrawdowns(10);
-  const status = currentStatus();
-  const ctx = historicalContext();
+  const series = buildSeries(county, anchorPrice, 0.2);
+  const drops = findDrawdowns(10, county);
+  const status = currentStatus(36, county);
+  const ctx = historicalContext(county);
 
   const pricePoints: ChartPoint[] = series.map((p) => ({ month: p.month, value: p.price }));
   const paymentPoints: ChartPoint[] = series.map((p) => ({ month: p.month, value: p.payment }));
@@ -934,16 +939,19 @@ function renderRentVsBuy(input: ScenarioInput): void {
 }
 
 let buyingPowerWired = false;
+/** The buying-power toggle re-renders, so it has to know which county it is on. */
+let lastBuyingPowerCounty: CaCounty | null = null;
 
-function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
+function renderBuyingPower(county: CaCounty): void {
+  lastBuyingPowerCounty = county;
   // Over 39 years a nominal chart is dominated by inflation, which makes both
   // lines look like they exploded and hides what actually changed. Real dollars
   // are the default. The ratio and "last month it worked" are inflation-neutral,
   // so no headline figure moves either way.
   const inTodaysDollars = $<HTMLInputElement>("realDollars").checked;
 
-  const series = buyingPowerSeries(anchorPrice, inTodaysDollars);
-  const v = buyingPowerVerdict(anchorPrice);
+  const series = buyingPowerSeries(county, undefined, inTodaysDollars);
+  const v = buyingPowerVerdict(county);
   const compact = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
   const unit = inTodaysDollars ? " in today's money" : " in the money of the day";
 
@@ -973,7 +981,7 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
 
   if (!buyingPowerWired) {
     buyingPowerWired = true;
-    $<HTMLInputElement>("realDollars").addEventListener("change", () => renderBuyingPower(anchorPrice));
+    $<HTMLInputElement>("realDollars").addEventListener("change", () => renderBuyingPower(lastBuyingPowerCounty!));
   }
 
   const bpFig = $("buyingPowerChart").querySelector<HTMLElement>("[data-multi]");
@@ -1026,21 +1034,20 @@ function renderBuyingPower(anchorPrice: number = DEFAULT_ANCHOR_PRICE): void {
   $("buyingPowerCaveat").textContent = BUYING_POWER_CAVEAT;
 }
 
-let lastSignalsAnchor: number | null = null;
+let lastSignalsCounty: CaCounty | null = null;
 
-function renderSignals(anchorPrice: number): void {
-  // Keyed on the anchor, like renderHistory. A one-shot flag froze the burden
-  // figures at first paint while the charts above them redrew on every
-  // keystroke, so the panel could report 54% of median income against a payment
-  // chart showing a different house entirely.
-  if (lastSignalsAnchor === anchorPrice) return;
-  lastSignalsAnchor = anchorPrice;
+function renderSignals(county: CaCounty): void {
+  // Keyed on the county, like renderHistory. A one-shot flag froze these figures
+  // at first paint while the charts above them redrew on every keystroke, and it
+  // would now also mean changing county never changed the panel.
+  if (lastSignalsCounty === county) return;
+  lastSignalsCounty = county;
 
-  const verdict = worstTimeToBuy(anchorPrice);
+  const verdict = worstTimeToBuy(county);
   $("worstTime").textContent = verdict.answer;
   $("worstTime").className = `verdict ${verdict.rank === 1 ? "verdict--no" : "verdict--yes"}`;
 
-  const { readings, summary, caveats } = crashSignals(anchorPrice);
+  const { readings, summary, caveats } = crashSignals(county);
   const fmt = (v: number | null, unit: string) =>
     v === null ? ", " : unit.startsWith("x") ? `${v.toFixed(1)}x` : `${v.toFixed(1)}${unit.startsWith("%") ? "%" : ""}`;
 
@@ -1066,7 +1073,7 @@ function renderSignals(anchorPrice: number): void {
   $("signalSummary").textContent = summary;
   $("signalSummary").className = "verdict";
 
-  const inds = leadingIndicators(24, anchorPrice).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+  const inds = leadingIndicators(24, county).sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
   const maxAbs = Math.max(...inds.map((i) => Math.abs(i.r)));
   $("correlations").innerHTML = `
     <p class="field-note">

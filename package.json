@@ -24,7 +24,7 @@
     "data:loan-limits": "node scripts/fetch-loan-limits.mjs",
     "deploy": "npm run build && wrangler deploy",
     "demo": "node scripts/demo.ts",
-    "data:history": "node scripts/fetch-history.mjs",
+    "data:history": "uv run python scripts/fetch_history.py",
     "data:signals": "node scripts/fetch-signals.mjs",
     "data:panel": "node scripts/fetch-panel.mjs",
     "data:insurance": "uv run python scripts/fetch_fair_plan.py",

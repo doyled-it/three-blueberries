@@ -7,7 +7,10 @@ import { CA_MEDIAN_INCOME, NEW_HOME_SUPPLY } from "../lib/data/signals.ts";
 
 test("the burden series is complete and plausible", () => {
   const s = burdenSeries();
-  assert.ok(s.length > 400);
+  // The affordability panels start where the INCOME series starts, in 1984, not
+  // where the price series starts, in 1975. Every figure here is a ratio of the
+  // two, and backfilled income produced artefacts rather than findings.
+  assert.ok(s.length > 150, `expected the full income-era record, got ${s.length}`);
   for (const p of s) {
     assert.ok(
       p.paymentToIncome > 0.1 && p.paymentToIncome < 2,
@@ -21,8 +24,8 @@ test("the burden series is complete and plausible", () => {
 test("burden combines price AND rate, not either alone", () => {
   const s = burdenSeries();
   const at = (m: string) => s.find((p) => p.month === m)!;
-  const peak2021 = at("2021-08");
-  const late2023 = at("2023-10");
+  const peak2021 = at("2021-09");
+  const late2023 = at("2023-12");
 
   // 2023 prices were higher than 2021's but not hugely so...
   assert.ok(late2023.price > peak2021.price);
@@ -96,7 +99,12 @@ test("correlations report an honest effective sample, not the inflated one", () 
   const inds = leadingIndicators(24);
   for (const c of inds) {
     assert.ok(Math.abs(c.r) <= 1);
-    assert.ok(c.effectiveObservations < c.observations / 20, "effective n must deflate the overlapping windows");
+    // The deflation factor is the window in ROWS: 8 on a quarterly series, 24 on
+    // the monthly one this used to be. Hardcoding 20 hardcoded the frequency.
+    assert.ok(
+      c.effectiveObservations < c.observations / 4,
+      `effective n must deflate the overlapping windows: ${c.effectiveObservations} of ${c.observations}`
+    );
     assert.ok(c.effectiveObservations < 30, `an effective n of ${c.effectiveObservations} would be suspiciously large`);
   }
 });
@@ -170,7 +178,7 @@ test("REGRESSION: the 2009 trough multiple is derived, not written into the pros
   // It used to read "took it back to ~6x", which was true at one anchor price
   // and printed directly above a card showing a different number at any other.
   for (const anchor of [600_000, 1_085_000, 1_800_000]) {
-    const reading = crashSignals(anchor).readings.find((r) => r.key === "priceToIncome")!;
+    const reading = crashSignals("San Diego", anchor).readings.find((r) => r.key === "priceToIncome")!;
     const trough = reading.at2009Trough!;
     assert.ok(
       reading.reading.includes(`${trough.toFixed(1)}x`),
@@ -183,7 +191,7 @@ test("the decline implied by the 2009 trough is the same whatever the anchor", (
   // Every ratio on this panel divides the anchor out. If one of them stops
   // doing that, the panel has started making a claim about one buyer's house.
   const decline = (anchor: number) => {
-    const r = crashSignals(anchor).readings.find((x) => x.key === "priceToIncome")!;
+    const r = crashSignals("San Diego", anchor).readings.find((x) => x.key === "priceToIncome")!;
     return 1 - r.at2009Trough! / r.now!;
   };
   assert.ok(Math.abs(decline(600_000) - decline(1_800_000)) < 1e-9);

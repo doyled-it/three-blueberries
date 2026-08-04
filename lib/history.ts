@@ -8,13 +8,14 @@
  * often enough that "wait for prices to fall" and "wait for it to get cheaper"
  * are different bets.
  *
- * The second lesson: San Diego has had exactly two declines over 10% in 39 years.
- * That's not a sample you can forecast from. Everything here is history, not
- * prediction, and the UI says so.
+ * The second lesson: most California counties have had two or three declines
+ * over 10% in fifty years. That is not a sample you can forecast from. Everything
+ * here is history, not prediction, and the UI says so.
  */
 
 import { monthlyPayment } from "./amortization.ts";
-import { HISTORY_LATEST_INDEX, SD_HISTORY, type HistoryRow } from "./data/history.ts";
+import { DEFAULT_COUNTY, historyFor, type CountyHistory, type HistoryRow } from "./data/history.ts";
+import type { CaCounty } from "./data/ca-loan-limits.ts";
 
 export interface MonthPoint {
   month: string;
@@ -28,28 +29,45 @@ export interface MonthPoint {
 }
 
 /**
- * The Case-Shiller index is unitless, so we anchor it to a real dollar figure at
+ * The FHFA index is unitless, so we anchor it to a real dollar figure at
  * the most recent reading. Everything else scales from there, which lets you read
  * "what would this same house have cost in 2009" directly in dollars.
  *
- * The anchor is the California Association of Realtors median price for an
- * existing single-family home in San Diego County, June 2026, `car-median-price`
- * in the source registry.
+ * The anchor is now per county: Zillow's typical single-family value there,
+ * `zillow-zhvi` in the source registry. It used to be one hand-typed San Diego
+ * median, which is part of why every county was shown San Diego's history.
  *
- * Two things follow from that and both matter. The dollars on the chart are a
- * repeat-sales index scaled by a median, so they describe ONE representative
- * house through time, not the median listing in each year. And every ratio the
- * panel reports (buying power lost, years of income, the purchasing ratio, the
- * best and worst months) divides the anchor out, so it is unaffected by this
- * number. Only the dollar axis and "the last month the math worked" move.
+ * Two things follow and both matter. The dollars on the chart are a repeat-sales
+ * index scaled by a typical value, so they describe ONE representative house
+ * through time, not the median listing in each year. And every ratio the panel
+ * reports divides the anchor out, so it is unaffected by this number. Only the
+ * dollar axis and "the last month the math worked" move.
  */
-export const DEFAULT_ANCHOR_PRICE = 1_085_000;
+export const DEFAULT_ANCHOR_PRICE = historyFor(DEFAULT_COUNTY).anchorPrice;
 
-export function buildSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, downPercent = 0.2): MonthPoint[] {
-  return SD_HISTORY.map((row: HistoryRow) => {
+/**
+ * Everything below reads ONE county's history. It used to read a module-level
+ * San Diego constant, which is why every county in the selector was shown San
+ * Diego's past. `historyFor` returns the series, its frequency, what it actually
+ * measures, and the dollar anchor, so a caller never has to know whether this
+ * county has a metro series or only an annual one.
+ */
+export function contextFor(county: CaCounty = DEFAULT_COUNTY): CountyHistory {
+  return historyFor(county);
+}
+
+export function buildSeries(
+  county: CaCounty = DEFAULT_COUNTY,
+  anchorPrice?: number,
+  downPercent = 0.2
+): MonthPoint[] {
+  const history = historyFor(county);
+  const anchor = anchorPrice ?? history.anchorPrice;
+  const latestIndex = history.rows[history.rows.length - 1]![1];
+  return history.rows.map((row: HistoryRow) => {
     const [month, index, ratePercent] = row;
     const rate = ratePercent / 100;
-    const price = (anchorPrice * index) / HISTORY_LATEST_INDEX;
+    const price = (anchor * index) / latestIndex;
     return { month, index, rate, price, payment: monthlyPayment(price * (1 - downPercent), rate, 30) };
   });
 }
@@ -80,8 +98,8 @@ export interface Drawdown {
  * repeat-sales index. Uses running-peak logic so overlapping dips collapse into
  * the single real drawdown rather than being double counted.
  */
-export function findDrawdowns(minDepthPercent = 10): Drawdown[] {
-  const rows = SD_HISTORY;
+export function findDrawdowns(minDepthPercent = 10, county: CaCounty = DEFAULT_COUNTY): Drawdown[] {
+  const rows = historyFor(county).rows;
   const out: Drawdown[] = [];
 
   let peakIdx = 0;
@@ -136,10 +154,14 @@ export interface CurrentStatus {
   trailing12: ReadonlyArray<{ month: string; index: number; changePercent: number }>;
 }
 
-export function currentStatus(lookbackMonths = 36): CurrentStatus {
-  const rows = SD_HISTORY;
+export function currentStatus(lookbackMonths = 36, county: CaCounty = DEFAULT_COUNTY): CurrentStatus {
+  const { rows, stepMonths } = historyFor(county);
   const latest = rows[rows.length - 1]!;
-  const window = rows.slice(Math.max(0, rows.length - lookbackMonths));
+  // Rows are quarters or years, never months, so a window expressed in MONTHS
+  // has to be converted. Slicing `lookbackMonths` rows made this a nine-year
+  // lookback on a quarterly series and a 36-YEAR one on an annual county.
+  const lookbackRows = Math.max(1, Math.round(lookbackMonths / stepMonths));
+  const window = rows.slice(Math.max(0, rows.length - lookbackRows));
 
   let peak = window[0]!;
   for (const r of window) if (r[1] > peak[1]) peak = r;
@@ -150,8 +172,9 @@ export function currentStatus(lookbackMonths = 36): CurrentStatus {
     else break;
   }
 
-  const trailing12 = rows.slice(-12).map((r, i, arr) => {
-    const prevIndex = i === 0 ? rows[rows.length - 13]?.[1] : arr[i - 1]![1];
+  const trailingRows = Math.max(2, Math.round(12 / stepMonths));
+  const trailing12 = rows.slice(-trailingRows).map((r, i, arr) => {
+    const prevIndex = i === 0 ? rows[rows.length - trailingRows - 1]?.[1] : arr[i - 1]![1];
     return {
       month: r[0],
       index: r[1],
@@ -172,8 +195,8 @@ export function currentStatus(lookbackMonths = 36): CurrentStatus {
 }
 
 /** The cheapest and most expensive months to have bought, measured by payment. */
-export function paymentExtremes(anchorPrice = DEFAULT_ANCHOR_PRICE, downPercent = 0.2) {
-  const series = buildSeries(anchorPrice, downPercent);
+export function paymentExtremes(county: CaCounty = DEFAULT_COUNTY, anchorPrice?: number, downPercent = 0.2) {
+  const series = buildSeries(county, anchorPrice, downPercent);
   let cheapest = series[0]!;
   let priciest = series[0]!;
   for (const p of series) {
@@ -345,10 +368,11 @@ export interface CrashPreset {
  * project exists to avoid. The 2008 case is offered as its own preset so the
  * severe tail is one click away rather than baked into the default.
  */
-export function crashPresets(): CrashPreset[] {
-  const drops = findDrawdowns(10);
+export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
+  const { rows } = historyFor(county);
+  const drops = findDrawdowns(10, county);
   const rateAtTroughOf = (d: (typeof drops)[number]) => {
-    const row = SD_HISTORY.find((r) => r[0] === d.troughMonth);
+    const row = rows.find((r) => r[0] === d.troughMonth);
     return row ? row[2] / 100 : 0.05;
   };
 
@@ -380,7 +404,7 @@ export function crashPresets(): CrashPreset[] {
       monthsToBottom: 18,
       rateAtBottom: 0.055,
       basis:
-        "Prices flat, rates drifting back toward 5.5%. This is the consensus 2026 forecast and by far the most common historical outcome, San Diego has spent 37 of the last 39 years not crashing.",
+        "Prices flat, rates drifting back toward 5.5%. This is the consensus 2026 forecast and by far the most common historical outcome, California housing spends the overwhelming majority of its years not crashing.",
     },
     {
       id: "stagflation",
@@ -431,20 +455,23 @@ export function defaultCrashPreset(): CrashPreset {
  * than a forecast. Rendered directly into the UI so the caveats travel with the
  * numbers.
  */
-export function historicalContext() {
-  const drops = findDrawdowns(10);
+export function historicalContext(county: CaCounty = DEFAULT_COUNTY) {
+  const { rows, stepMonths, place } = historyFor(county);
+  const drops = findDrawdowns(10, county);
   const worst = drops.reduce((a, b) => (b.depthPercent < a.depthPercent ? b : a), drops[0]!);
-  const status = currentStatus();
-  const extremes = paymentExtremes();
+  const status = currentStatus(36, county);
+  const extremes = paymentExtremes(county);
 
   return {
-    yearsOfData: Math.round(SD_HISTORY.length / 12),
+    place,
+    // Rows are quarters or years, so the row count is not a month count.
+    yearsOfData: Math.round((rows.length * stepMonths) / 12),
     declines: drops,
     worst,
     status,
     extremes,
     caveats: [
-      "Two declines over 10% in 39 years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.",
+      "Two or three declines over 10% in fifty years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.",
       "Price is not payment. A 2021 peak buyer paid about what a 2006 peak buyer paid, because the rate was 2.84% not 6.24%. And if a recession cracks prices, rate cuts are what stop the cracking.",
       "You have to still have a job at the bottom. San Diego unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
       "Credit tightens exactly when prices fall. In 2009 private lenders went back to 20% down; FHA at 3.5% and VA at zero stayed open.",

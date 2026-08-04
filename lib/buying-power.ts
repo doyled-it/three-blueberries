@@ -20,7 +20,8 @@
  */
 
 import { monthlyPayment } from "./amortization.ts";
-import { HISTORY_LATEST_INDEX, SD_HISTORY } from "./data/history.ts";
+import { DEFAULT_COUNTY, historyFor } from "./data/history.ts";
+import type { CaCounty } from "./data/ca-loan-limits.ts";
 import { CA_MEDIAN_INCOME, CPI, CPI_LATEST, SIGNALS_INCOME_LAST_YEAR } from "./data/signals.ts";
 import { DEFAULT_ANCHOR_PRICE } from "./history.ts";
 
@@ -35,8 +36,9 @@ export interface BuyingPowerPoint {
   /**
    * What the same house cost that month.
    *
-   * NOT a median for that month. It is the Case-Shiller repeat-sales index,
-   * which tracks what the same houses resold for, anchored to today's median.
+   * NOT a median for that period. It is the FHFA repeat-sales index for this
+   * county, which tracks what the same houses resold for, anchored to today's
+   * typical value.
    * That makes it a like-for-like price series rather than a mix-shifting one,
    * and it is the reason the label everywhere says "the same house".
    */
@@ -53,11 +55,31 @@ export interface BuyingPowerPoint {
   shortfall: number;
 }
 
+/**
+ * The income series runs 1984 to 2024. Outside it, carry the NEAREST END
+ * forward or backward rather than always the last value: dividing a 1975 house
+ * price by a 2024 income produced a 3% burden and made 1975 look like the best
+ * time to buy in history, which is an artefact, not a finding.
+ */
 const incomeForYear = (year: string): number => {
   const exact = CA_MEDIAN_INCOME.find((r) => r[0].startsWith(year));
   if (exact) return exact[1];
+  // Past the END of the series only. Holding income flat overstates the burden
+  // slightly, which is the conservative direction.
   return CA_MEDIAN_INCOME[CA_MEDIAN_INCOME.length - 1]![1];
 };
+
+/**
+ * The first year median income is actually measured.
+ *
+ * The price series now reaches back to 1975 but the income series starts in
+ * 1984, and every figure on these panels is a RATIO of the two. Backfilling
+ * income made a 1975 house look like 13% of income and crowned it the best time
+ * to buy in history, which is an artefact of the backfill and nothing else. So
+ * the affordability panels start where the income data starts. The price and
+ * payment charts still show the full record, because those need no income.
+ */
+const INCOME_STARTS = CA_MEDIAN_INCOME[0]![0].slice(0, 4);
 
 /**
  * Invert the mortgage payment formula: given a monthly budget and a rate, how
@@ -89,7 +111,7 @@ const cpiFor = (month: string): number => {
 /**
  * Restate old dollars in today's money.
  *
- * Over 39 years the nominal chart is dominated by inflation, which makes every
+ * Over four decades the nominal chart is dominated by inflation, which makes every
  * line look like it exploded and hides the thing that actually changed. The
  * RATIO between the two lines is inflation-neutral either way, so the headline
  * findings do not move. Only the shape of the chart and the axis do.
@@ -98,28 +120,37 @@ export function inflationFactor(month: string): number {
   return CPI_LATEST / cpiFor(month);
 }
 
-export function buyingPowerSeries(anchorPrice = DEFAULT_ANCHOR_PRICE, inTodaysDollars = false): BuyingPowerPoint[] {
-  return SD_HISTORY.map(([month, index, ratePercent]) => {
-    const rate = ratePercent / 100;
-    const factor = inTodaysDollars ? inflationFactor(month) : 1;
-    const homePrice = ((anchorPrice * index) / HISTORY_LATEST_INDEX) * factor;
-    const income = incomeForYear(month.slice(0, 4));
-    const budget = (income / 12) * AFFORDABILITY_EFFORT;
-    const affordablePrice = affordablePriceAt(budget, rate) * factor;
+export function buyingPowerSeries(
+  county: CaCounty = DEFAULT_COUNTY,
+  anchorPrice?: number,
+  inTodaysDollars = false
+): BuyingPowerPoint[] {
+  const { rows, anchorPrice: countyAnchor } = historyFor(county);
+  const anchor = anchorPrice ?? countyAnchor;
+  const latestIndex = rows[rows.length - 1]![1];
+  return rows
+    .filter(([month]) => month.slice(0, 4) >= INCOME_STARTS)
+    .map(([month, index, ratePercent]) => {
+      const rate = ratePercent / 100;
+      const factor = inTodaysDollars ? inflationFactor(month) : 1;
+      const homePrice = ((anchor * index) / latestIndex) * factor;
+      const income = incomeForYear(month.slice(0, 4));
+      const budget = (income / 12) * AFFORDABILITY_EFFORT;
+      const affordablePrice = affordablePriceAt(budget, rate) * factor;
 
-    return {
-      month,
-      inflationFactor: factor,
-      homePrice,
-      affordablePrice,
-      income: income * factor,
-      rate,
-      // Both sides carry the same factor, so these are unchanged either way.
-      purchasingRatio: affordablePrice / homePrice,
-      yearsOfIncome: homePrice / (income * factor),
-      shortfall: homePrice - affordablePrice,
-    };
-  });
+      return {
+        month,
+        inflationFactor: factor,
+        homePrice,
+        affordablePrice,
+        income: income * factor,
+        rate,
+        // Both sides carry the same factor, so these are unchanged either way.
+        purchasingRatio: affordablePrice / homePrice,
+        yearsOfIncome: homePrice / (income * factor),
+        shortfall: homePrice - affordablePrice,
+      };
+    });
 }
 
 export interface BuyingPowerVerdict {
@@ -137,8 +168,9 @@ export interface BuyingPowerVerdict {
   blueberries: string;
 }
 
-export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPowerVerdict {
-  const series = buyingPowerSeries(anchorPrice);
+export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPrice?: number): BuyingPowerVerdict {
+  const { place } = historyFor(county);
+  const series = buyingPowerSeries(county, anchorPrice);
   const first = series[0]!;
   const latest = series[series.length - 1]!;
 
@@ -167,22 +199,40 @@ export function buyingPowerVerdict(anchorPrice = DEFAULT_ANCHOR_PRICE): BuyingPo
     lastAffordableMonth,
     powerLost,
     incomeNeededToday,
+    // Buying power has NOT fallen everywhere. It is down 23% in San Diego and up
+    // 27% in Fresno, and a headline that only knows how to say "gone" printed
+    // "-27% gone" for half the state. Which way it went is the finding.
     headline:
-      `In ${first.month.slice(0, 4)} the median California household could afford ${first.purchasingRatio.toFixed(2)}x a typical San Diego house. ` +
-      `Today it is ${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone, not because prices rose, ` +
-      `but because they rose ${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`,
+      powerLost > 0
+        ? `In ${first.month.slice(0, 4)} the median California household could afford ` +
+          `${first.purchasingRatio.toFixed(2)}x a typical ${place} house. Today it is ` +
+          `${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone, not ` +
+          `because prices rose, but because they rose ` +
+          `${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`
+        : `In ${first.month.slice(0, 4)} the median California household could afford ` +
+          `${first.purchasingRatio.toFixed(2)}x a typical ${place} house. Today it is ` +
+          `${latest.purchasingRatio.toFixed(2)}x, which is ${pct(-powerLost)} MORE. This is the part of ` +
+          `California where the story people tell about housing is not true: incomes here have kept up with ` +
+          `prices. Whether you would want to live here is a different question, and not one arithmetic answers.`,
     blueberries:
-      `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ${first.month.slice(0, 4)} it cost ` +
-      `${first.yearsOfIncome.toFixed(1)} years. To buy the same house on the same terms your parents did, ` +
-      `a household would need to earn ${money(incomeNeededToday)} instead of ${money(latest.income)}.`,
+      powerLost > 0
+        ? `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ` +
+          `${first.month.slice(0, 4)} it cost ${first.yearsOfIncome.toFixed(1)} years. To buy the same house on ` +
+          `the same terms your parents did, a household would need to earn ${money(incomeNeededToday)} instead ` +
+          `of ${money(latest.income)}.`
+        : `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today, against ` +
+          `${first.yearsOfIncome.toFixed(1)} years in ${first.month.slice(0, 4)}. A median income goes further ` +
+          `here now than it did then, which is the opposite of the national story and worth knowing if you are ` +
+          `deciding where in California to buy.`,
   };
 }
 
 /** Income series ends before the price series; the UI should say so. */
 export const BUYING_POWER_CAVEAT =
-  `The price line is the Case-Shiller repeat-sales index for San Diego, which tracks what the same houses resold for, ` +
-  `anchored to the current county median so it reads in dollars. So it is one representative house through time, ` +
-  `not the median listing of each year, and the anchor only moves the dollar axis: every ratio here divides it out. ` +
+  `The price line is the FHFA repeat-sales index for your county, which tracks what the same houses resold for, ` +
+  `anchored to Zillow's current typical single-family value there so it reads in dollars. So it is one ` +
+  `representative house through time, not the median listing of each year, and the anchor only moves the dollar ` +
+  `axis. It starts where the income series starts, because every figure here is a ratio of the two. ` +
   `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR}, ` +
   `later months carry the last value forward, which if anything understates the gap. ` +
   `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
