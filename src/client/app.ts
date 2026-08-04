@@ -23,10 +23,9 @@ import {
   evaluateWaiting,
   findDrawdowns,
   historicalContext,
-  paymentExtremes,
 } from "../../lib/history.ts";
 import { compareToCohort, refinanceOpportunity, BEST_REFI } from "../../lib/cohort.ts";
-import { PEAK_2006, TROUGH_2009, crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signals.ts";
+import { crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signals.ts";
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
@@ -437,8 +436,7 @@ function renderCohort(input: ScenarioInput): void {
  * Say whose history this is, when it is not the reader's.
  *
  * The calculator follows the county selector everywhere it can. The history
- * cannot: the price indexes cover a handful of California metros, not 58
- * counties. A
+ * cannot: Case-Shiller indexes three California metros, not 58 counties. A
  * buyer in Fresno reading "the last month the math worked was March 2013"
  * deserves to know whose math, on the panel, not in a footnote.
  */
@@ -468,10 +466,6 @@ function renderHistory(anchorPrice: number): void {
 
   const bands = drops.map((d) => ({ fromMonth: d.peakMonth, toMonth: d.troughMonth }));
   const worst = ctx.worst;
-  // Derived, because the series is quarterly and a hardcoded month like
-  // "2021-08" simply is not in it. A marker on a month with no reading renders
-  // nothing at all, so it fails silently rather than loudly.
-  const { cheapest: cheapestPayment, priciest: priciestPayment } = paymentExtremes(anchorPrice);
 
   const compact = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
   const label = (p: ChartPoint) => {
@@ -481,14 +475,14 @@ function renderHistory(anchorPrice: number): void {
 
   $("history").innerHTML = `
     <div class="chart-block">
-      <h4>What the same house cost <span class="chart-sub">shaded: every decline over 10% on record</span></h4>
+      <h4>What the same house cost <span class="chart-sub">shaded: the two declines over 10% since 1987</span></h4>
       ${renderChart({
         points: pricePoints,
         color: SERIES_PRICE,
         format: compact,
         bands,
         markers: [
-          { month: worst.peakMonth, label: `${worst.peakMonth.slice(0, 4)} peak` },
+          { month: worst.peakMonth, label: "2006 peak" },
           { month: worst.troughMonth, label: `${worst.depthPercent.toFixed(0)}%` },
         ],
         description: `San Diego home prices from ${series[0]!.month} to ${series[series.length - 1]!.month}, scaled to today's dollars.`,
@@ -502,8 +496,8 @@ function renderHistory(anchorPrice: number): void {
         format: (n) => `$${Math.round(n / 1000)}k`,
         bands,
         markers: [
-          { month: cheapestPayment.month, label: "cheapest ever" },
-          { month: priciestPayment.month, label: "worst ever" },
+          { month: "2021-08", label: "2021: cheap money" },
+          { month: "2023-10", label: "worst ever" },
         ],
         description: `Monthly principal and interest on the same San Diego home, at each month's prevailing rate.`,
       })}
@@ -531,7 +525,7 @@ function renderHistory(anchorPrice: number): void {
         <span class="stat__label">Right now</span>
         <span class="stat__value">${status.percentOffRecentPeak.toFixed(1)}%<span class="stat__unit"> off peak</span></span>
         <span class="stat__note">
-          ${status.consecutiveDeclines} consecutive quarterly ${status.consecutiveDeclines === 1 ? "decline" : "declines"}
+          ${status.consecutiveDeclines} consecutive monthly ${status.consecutiveDeclines === 1 ? "decline" : "declines"}
           through ${longMonth(status.month)}. Real, but small. The 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
         </span>
       </div>
@@ -1060,8 +1054,8 @@ function renderSignals(anchorPrice: number): void {
         </div>
         <span class="signal__value">${fmt(r.now, r.unit)}<span class="signal__unit">${r.unit.replace(/^[x%]\s*/, " ")}</span></span>
         <div class="signal__compare">
-          <span><em>${longMonth(PEAK_2006)} peak</em> ${fmt(r.at2006Peak, r.unit)}</span>
-          <span><em>${longMonth(TROUGH_2009)} bottom</em> ${fmt(r.at2009Trough, r.unit)}</span>
+          <span><em>2006 peak</em> ${fmt(r.at2006Peak, r.unit)}</span>
+          <span><em>2009 bottom</em> ${fmt(r.at2009Trough, r.unit)}</span>
         </div>
         <p class="signal__reading">${r.reading}</p>
         ${r.caveat ? `<p class="line__warning">${r.caveat}</p>` : ""}

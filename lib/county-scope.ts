@@ -12,9 +12,7 @@
  * math worked was March 2013" deserves to know whose math.
  *
  * The correlations below are measured, not asserted. See the test, which
- * recomputes them from data/panel.json and fails if they drift. That panel is
- * still Case-Shiller, which is fine for measuring how closely two metros move
- * together, and is a separate question from what the site itself plots.
+ * recomputes them from data/panel.json and fails if they drift.
  */
 
 import type { CaCounty } from "./data/ca-loan-limits.ts";

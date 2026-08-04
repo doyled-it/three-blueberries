@@ -932,7 +932,7 @@ export const ASSUMPTION_SETS: AssumptionSet[] = [
     investmentReturn: 0.1,
     rentGrowth: 0.035,
     basis:
-      "San Diego housing since 1991 from the FHFA index, against the long-run nominal total return on US equities of roughly 10%. Both measured over decades.",
+      "San Diego housing since 1987 from Case-Shiller, against the long-run nominal total return on US equities of roughly 10%. Both measured over decades.",
   },
   {
     id: "last-decade",

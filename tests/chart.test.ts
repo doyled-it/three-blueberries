@@ -17,12 +17,10 @@ const svg = renderChart({
   points: pricePoints,
   color: "#3987e5",
   format: (n) => `$${Math.round(n / 1000)}k`,
-  // Quarter-end months, because the series is quarterly. A band whose endpoints
-  // are not in the data renders nothing, which is the behaviour asserted below.
-  bands: [{ fromMonth: "2005-12", toMonth: "2009-03" }],
+  bands: [{ fromMonth: "2006-06", toMonth: "2009-05" }],
   markers: [
-    { month: "2005-12", label: "2006 peak" },
-    { month: "2009-03", label: "-42%" },
+    { month: "2006-06", label: "2006 peak" },
+    { month: "2009-05", label: "-42%" },
   ],
   description: "test chart",
 });

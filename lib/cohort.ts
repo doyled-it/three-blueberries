@@ -12,7 +12,7 @@
 
 import { balanceAfter, monthlyPayment } from "./amortization.ts";
 import { PROP_13_MAX_ANNUAL_GROWTH } from "./data/ca-property.ts";
-import { HISTORY_LATEST_INDEX, HISTORY_LATEST_MONTH, SD_HISTORY, HISTORY_STEP_MONTHS, type HistoryRow } from "./data/history.ts";
+import { HISTORY_LATEST_INDEX, HISTORY_LATEST_MONTH, SD_HISTORY } from "./data/history.ts";
 
 export interface CohortInput {
   /** Today's price for the house in question. */
@@ -63,44 +63,20 @@ export interface CohortComparison {
   yearsHeld: number;
 }
 
+const indexFor = (month: string): number | null => {
+  const row = SD_HISTORY.find((r) => r[0] === month);
+  return row ? row[1] : null;
+};
+
+const rateFor = (month: string): number | null => {
+  const row = SD_HISTORY.find((r) => r[0] === month);
+  return row ? row[2] / 100 : null;
+};
+
 const monthsBetween = (a: string, b: string): number => {
   const [ay, am] = a.split("-").map(Number) as [number, number];
   const [by, bm] = b.split("-").map(Number) as [number, number];
   return (by - ay) * 12 + (bm - am);
-};
-
-/**
- * The reading for a month, snapped to the nearest one WITHIN ONE STEP.
- *
- * The series is quarterly, so eight months in twelve have no row of their own.
- * Requiring an exact match made "what did someone who bought in January 2015
- * pay" return null, and callers should not have to know what frequency FHFA
- * publishes at. January is inside a quarter we measured; the quarter's reading
- * is the answer, not a guess.
- *
- * Anything further away than one step still returns null, deliberately. Clamping
- * an out-of-range month to the nearest end would answer "what did a 1902 buyer
- * pay" with 1991's number, which is exactly the kind of confident fabrication
- * this project exists to avoid.
- */
-const rowFor = (month: string): HistoryRow | null => {
-  let best: HistoryRow | null = null;
-  let bestGap = Infinity;
-  for (const row of SD_HISTORY) {
-    const gap = Math.abs(monthsBetween(row[0], month));
-    if (gap < bestGap) {
-      best = row;
-      bestGap = gap;
-    }
-  }
-  return bestGap <= HISTORY_STEP_MONTHS ? best : null;
-};
-
-const indexFor = (month: string): number | null => rowFor(month)?.[1] ?? null;
-
-const rateFor = (month: string): number | null => {
-  const row = rowFor(month);
-  return row ? row[2] / 100 : null;
 };
 
 export const EARLIEST_COHORT_MONTH = SD_HISTORY[0]![0];
@@ -133,7 +109,7 @@ export function refinanceOpportunity(purchaseMonth: string): { month: string; ra
  * who bought the same house in `purchaseMonth`.
  *
  * The price for the earlier buyer is derived by scaling today's price back along
- * the FHFA repeat-sales index, which is exactly what that index is for,
+ * the Case-Shiller repeat-sales index, which is exactly what that index is for,
  * since it tracks what the same homes resell for.
  */
 export function compareToCohort(input: CohortInput): CohortComparison | null {

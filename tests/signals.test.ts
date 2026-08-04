@@ -7,7 +7,7 @@ import { CA_MEDIAN_INCOME, NEW_HOME_SUPPLY } from "../lib/data/signals.ts";
 
 test("the burden series is complete and plausible", () => {
   const s = burdenSeries();
-  assert.ok(s.length > 130, "the burden series should cover the whole quarterly record");
+  assert.ok(s.length > 400);
   for (const p of s) {
     assert.ok(
       p.paymentToIncome > 0.1 && p.paymentToIncome < 2,
@@ -21,8 +21,8 @@ test("the burden series is complete and plausible", () => {
 test("burden combines price AND rate, not either alone", () => {
   const s = burdenSeries();
   const at = (m: string) => s.find((p) => p.month === m)!;
-  const peak2021 = at("2021-09");
-  const late2023 = at("2023-12");
+  const peak2021 = at("2021-08");
+  const late2023 = at("2023-10");
 
   // 2023 prices were higher than 2021's but not hugely so...
   assert.ok(late2023.price > peak2021.price);
@@ -96,13 +96,7 @@ test("correlations report an honest effective sample, not the inflated one", () 
   const inds = leadingIndicators(24);
   for (const c of inds) {
     assert.ok(Math.abs(c.r) <= 1);
-    // The deflation factor is the window length in ROWS, which is 8 on a
-    // quarterly series and was 24 on a monthly one. Hardcoding 20 was really
-    // hardcoding the frequency.
-    assert.ok(
-      c.effectiveObservations < c.observations / 4,
-      `effective n must deflate the overlapping windows: ${c.effectiveObservations} vs ${c.observations}`
-    );
+    assert.ok(c.effectiveObservations < c.observations / 20, "effective n must deflate the overlapping windows");
     assert.ok(c.effectiveObservations < 30, `an effective n of ${c.effectiveObservations} would be suspiciously large`);
   }
 });
