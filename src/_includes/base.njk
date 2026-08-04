@@ -1,11 +1,39 @@
+{% set pageTitle = title or site.title %}
+{% set pageDescription = description or site.description %}
+{% set canonical = site.url + (page.url | default("/")) %}
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title }}</title>
-    <meta name="description" content="{{ description }}" />
+    <title>{{ pageTitle }}</title>
+    <meta name="description" content="{{ pageDescription }}" />
+    <link rel="canonical" href="{{ canonical }}" />
+    <meta name="author" content="{{ site.author.name }}" />
+    <!-- max-image-preview:large is what lets a result show the card rather than
+         a thumbnail. The rest is the default, stated so it is not a mystery. -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="color-scheme" content="dark" />
+
+    <!-- Open Graph and Twitter, so a pasted link renders as something rather
+         than as a bare URL. Absolute paths: the crawler has no base to resolve
+         against. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="{{ site.name }}" />
+    <meta property="og:locale" content="{{ site.locale }}" />
+    <meta property="og:url" content="{{ canonical }}" />
+    <meta property="og:title" content="{{ pageTitle }}" />
+    <meta property="og:description" content="{{ pageDescription }}" />
+    <meta property="og:image" content="{{ site.url }}{{ site.image }}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{{ site.imageAlt }}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{ pageTitle }}" />
+    <meta name="twitter:description" content="{{ pageDescription }}" />
+    <meta name="twitter:image" content="{{ site.url }}{{ site.image }}" />
+    <meta name="twitter:image:alt" content="{{ site.imageAlt }}" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,6 +47,55 @@
     <link rel="apple-touch-icon" href="/assets/icons/icon-180.png" />
     <meta name="theme-color" content="#0c0a12" />
     <link rel="stylesheet" href="/assets/css/main.css" />
+
+    <!-- Structured data. A free tool with a named author, which is what it is.
+         No FAQ or review markup: the page has no reviews, and inventing schema
+         to farm a rich result is the same instinct as inventing a number. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "@id": "{{ site.url }}/#app",
+            "name": "{{ site.name }}",
+            "url": "{{ site.url }}",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Any modern browser",
+            "browserRequirements": "Requires JavaScript",
+            "description": "{{ site.description }}",
+            "inLanguage": "en-US",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "author": { "@id": "{{ site.author.url }}/#person" },
+            "publisher": { "@id": "{{ site.author.url }}/#person" },
+            "featureList": [
+              "Itemised true monthly cost of a California home purchase",
+              "Property tax by county under Proposition 13",
+              "Mello-Roos and special assessments",
+              "FHA, VA and conventional mortgage insurance, including when it terminates",
+              "Rent versus buy breakeven, with the mortgage interest deduction",
+              "California FAIR Plan wildfire insurance risk by county"
+            ]
+          },
+          {
+            "@type": "Person",
+            "@id": "{{ site.author.url }}/#person",
+            "name": "{{ site.author.name }}",
+            "url": "{{ site.author.url }}"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "{{ site.url }}/#website",
+            "url": "{{ site.url }}",
+            "name": "{{ site.name }}",
+            "description": "{{ site.description }}",
+            "inLanguage": "en-US",
+            "publisher": { "@id": "{{ site.author.url }}/#person" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div class="wrap">
@@ -29,6 +106,13 @@
           lender's Loan Estimate is a quote.
         </p>
         <p>Your numbers stay in your browser. Nothing is sent anywhere.</p>
+        <p class="site-footer__by">
+          Built by <a href="{{ site.author.url }}" rel="author">{{ site.author.name }}</a>, who wanted this to
+          exist and could not find it. Free, no ads, nothing sold.
+          <a class="site-footer__coffee" href="{{ site.author.support }}" rel="noopener" target="_blank">
+            Buy me a coffee
+          </a>
+        </p>
       </footer>
     </div>
     <script type="module" src="/assets/js/app.js"></script>

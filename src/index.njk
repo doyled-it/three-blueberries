@@ -1,7 +1,9 @@
 ---
 layout: base.njk
-title: Three Blueberries, what a California house actually costs
-description: The real monthly cost of buying a house in California, itemized and sourced. No lead capture, no lender trying to sell you anything.
+# Leads with what someone is searching for rather than with the name, and fits
+# in the roughly 60 characters a result actually shows.
+title: "What a California house actually costs | Three Blueberries"
+description: "The real monthly cost of buying a house in California: property tax, Mello-Roos, insurance, PMI, maintenance, all itemised and cited. No lead capture, no email gate."
 ---
 
 <header class="hero">
@@ -154,7 +156,21 @@ description: The real monthly cost of buying a house in California, itemized and
 
 <section class="panel panel--warn">
   <h2>Things nobody tells you</h2>
-  <ul id="warnings" class="warnings"></ul>
+  {#
+    Seeded with the one warning that fires on every scenario, so this section is
+    not an empty list to anything without JavaScript, which includes a crawler
+    landing on the page cold. The script replaces the list on first render with
+    the full set for the numbers actually entered. Nothing here is a claim that
+    depends on the form, so nothing here can be wrong.
+  #}
+  <ul id="warnings" class="warnings">
+    <li>
+      Expect a supplemental property tax bill a few months after closing. When the county reassesses to your
+      purchase price, it bills you the difference from the seller's old assessment, prorated for the rest of the
+      fiscal year. Your impound account does not cover it, it arrives as a separate bill you pay out of pocket,
+      and on a long-held California home it can be thousands.
+    </li>
+  </ul>
 </section>
 
 <section class="panel">

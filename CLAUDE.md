@@ -94,6 +94,8 @@ scripts/
   fetch-loan-limits.mjs regenerates ca-loan-limits.ts from FHFA's CSV
   fetch_fair_plan.py    regenerates ca-insurance.ts from FAIR Plan PDFs + DOF E-5
   build-client.mjs      esbuild bundle
+  make-favicon.py       draws the icon PNGs and .ico
+  make-og-image.py      draws the social card, from the same berry geometry
   demo.ts               prints worked scenarios to the terminal. Use it to eyeball output
 ```
 
@@ -101,14 +103,19 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           243 tests, no watch mode needed, runs in ~250ms
+npm test           251 tests, no watch mode needed, under a second
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
 ```
 
-Node 26 runs the TypeScript tests directly via type stripping. There is no test build step
-and no test framework dependency. Keep it that way.
+Node 26 runs the TypeScript tests directly via type stripping. There is no TypeScript build
+step and no test framework dependency. Keep it that way.
+
+`pretest` does run `npm run build` first, because `tests/metadata.test.ts` asserts on the
+BUILT `_site/` output rather than on the templates. That is deliberate: a Nunjucks variable
+that silently resolves to an empty string produces a valid-looking template and a broken
+`og:image`, and only the built file catches it.
 
 The worker needs its own tsconfig because `@cloudflare/workers-types` conflicts with `DOM`.
 

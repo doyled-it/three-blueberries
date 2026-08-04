@@ -996,6 +996,48 @@ input[type="range"] {
 .site-footer p {
   margin: 0 0 10px;
 }
+/* The byline sits below a rule, so it reads as a signature rather than as one
+   more disclaimer in the stack. */
+.site-footer__by {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink-3);
+}
+.site-footer__by a {
+  color: var(--ink-2);
+  border-bottom-color: var(--rule);
+}
+.site-footer__by a:hover {
+  color: var(--berry-bright);
+  border-bottom-color: var(--berry-bright);
+}
+/* Deliberately small. It is a tip jar, not a call to action, and the whole
+   pitch of the page is that nothing here is trying to extract anything. */
+.site-footer__by a.site-footer__coffee {
+  margin-left: auto;
+  padding: 5px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink-3);
+  font-size: 0.94em;
+  white-space: nowrap;
+  transition: 0.15s;
+}
+.site-footer__by a.site-footer__coffee:hover {
+  border-color: var(--berry);
+  color: var(--berry-bright);
+  background: color-mix(in oklab, var(--berry) 10%, transparent);
+}
+@media (max-width: 560px) {
+  .site-footer__by a.site-footer__coffee {
+    margin-left: 0;
+  }
+}
 
 @media (max-width: 620px) {
   .corr__row {
