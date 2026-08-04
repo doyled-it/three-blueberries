@@ -182,17 +182,16 @@ description: "The real monthly cost of buying a house in California: property ta
 <section class="panel">
   <h2>Should you buy it?</h2>
   <p class="panel__sub">
-    "Rent is throwing money away" is the argument everyone makes. It is mostly wrong, and the honest version is
-    below: net worth under both paths, with the renter investing what the buyer sank into the house.
+    "Rent is throwing money away" is the argument everyone makes, and it is mostly wrong. The honest version:
+    net worth under both paths, with the renter investing what the buyer sank into the house.
   </p>
 
   <div id="rentRatio" class="stats"></div>
 
   <h3 class="sub-head">The verdict</h3>
   <p class="panel__sub">
-    Not a yes or no, because that depends on assumptions nobody can pin down. What follows is every condition that
-    would have to be true, stated as a number, so you can judge which of them is plausible. Usually one is much
-    closer than the rest.
+    Not a yes or no: that depends on assumptions nobody can pin down. Instead, every condition that would have to
+    be true, stated as a number. Usually one is much closer than the rest.
   </p>
   <h4 class="chart-title">What the interest rate actually decides</h4>
   <div id="buyZoneChart"></div>
@@ -238,9 +237,8 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <h3 class="sub-head">How long would you have to stay?</h3>
   <p class="panel__sub">
-    Buying has large costs at both ends: closing fees going in, agent commission going out, and years of payments
-    that are almost entirely interest. Sell before the crossover and you would have been wealthier renting. This is
-    the crossover, at every price, holding your rent fixed.
+    Buying has large costs at both ends: closing fees going in, commission going out, and years of payments that
+    are almost entirely interest. Sell before the crossover and you would have been wealthier renting.
   </p>
   <label for="holdYears" class="slider-label">
     You expect to stay <output id="holdYearsOut">10 years</output>
@@ -258,10 +256,10 @@ description: "The real monthly cost of buying a house in California: property ta
 <section class="panel">
   <h2>What if you wait?</h2>
   <p class="panel__sub">
-    Forty years of San Diego prices, and the rate that went with them. Top chart is what a house cost; bottom is
+    Decades of prices in your county, and the rate that went with them. Top chart is what a house cost; bottom is
     what it cost <em>per month</em>. They're not the same shape, that's the argument.
   </p>
-  <p class="scope-note" data-county-scope hidden></p>
+  <p class="scope-note" data-county-scope></p>
 
   <div id="history" class="history"></div>
 
@@ -270,8 +268,8 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <h3 class="sub-head">Is there a tell?</h3>
   <p class="panel__sub">
-    Today's readings against the 2006 peak and the 2009 bottom. Two declines in 39 years isn't a sample you can
-    forecast from, this describes conditions, it doesn't predict.
+    Today's readings against your county's own bubble peak and the bottom that followed. Two or three declines in
+    fifty years isn't a sample you can forecast from: this describes conditions, it doesn't predict.
   </p>
   <div id="signals" class="signals"></div>
   <p id="signalSummary" class="verdict"></p>
@@ -336,7 +334,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <p class="panel__sub">
     Almost never because they out-earn you. Here's what the person already living in this house pays.
   </p>
-  <p class="scope-note" data-county-scope hidden></p>
+  <p class="scope-note" data-county-scope></p>
 
   <label for="cohortYear" class="slider-label">
     They bought in <output id="cohortYearOut">2019</output>
@@ -352,12 +350,11 @@ description: "The real monthly cost of buying a house in California: property ta
 <section class="panel panel--thesis">
   <h2>Why this is so hard</h2>
   <p class="panel__sub">
-    The three blueberries, finally. Houses got more expensive, but so did everything else, and wages rose too,
-    so a price on its own proves nothing. What matters is what the <em>same job</em> buys. Below: what the same
-    house cost in your county, against what a median income could carry at 30% of pay. Where those two lines sit
-    is the part that isn't about you, and it is not the same story in every county.
+    The three blueberries, finally. Prices rose, but so did everything else, so a price on its own proves
+    nothing. What matters is what the <em>same job</em> buys. Below: what the same house cost in your county,
+    against what a median income could carry at 30% of pay.
   </p>
-  <p class="scope-note" data-county-scope hidden></p>
+  <p class="scope-note" data-county-scope></p>
   <label class="check">
     <input id="realDollars" type="checkbox" checked />
     Show every year in today's money

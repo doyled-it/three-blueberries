@@ -189,6 +189,10 @@ The anchor used to be one hand-typed San Diego median.
 income, and the income series starts in 1984. Backfilling income made a 1975 house look like
 13% of income and crowned it the best time to buy in history, which was an artefact.
 
+**The labour indicator is STATEWIDE.** It used to be the San Diego MSA unemployment series,
+shown to every county as if it were theirs and fed into their correlations. Statewide California
+is the widest claim that is true everywhere.
+
 **Buying power has not fallen everywhere.** Down 23% in San Diego, UP 27% in Fresno. Any copy
 about the thesis has to handle both directions; `buyingPowerVerdict` does, and a test pins it.
 

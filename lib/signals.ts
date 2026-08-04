@@ -4,11 +4,11 @@
  * ────────────────────────────────────────────────────────────────────────────
  * READ THIS FIRST. It governs how everything below may be presented.
  *
- * San Diego has had TWO price declines over 10% in 39 years. Two. Any model
- * fitted to two events is fitted to noise, and the correlations computed here
- * use overlapping forward windows, which inflates the apparent sample size by
- * roughly the window length. A reported n of 449 is really something closer to
- * 19 independent observations.
+ * A California county has had two or three price declines over 10% in fifty
+ * years. Two or three. Any model fitted to that is fitted to noise, and the
+ * correlations computed here use overlapping forward windows, which inflates the
+ * apparent sample size by roughly the window length. A reported n in the
+ * hundreds is really closer to twenty independent observations.
  *
  * So: this module describes what conditions looked like before things happened.
  * It does NOT predict. Every number it produces ships with that caveat attached,
@@ -23,11 +23,33 @@ import {
   CA_MEDIAN_INCOME,
   MORTGAGE_DELINQUENCY,
   NEW_HOME_SUPPLY,
-  SD_UNEMPLOYMENT,
+  CA_UNEMPLOYMENT,
   SIGNALS_INCOME_LAST_YEAR,
   type SignalRow,
 } from "./data/signals.ts";
 import { DEFAULT_ANCHOR_PRICE } from "./history.ts";
+
+const LONG_MONTHS = [
+  "",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "2023-12" is a database key. Anything a reader sees says "December 2023". */
+export function longMonth(month: string): string {
+  const [year, m] = month.split("-");
+  return LONG_MONTHS[Number(m)] ? `${LONG_MONTHS[Number(m)]} ${year}` : month;
+}
 
 /** Most recent observation at or before `month`. Series have different frequencies. */
 function asOf(series: readonly SignalRow[], month: string): number | null {
@@ -80,7 +102,7 @@ export interface BurdenPoint {
 
 /**
  * The affordability burden series: what a median household would spend on a
- * 20%-down median home, as a share of income, every month since 1987.
+ * 20%-down typical home, as a share of income, for every period on record.
  *
  * This is the honest way to ask "is now the worst time ever", price alone
  * ignores rates, and rates alone ignore price.
@@ -137,10 +159,16 @@ export function worstTimeToBuy(county: CaCounty = DEFAULT_COUNTY, anchorPrice?: 
 
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
+  // The record is quarterly or annual, never monthly, and a raw "2023-12" in
+  // prose is a database key rather than a date somebody reads.
   const answer =
     rank === 1
-      ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive month to buy in the ${series.length} months on record.`
-      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, which is worse than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of all months since ${series[0]!.month.slice(0, 4)}. The actual worst was ${worstEver.month}, at ${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The median month in this record was ${pct(median)}, roughly half what you'd pay now.`;
+      ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive it has been in the ${series.length} readings on record.`
+      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, worse ` +
+        `than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of the record since ` +
+        `${series[0]!.month.slice(0, 4)}. The worst was ${longMonth(worstEver.month)} at ` +
+        `${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The typical reading here is ` +
+        `${pct(median)}.`;
 
   return {
     latest,
@@ -230,7 +258,7 @@ export function crashSignals(
   const nowMonth = latest.month;
   const supplyNow = asOf(NEW_HOME_SUPPLY, nowMonth);
   const delinqNow = asOf(MORTGAGE_DELINQUENCY, nowMonth);
-  const unempNow = asOf(SD_UNEMPLOYMENT, nowMonth);
+  const unempNow = asOf(CA_UNEMPLOYMENT, nowMonth);
 
   const readings: SignalReading[] = [
     {
@@ -291,11 +319,11 @@ export function crashSignals(
     },
     {
       key: "unemployment",
-      label: "San Diego unemployment",
+      label: "California unemployment",
       now: unempNow,
       unit: "%",
-      at2006Peak: asOf(SD_UNEMPLOYMENT, PEAK_2006),
-      at2009Trough: asOf(SD_UNEMPLOYMENT, TROUGH_2009),
+      at2006Peak: asOf(CA_UNEMPLOYMENT, PEAK_2006),
+      at2009Trough: asOf(CA_UNEMPLOYMENT, TROUGH_2009),
       lean: "bullish",
       reading:
         "Low. Job losses turn a slowdown into a cascade, people sell because they must. It also decides whether you could buy a dip: you have to still be employed at the bottom.",
@@ -309,7 +337,7 @@ export function crashSignals(
     readings,
     summary,
     caveats: [
-      `Two declines over 10% in 39 years is the entire sample. Any "formula" fitted to it is fitted to noise, including the correlations quoted here.`,
+      `Two or three declines over 10% in fifty years is the entire sample. Any "formula" fitted to it is fitted to noise, including the correlations quoted here.`,
       "Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat a reported n of 449 as closer to 19 real observations.",
       "Supply and delinquency are national; only unemployment is San Diego. Income is statewide California, annual, ending " +
         SIGNALS_INCOME_LAST_YEAR +
@@ -364,7 +392,7 @@ export function leadingIndicators(
         priceToIncome: now.priceToIncome,
         supply: asOf(NEW_HOME_SUPPLY, now.month),
         delinquency: asOf(MORTGAGE_DELINQUENCY, now.month),
-        unemployment: asOf(SD_UNEMPLOYMENT, now.month),
+        unemployment: asOf(CA_UNEMPLOYMENT, now.month),
         rate: now.rate,
       },
     });

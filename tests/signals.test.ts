@@ -120,7 +120,7 @@ test("the caveats travel with the numbers as data, not prose the UI can drop", (
   const { caveats, summary } = crashSignals();
   assert.ok(caveats.length >= 4);
   assert.ok(
-    caveats.some((c) => /two declines/i.test(c)),
+    caveats.some((c) => /two or three declines/i.test(c)),
     "the N=2 problem must be stated"
   );
   assert.ok(
@@ -144,7 +144,7 @@ test("extreme scenarios exist and are ordered sensibly", () => {
 
 test("the beyond-historical scenario admits it is beyond historical", () => {
   const worst = crashPresets().find((p) => p.id === "worse-than-2008")!;
-  assert.match(worst.basis, /Beyond anything in the San Diego record/i);
+  assert.match(worst.basis, /Beyond anything in the California record/i);
   assert.match(worst.basis, /because you asked for the tail, not because anything in the data points here/i);
 });
 

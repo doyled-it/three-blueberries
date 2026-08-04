@@ -25,7 +25,14 @@ import {
   historicalContext,
 } from "../../lib/history.ts";
 import { compareToCohort, refinanceOpportunity, BEST_REFI } from "../../lib/cohort.ts";
-import { crashSignals, leadingIndicators, worstTimeToBuy } from "../../lib/signals.ts";
+import {
+  crashSignals,
+  leadingIndicators,
+  longMonth,
+  peakOfBubble,
+  troughOfBust,
+  worstTimeToBuy,
+} from "../../lib/signals.ts";
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
 import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
@@ -547,28 +554,6 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const LONG_MONTH_NAMES = [
-  "",
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-/** "2013-04" is a database key. A reader wants "April 2013". */
-function longMonth(month: string): string {
-  const [year, m] = month.split("-");
-  const name = LONG_MONTH_NAMES[Number(m)];
-  return name ? `${name} ${year}` : month;
-}
 
 function renderRentVsBuy(input: ScenarioInput): void {
   const result = evaluateScenario(input);

@@ -9,14 +9,17 @@
  *   MEHOINUSCAA646N  California median household income, NOMINAL, annual
  *   MSACSR           Months' supply of NEW houses, national, monthly
  *   DRSFRMACBS       Delinquency rate, single-family residential mortgages, quarterly
- *   LAUMT064174000000003A  San Diego-Carlsbad MSA unemployment rate, annual
+ *   CAUR                   California unemployment rate, annual
  *
  * Caveats that must travel with this data (see lib/signals.ts):
  *   - MSACSR covers NEW construction only. Existing-home supply is a different,
  *     much shorter series and currently reads far lower. Do not present MSACSR as
  *     "the housing market's inventory."
  *   - Income is statewide California, not San Diego specifically, and annual.
- *   - Delinquency and supply are national; only unemployment is San Diego.
+ *   - Delinquency and supply are national; unemployment is statewide California.
+ *     It used to be the San Diego MSA series, which was shown to every county as
+ *     if it were theirs and fed into their correlations. Statewide is the widest
+ *     claim that is true everywhere in the state.
  */
 
 import fs from "node:fs/promises";
@@ -30,7 +33,7 @@ const SERIES = {
   income: "MEHOINUSCAA646N",
   newHomeSupply: "MSACSR",
   delinquency: "DRSFRMACBS",
-  sdUnemployment: "LAUMT064174000000003A",
+  caUnemployment: "CAUR",
   cpi: "CPIAUCSL",
 };
 
@@ -47,7 +50,7 @@ async function fetchSeries(id) {
 }
 
 const [income, supply, delinquency, unemployment, cpi] = await Promise.all(
-  [SERIES.income, SERIES.newHomeSupply, SERIES.delinquency, SERIES.sdUnemployment, SERIES.cpi].map(fetchSeries)
+  [SERIES.income, SERIES.newHomeSupply, SERIES.delinquency, SERIES.caUnemployment, SERIES.cpi].map(fetchSeries)
 );
 
 // Trim to the era the price index covers.
@@ -65,7 +68,7 @@ const body = `// GENERATED FILE. Do not edit by hand.
 //     https://fred.stlouisfed.org/series/${SERIES.newHomeSupply}
 //   ${SERIES.delinquency}       Delinquency rate on single-family residential mortgages, national
 //     https://fred.stlouisfed.org/series/${SERIES.delinquency}
-//   ${SERIES.sdUnemployment}  San Diego-Carlsbad MSA unemployment rate
+//   ${SERIES.caUnemployment}  California unemployment rate
 //
 // Retrieved: ${new Date().toISOString().slice(0, 10)}
 //
@@ -90,8 +93,8 @@ export const MORTGAGE_DELINQUENCY: readonly SignalRow[] = [
 ${fmt(delinquency)}
 ];
 
-/** San Diego-Carlsbad MSA unemployment rate, annual, percent. */
-export const SD_UNEMPLOYMENT: readonly SignalRow[] = [
+/** California unemployment rate, annual, percent. */
+export const CA_UNEMPLOYMENT: readonly SignalRow[] = [
 ${fmt(unemployment)}
 ];
 
@@ -115,5 +118,5 @@ console.log(
   `  delinquency ${delinquency.length} rows (to ${delinquency[delinquency.length - 1][0]} = ${delinquency[delinquency.length - 1][1]}%)`
 );
 console.log(
-  `  SD unemployment ${unemployment.length} rows (to ${unemployment[unemployment.length - 1][0]} = ${unemployment[unemployment.length - 1][1]}%)`
+  `  CA unemployment ${unemployment.length} rows (to ${unemployment[unemployment.length - 1][0]} = ${unemployment[unemployment.length - 1][1]}%)`
 );

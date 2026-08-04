@@ -2,7 +2,7 @@
  * Three blueberries: what a median income can actually buy.
  *
  * This is the thesis of the whole project, and it is deliberately NOT "houses
- * got expensive." Prices rising is unremarkable, wages rise too, and a 1987
+ * got expensive." Prices rising is unremarkable, wages rise too, and a 1984
  * dollar is not a 2026 dollar. The claim that means something is *relative*:
  * the same job buys less house than it used to.
  *

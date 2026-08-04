@@ -1,6 +1,6 @@
 /**
- * Forty years of San Diego housing history, and what it can and cannot tell you
- * about waiting for a crash.
+ * Decades of California housing history, per county, and what it can and cannot
+ * tell you about waiting for a crash.
  *
  * The central lesson buried in this data: **price is not payment**. A buyer at
  * the 2021 peak paid about the same monthly as a buyer at the 2006 peak, because
@@ -422,7 +422,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: 30,
       rateAtBottom: 0.05,
       basis:
-        "Moody's Analytics has repeatedly framed the recession case for 'significantly overvalued' metros as a 15-20% peak-to-trough decline, with rates falling as the Fed responds. San Diego screens as overvalued on price-to-income, so this is the mainstream bear case rather than a fringe one.",
+        "Moody's Analytics has repeatedly framed the recession case for 'significantly overvalued' metros as a 15-20% peak-to-trough decline, with rates falling as the Fed responds. Coastal California screens as overvalued on price-to-income, so this is the mainstream bear case rather than a fringe one.",
     },
     {
       id: "worse-than-2008",
@@ -431,7 +431,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: 48,
       rateAtBottom: 0.04,
       basis:
-        "Beyond anything in the San Diego record. The 2006 crash was 42%. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and today's mortgage delinquency rate is near a historic low rather than climbing.",
+        "Beyond anything in the California record. The 2008 crash was 42% in San Diego. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and today's mortgage delinquency rate is near a historic low rather than climbing.",
     },
     {
       id: "japan",
@@ -473,7 +473,7 @@ export function historicalContext(county: CaCounty = DEFAULT_COUNTY) {
     caveats: [
       "Two or three declines over 10% in fifty years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.",
       "Price is not payment. A 2021 peak buyer paid about what a 2006 peak buyer paid, because the rate was 2.84% not 6.24%. And if a recession cracks prices, rate cuts are what stop the cracking.",
-      "You have to still have a job at the bottom. San Diego unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
+      "You have to still have a job at the bottom. California unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
       "Credit tightens exactly when prices fall. In 2009 private lenders went back to 20% down; FHA at 3.5% and VA at zero stayed open.",
       "In California, buying lower is permanent. Prop 13 locks your assessed value to your price and caps growth at 2%/year, so a cheaper entry keeps paying you back for as long as you own it.",
     ],
