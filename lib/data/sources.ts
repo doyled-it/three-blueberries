@@ -225,6 +225,28 @@ export const SOURCES = {
       "$40,000 for 2025 rising 1% a year, so $40,400 in 2026, and it reverts to $10,000 after 2029. Above $505,000 of modified AGI the raise is clawed back at 30 cents on the dollar down to a $10,000 floor, which two California salaries reach without feeling wealthy.",
   },
 
+  "fair-plan-county": {
+    id: "fair-plan-county",
+    title: "Residential policy count and written premium by ZIP code, category and wildfire risk score",
+    publisher: "California FAIR Plan Association",
+    url: "https://www.cfpnet.com/key-statistics-data/",
+    asOf: "2026-06-30",
+    kind: "published",
+    caveat:
+      "The insurer of last resort's own book, published quarterly, so it is exact rather than surveyed. It is NOT the price of a normal policy: FAIR Plan cover is fire-only and usually needs a separate DIC policy on top for everything a homeowners policy otherwise does, so the real cost of ending up here is higher than the premium alone. Aggregated to counties from 1,662 ZIP rows; the parse is reconciled against the totals printed in the source.",
+  },
+
+  "dof-e5": {
+    id: "dof-e5",
+    title: "E-5 Population and Housing Estimates for Cities, Counties and the State, 2020-2026",
+    publisher: "California Department of Finance, Demographic Research Unit",
+    url: "https://dof.ca.gov/forecasting/demographics/estimates/e-5-population-and-housing-estimates-for-cities-counties-and-the-state-2020-2026/",
+    asOf: "2026-01-01",
+    kind: "published",
+    caveat:
+      "Used only as the denominator for FAIR Plan penetration: single detached housing units per county, so detached houses are compared with detached houses. It counts units, not households, so a county with many vacant or seasonal homes reads slightly low.",
+  },
+
   "ab-1482-cpi": {
     id: "ab-1482-cpi",
     title: "Tenant Protection Act (AB 1482) rent cap, regional CPI for August 2026 through July 2027",

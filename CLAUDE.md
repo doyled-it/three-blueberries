@@ -79,8 +79,10 @@ lib/                    the engine, pure TypeScript, no DOM, no I/O
     programs.ts         VA funding fee, FHA MIP, PMI bands, DTI ceilings, residual income
     ca-property.ts      Prop 13, county tax rates, insurance + closing cost defaults
     ca-rent-cap.ts      AB 1482 by CPI region, because the cap is not one number
+    ca-insurance.ts     GENERATED. FAIR Plan premium and penetration by county
     federal-tax.ts      standard deduction by filing status, SALT cap and its phase-out
   county-scope.ts       what the county selector does NOT change, said out loud
+  insurance.ts          the county FAIR Plan reality check on the premium line
 src/
   client/app.ts         browser wiring; bundled by esbuild to src/assets/js/
   index.njk             the form + result panels
@@ -90,6 +92,7 @@ worker/index.ts         /api/rates (FRED, KV-cached) + static asset passthrough
 tests/                  node --test, TypeScript run natively via type stripping
 scripts/
   fetch-loan-limits.mjs regenerates ca-loan-limits.ts from FHFA's CSV
+  fetch_fair_plan.py    regenerates ca-insurance.ts from FAIR Plan PDFs + DOF E-5
   build-client.mjs      esbuild bundle
   demo.ts               prints worked scenarios to the terminal. Use it to eyeball output
 ```
@@ -98,7 +101,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           236 tests, no watch mode needed, runs in ~250ms
+npm test           243 tests, no watch mode needed, runs in ~250ms
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -151,6 +154,26 @@ reached. **If you can't write that sentence, don't ship the number.** The UI ren
   used is still the conforming one. Fix this before trusting max-price answers near the limit.
 - **The supplemental tax bill warning fires on every scenario.** It is not modeled numerically
   because that requires the seller's old assessed value, which we don't have. Do not fake it.
+
+### Insurance: what we can and cannot say by county
+
+**Do not synthesise a county premium.** No agency publishes an admitted-market county
+average. The Department of Insurance runs an interactive quote tool rather than a dataset,
+and the aggregators that do publish city tables will not say where their numbers came from.
+A county multiplier invented to make the line look precise is exactly the failure this
+project exists to avoid, so the premium itself stays a statewide estimate, flagged as one.
+
+What IS published, quarterly, by the body that writes the policies, is the FAIR Plan's own
+book: policy counts and written premium for all 1,662 California ZIPs, split by wildfire
+risk band and policy category. So the county fact we state is not "your premium will be X",
+it is "this many of your neighbours could not get a normal policy, and this is what they pay
+instead". On a California house that is the more decision-relevant number: Tuolumne is at
+48% of detached homes on the FAIR Plan, Sacramento at 0.3%, and the average premium runs
+from $669 in Imperial to $7,655 in Napa.
+
+`scripts/fetch_fair_plan.py` refuses to write unless the parse reconciles exactly to the
+policy and premium totals printed on the source PDFs and finds all 58 counties. A silent
+partial parse would understate the risk in precisely the counties where it matters most.
 
 ### All 58 counties, and the line between them
 
@@ -215,7 +238,9 @@ Two related rules the bridge enforces:
 | VA funding fee         | va.gov                               | check annually                                       |
 | VA residual income     | VA Lender's Handbook M26-7 ch.4      | rarely changes                                       |
 | County tax rates       | hand-curated estimates               | flagged `estimate`; users should override            |
-| Insurance              | market survey                        | flagged `estimate`; volatile, warn loudly            |
+| Insurance premium      | market survey                        | flagged `estimate`, STATEWIDE; volatile, warn loudly |
+| FAIR Plan by county    | cfpnet.com quarterly ZIP reports     | `npm run data:insurance`, quarterly                  |
+| AB 1482 rent caps      | BLS regional CPI / DIR state CPI     | every May, effective each 1 August                   |
 
 FHFA renames their CSV every year. `scripts/fetch-loan-limits.mjs` has `YEAR` at the top and
 refuses to write the file if it doesn't find exactly 58 California counties.

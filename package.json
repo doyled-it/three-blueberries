@@ -18,6 +18,7 @@
     "data:history": "node scripts/fetch-history.mjs",
     "data:signals": "node scripts/fetch-signals.mjs",
     "data:panel": "node scripts/fetch-panel.mjs",
+    "data:insurance": "uv run python scripts/fetch_fair_plan.py",
     "train": "uv run python -m training.train",
     "train:test": "uv run pytest -q",
     "data:international": "node scripts/fetch-international.mjs",

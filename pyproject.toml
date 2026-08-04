@@ -9,6 +9,11 @@ dependencies = [
     "pandas>=2.2",
     "scikit-learn>=1.5",
     "scipy>=1.14",
+    # Data generation: the FAIR Plan publishes PDFs and the Department of
+    # Finance publishes a workbook. Neither offers a CSV.
+    "openpyxl>=3.1",
+    # The FAIR Plan PDFs carry an owner password, so pypdf needs an AES provider.
+    "pypdf[crypto]>=5.1",
 ]
 
 [dependency-groups]

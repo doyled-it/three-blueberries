@@ -14,6 +14,7 @@
 
 import { balanceAfter, monthLtvReaches, monthlyPayment, totalInterest } from "./amortization.ts";
 import { conformingLimitFor, CONFORMING_BASELINE } from "./data/ca-loan-limits.ts";
+import { fairPlanRisk } from "./insurance.ts";
 import {
   CA_HOMEOWNERS_EXEMPTION,
   DEFAULT_CLOSING_COST_RATE,
@@ -211,19 +212,29 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
   // --- Homeowners insurance -------------------------------------------------
   const insuranceAnnual = input.insuranceAnnual ?? estimateInsuranceAnnual(input.purchasePrice);
   const insuranceEstimated = input.insuranceAnnual === undefined;
+  // The premium itself stays a statewide estimate: nobody publishes an
+  // admitted-market county average, and inventing a county multiplier to make
+  // the line look precise is the failure this project exists to avoid. What we
+  // CAN say for the reader's own county, from the FAIR Plan's published book,
+  // is how many of their neighbours could not get a normal policy at all.
+  const fairPlan = fairPlanRisk(input.county);
   lines.push({
     key: "homeownersInsurance",
     label: "Homeowners insurance",
     monthly: insuranceAnnual / 12,
     annual: insuranceAnnual,
     basis: insuranceEstimated
-      ? `Placeholder for a standard HO-3 policy in a non-wildfire California ZIP, scaled to a ${money(input.purchasePrice)} home.`
+      ? `Placeholder for a standard HO-3 policy in a non-wildfire California ZIP, scaled to a ${money(input.purchasePrice)} home. It is not specific to ${input.county} County, because no agency publishes a county average for the normal market. What is published, and is below, is what the insurer of last resort charges there.`
       : `Your quoted annual premium of ${money(insuranceAnnual)}.`,
     confidence: insuranceEstimated ? "estimated" : "user",
-    sourceIds: ["ca-insurance-market"],
+    sourceIds: insuranceEstimated
+      ? ["ca-insurance-market", "fair-plan-county", "dof-e5"]
+      : ["ca-insurance-market", "fair-plan-county"],
     warning: insuranceEstimated
-      ? "The least reliable number on this page. California's market is in crisis: brush-adjacent homes quote $5,000-$25,000+, and FAIR Plan policies average around $3,000-$3,200. Get a real quote before you write an offer."
-      : undefined,
+      ? `The least reliable number on this page. ${fairPlan.warning} Get a real quote before you write an offer.`
+      : fairPlan.level === "severe"
+        ? fairPlan.warning
+        : undefined,
   });
 
   // --- Mortgage insurance ---------------------------------------------------
