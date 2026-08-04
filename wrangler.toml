@@ -27,7 +27,7 @@ run_worker_first = ["/api/*"]
 # end rather than shipping a broken /api/rates, which is the behaviour we want.
 [[kv_namespaces]]
 binding = "CACHE"
-id = "REPLACE_ME"
+id = "dd50ac55699e445da3adafae5cc170e1"
 
 # Secrets are NOT set here. Use:
 #   npx wrangler secret put FRED_API_KEY
