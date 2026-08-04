@@ -28,7 +28,7 @@ const RATES_TTL_SECONDS = 12 * 60 * 60;
  */
 const RATE_FALLBACK = {
   thirtyYear: 0.0666,
-  fifteenYear: 0.0587,
+  fifteenYear: 0.0604,
   asOf: "2026-07-30",
 };
 
