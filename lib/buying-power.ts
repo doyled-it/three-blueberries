@@ -212,23 +212,26 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
         : `In ${first.month.slice(0, 4)} the median California household could afford ` +
           `${first.purchasingRatio.toFixed(2)}x a typical ${place} house. Today it is ` +
           `${latest.purchasingRatio.toFixed(2)}x, which is ${pct(-powerLost)} MORE. This is the part of ` +
-          `California where the story people tell about housing is not true: incomes here have kept up with ` +
-          `prices. Whether you would want to live here is a different question, and not one arithmetic answers.`,
+          `California a typical statewide income can still reach. Whether the people who actually live here earn ` +
+          `that, and whether you would want to, are the next two questions, and they are below.`,
     blueberries:
       powerLost > 0
         ? `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ` +
           `${first.month.slice(0, 4)} it cost ${first.yearsOfIncome.toFixed(1)} years. To buy the same house on ` +
           `the same terms your parents did, a household would need to earn ${money(incomeNeededToday)} instead ` +
           `of ${money(latest.income)}.`
-        : `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today, against ` +
-          `${first.yearsOfIncome.toFixed(1)} years in ${first.month.slice(0, 4)}. A median income goes further ` +
-          `here now than it did then, which is the opposite of the national story and worth knowing if you are ` +
-          `deciding where in California to buy.`,
+        : `That house costs ${latest.yearsOfIncome.toFixed(1)} years of STATEWIDE median household income today, ` +
+          `against ${first.yearsOfIncome.toFixed(1)} years in ${first.month.slice(0, 4)}. A typical California ` +
+          `income goes further here now than it did then, which is the opposite of the national story. What the ` +
+          `people who live here earn is a different number, and the panel below uses it.`,
   };
 }
 
 /** Income series ends before the price series; the UI should say so. */
 export const BUYING_POWER_CAVEAT =
+  `The income is STATEWIDE California median household income, so this line answers "could a typical Californian ` +
+  `buy here", not "can the people who live here afford it". Those are different questions and the second one is ` +
+  `answered in the panel below, using each county's own income. ` +
   `The price line is the FHFA repeat-sales index for your county, which tracks what the same houses resold for, ` +
   `anchored to Zillow's current typical single-family value there so it reads in dollars. So it is one ` +
   `representative house through time, not the median listing of each year, and the anchor only moves the dollar ` +

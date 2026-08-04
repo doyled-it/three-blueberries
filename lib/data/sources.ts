@@ -269,6 +269,17 @@ export const SOURCES = {
       "A repeat-sales index, not a median: it tracks what the SAME houses resold for, which is the right way to measure price change and the wrong way to read a level. Covers 28 California metros quarterly and all 58 counties annually, which is why the history follows your county rather than showing everyone San Diego. A US government work, so it can be redistributed freely, unlike Case-Shiller which this replaced. Each metro series splices FHFA's longer all-transactions index onto the more accurate expanded-data one at 1991; the two disagree by a couple of points a year, so the earliest stretch is the shape of what happened rather than a precise measurement.",
   },
 
+  "census-saipe": {
+    id: "census-saipe",
+    title: "Small Area Income and Poverty Estimates: median household income by county",
+    publisher: "U.S. Census Bureau",
+    url: "https://www.census.gov/programs-surveys/saipe.html",
+    asOf: "2023",
+    kind: "published",
+    caveat:
+      "What the households who actually live in a county earn, which is the only way to ask whether the people working somewhere can afford to live there. A statewide income measured against local prices answers a different question. A US government work, published annually with about a two-year lag.",
+  },
+
   "zillow-zhvi": {
     id: "zillow-zhvi",
     title: "Zillow Home Value Index, single-family, by county",

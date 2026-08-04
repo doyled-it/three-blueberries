@@ -1324,3 +1324,18 @@ input[type="range"] {
   font-size: 0.85rem;
   line-height: 1.55;
 }
+
+/* The county ladder: a ranking, so it reads as a list rather than as 58 bars
+   nobody can label. Reuses the correlation rows from the signals panel. */
+.corr__row--you .corr__label {
+  color: var(--berry-bright);
+  font-weight: 500;
+}
+.corr__row--you .corr__bar i {
+  background: var(--berry-bright);
+}
+.corr__row--gap {
+  color: var(--ink-4);
+  font-size: 0.8rem;
+  padding: 2px 0;
+}

@@ -32,6 +32,7 @@ import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../.
 import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
 import { countyTaxRate } from "../../lib/data/ca-property.ts";
 import { countyScope } from "../../lib/county-scope.ts";
+import { WHERE_IT_WORKS_CAVEAT, allStandings, countyStanding, payTrap } from "../../lib/where-it-works.ts";
 import {
   ASSUMPTION_SETS,
   RATE_SOLVER_CEILING,
@@ -1032,7 +1033,80 @@ function renderBuyingPower(county: CaCounty): void {
     </div>`;
 
   $("buyingPowerCaveat").textContent = BUYING_POWER_CAVEAT;
+  renderWhereItWorks(county);
 }
+
+/**
+ * The sharper version of the thesis, and the one the data actually supports.
+ *
+ * "Housing outran wages" is true in 24 counties and false in 34, which sounds
+ * like a weaker claim until you see WHICH counties. Affordability did not leave
+ * California, it relocated to where the work is not, and the counties that pay
+ * best are the least affordable of all.
+ */
+function renderWhereItWorks(county: CaCounty): void {
+  const trap = payTrap();
+  const here = countyStanding(county);
+  const standings = allStandings();
+  const rank = standings.findIndex((s) => s.county === county) + 1;
+
+  $("payTrapHeadline").textContent = trap.headline;
+  $("payTrapHeadline").className = "verdict verdict--no";
+
+  $("payTrap").innerHTML = `
+    <div class="stat stat--wide ${here.yearsOfIncome >= 7 ? "stat--fail" : here.yearsOfIncome < 5 ? "stat--pass" : ""}">
+      <span class="stat__label">${county} County, on its own income</span>
+      <span class="stat__value">${here.yearsOfIncome.toFixed(1)}x<span class="stat__unit"> years of local pay</span></span>
+      <span class="stat__note">
+        A typical single-family home here is ${money(here.homeValue)}. The households who already live and work here
+        earn a median of ${money(here.income)}. That makes it the ${rank}${ordinal(rank)} least affordable of the 58
+        counties, measured against what people there actually earn.
+      </span>
+    </div>
+    <div class="stat stat--fail">
+      <span class="stat__label">Priced out of their own county</span>
+      <span class="stat__value">${trap.pricedOut.length}<span class="stat__unit"> of 58</span></span>
+      <span class="stat__note">Counties where a local median household would need 7 years of gross income or more.</span>
+    </div>
+    <div class="stat stat--pass">
+      <span class="stat__label">Where it still works</span>
+      <span class="stat__value">${trap.workable.length}<span class="stat__unit"> of 58</span></span>
+      <span class="stat__note">
+        Under 5 years of local income: ${trap.workable.map((s) => s.county).join(", ")}. Look at that list and then
+        at the one above it. That is the whole finding.
+      </span>
+    </div>
+    <div class="stat stat--fail">
+      <span class="stat__label">Better pay, worse housing</span>
+      <span class="stat__value">r = +${trap.payVsMultiple.toFixed(2)}</span>
+      <span class="stat__note">
+        Correlation between what a county pays and how many years of that pay a house costs. Prices track pay at
+        +${trap.payVsPrice.toFixed(2)}, which is why the raise does not reach the house.
+      </span>
+    </div>`;
+
+  // A ladder rather than a chart: the ranking IS the point, and 58 rows of one
+  // number read better as a list than as 58 bars nobody can label.
+  const worst = standings.slice(0, 5);
+  const best = standings.slice(-5).reverse();
+  const row = (s: (typeof standings)[number]) => `
+    <div class="corr__row${s.county === county ? " corr__row--you" : ""}">
+      <span class="corr__label">${s.county}</span>
+      <span class="corr__bar"><i style="width:${(s.yearsOfIncome / standings[0]!.yearsOfIncome) * 100}%"></i></span>
+      <span class="corr__r">${s.yearsOfIncome.toFixed(1)}x</span>
+      <span class="corr__n">${money(s.income)} local median income</span>
+    </div>`;
+  const gap = `<div class="corr__row corr__row--gap"><span class="corr__label">…${standings.length - 10} more</span></div>`;
+  $("countyLadder").innerHTML =
+    worst.map(row).join("") + gap + best.map(row).join("") + (rank > 5 && rank <= 53 ? row(here) : "");
+
+  $("whereItWorksCaveat").textContent = WHERE_IT_WORKS_CAVEAT;
+}
+
+const ordinal = (n: number): string => {
+  if (n % 100 >= 11 && n % 100 <= 13) return "th";
+  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
+};
 
 let lastSignalsCounty: CaCounty | null = null;
 

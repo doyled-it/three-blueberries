@@ -6,7 +6,8 @@ import { CA_COUNTIES, conformingLimitFor, type CaCounty } from "../lib/data/ca-l
 import { countyTaxRate, hasCountySpecificTaxRate, DEFAULT_COUNTY_TAX_RATE } from "../lib/data/ca-property.ts";
 import { statutoryRentCap } from "../lib/data/ca-rent-cap.ts";
 import { countyScope } from "../lib/county-scope.ts";
-import { buyingPowerVerdict } from "../lib/buying-power.ts";
+import { BUYING_POWER_CAVEAT, buyingPowerVerdict } from "../lib/buying-power.ts";
+import { countyStanding, payTrap } from "../lib/where-it-works.ts";
 import { evaluateScenario } from "../lib/mortgage.ts";
 import { maxAffordablePrice } from "../lib/affordability.ts";
 import { bridgeScenario } from "../lib/scenario-bridge.ts";
@@ -173,4 +174,40 @@ test("every county produces a complete, finite buying-power verdict", () => {
     const { place } = countyScope(county);
     assert.ok(v.headline.includes(place), `${county}: headline does not name ${place}`);
   }
+});
+
+test("the pay trap is measured, not asserted", () => {
+  // This is the sharpest claim on the site, so it is computed from the data
+  // every time rather than written into prose that could drift from it.
+  const trap = payTrap();
+  assert.ok(trap.payVsMultiple > 0.5, `expected a strong positive, got ${trap.payVsMultiple}`);
+  assert.ok(trap.payVsPrice > trap.payVsMultiple, "prices should track pay even harder than the multiple does");
+  assert.ok(trap.bestPaying.medianIncome > trap.worstPaying.medianIncome * 1.5);
+  assert.ok(
+    trap.bestPaying.medianMultiple > trap.worstPaying.medianMultiple,
+    "the better-paying counties must be the LESS affordable ones, which is the whole point"
+  );
+  assert.ok(trap.headline.includes(trap.bestPaying.medianMultiple.toFixed(1)));
+});
+
+test("every county has a local standing built from its own income", () => {
+  for (const county of CA_COUNTIES) {
+    const s = countyStanding(county);
+    assert.ok(s.income > 30_000 && s.income < 250_000, `${county}: implausible income ${s.income}`);
+    assert.ok(s.homeValue > 100_000 && s.homeValue < 5_000_000, `${county}: implausible value ${s.homeValue}`);
+    assert.ok(s.yearsOfIncome > 1 && s.yearsOfIncome < 30, `${county}: ${s.yearsOfIncome}x is implausible`);
+  }
+  // Incomes must actually differ per county, or this is a statewide figure wearing a hat.
+  assert.ok(new Set(CA_COUNTIES.map((c) => countyStanding(c).income)).size > 40);
+});
+
+test("REGRESSION: the statewide-income panel says it is statewide", () => {
+  // buyingPowerSeries measures a STATEWIDE income against a LOCAL price, which
+  // answers "could a typical Californian buy here", not "can the locals afford
+  // it". Copy that blurred the two claimed incomes had kept up with prices in
+  // Fresno, which this data cannot support.
+  assert.match(BUYING_POWER_CAVEAT, /STATEWIDE/);
+  const rising = buyingPowerVerdict("Fresno");
+  assert.ok(!/incomes here have kept up/.test(rising.headline), "that claim needs local income, which that panel lacks");
+  assert.match(rising.blueberries, /STATEWIDE/);
 });

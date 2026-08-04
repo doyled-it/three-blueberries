@@ -53,6 +53,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import openpyxl
+import xlrd
 
 REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "lib" / "data" / "history.ts"
@@ -63,6 +64,9 @@ CBSA_DELINEATION = (
     "https://www2.census.gov/programs-surveys/metro-micro/geographies/"
     "reference-files/2023/delineation-files/list1_2023.xlsx"
 )
+SAIPE = "https://www2.census.gov/programs-surveys/saipe/datasets/2023/2023-state-and-county/est23all.xls"
+SAIPE_YEAR = 2023
+
 ZHVI_COUNTY_SFR = (
     "https://files.zillowstatic.com/research/public_csvs/zhvi/"
     "County_zhvi_uc_sfr_tier_0.33_0.67_sm_sa_month.csv"
@@ -209,6 +213,29 @@ def anchors() -> dict[str, int]:
     return out
 
 
+def county_income() -> dict[str, int]:
+    """Median household income per county, Census SAIPE. A US government work.
+
+    This is what makes the affordability claim LOCAL. Measuring a county's prices
+    against the STATEWIDE median income answers "could a typical Californian buy
+    here", which is a real question but a different one from "can the people who
+    already live and work here afford to".
+    """
+    sheet = xlrd.open_workbook(file_contents=fetch(SAIPE, "Census SAIPE income")).sheet_by_index(0)
+    out: dict[str, int] = {}
+    for r in range(3, sheet.nrows):
+        if str(sheet.cell_value(r, 2)).strip() != "CA":
+            continue
+        if str(sheet.cell_value(r, 1)).strip() == "000":  # the state total row
+            continue
+        county = str(sheet.cell_value(r, 3)).replace(" County", "").strip()
+        try:
+            out[county] = int(float(sheet.cell_value(r, 22)))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def rates() -> list[tuple[str, float]]:
     text = fetch(RATES, "Freddie Mac PMMS").decode("utf-8-sig")
     out = []
@@ -230,7 +257,12 @@ def main() -> None:
     counties = county_annual()
     mapping = county_to_metro(set(metros))
     anchor = anchors()
+    income = county_income()
     weekly = rates()
+
+    missing_income = [c for c in CA_COUNTIES if c not in income]
+    if missing_income:
+        die(f"no SAIPE income for {', '.join(missing_income)}")
 
     missing_anchor = [c for c in CA_COUNTIES if c not in anchor]
     if missing_anchor:
@@ -361,6 +393,14 @@ def main() -> None:
     lines.append("};")
     lines.append("")
 
+    lines.append("/** Census SAIPE median household income by county, the LOCAL income. */")
+    lines.append(f"export const COUNTY_INCOME_YEAR = {SAIPE_YEAR};")
+    lines.append("export const COUNTY_INCOME: Record<CaCounty, number> = {")
+    for county in CA_COUNTIES:
+        key = f'"{county}"' if " " in county else county
+        lines.append(f"  {key}: {income[county]},")
+    lines.append("};")
+    lines.append("")
     lines.append("export function historyFor(county: CaCounty): CountyHistory {")
     lines.append("  const place = COUNTY_METRO[county];")
     lines.append("  if (place) {")

@@ -104,7 +104,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           258 tests, no watch mode needed, under a second
+npm test           261 tests, no watch mode needed, under a second
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -191,6 +191,32 @@ income, and the income series starts in 1984. Backfilling income made a 1975 hou
 
 **Buying power has not fallen everywhere.** Down 23% in San Diego, UP 27% in Fresno. Any copy
 about the thesis has to handle both directions; `buyingPowerVerdict` does, and a test pins it.
+
+### The sharpest claim on the site: `lib/where-it-works.ts`
+
+"Housing outran wages" is true in 24 counties and FALSE in 34. That sounds like it weakens the
+thesis until you see which counties are which: the ones where a median income still buys are
+Lassen, Modoc, Trinity, Siskiyou and Sierra. **Affordability did not leave California, it
+relocated to where the work is not.**
+
+Measured against each county's OWN income (Census SAIPE, not the statewide figure):
+
+- pay vs housing multiple: **r = +0.71**. The better a county pays, the worse its multiple.
+- pay vs home price: **r = +0.91**. Prices absorb pay almost completely.
+- ten best-paying counties: ~$120,000 income, ~10.6x housing
+- ten worst-paying: ~$59,000 income, ~5.7x housing
+
+The raise does not get you in, it gets bid away. Every one of those figures is computed at
+render time, never written into prose, and pinned by tests.
+
+**Two panels, two different questions, do not blur them.** `buying-power.ts` measures STATEWIDE
+income against local prices: "could a typical Californian buy here". `where-it-works.ts`
+measures LOCAL income against local prices: "can the people who work here afford to live here".
+Copy that blurred the two once claimed incomes had kept up with prices in Fresno, which the
+statewide series cannot support. A test pins the distinction.
+
+**It is a snapshot, not a trend.** It cannot see jobs arriving or leaving, and the caveat says
+so. Do not let copy imply a direction this data cannot measure.
 
 ### Insurance: what we can and cannot say by county
 
