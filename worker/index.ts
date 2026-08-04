@@ -77,7 +77,16 @@ async function fetchFredSeries(seriesId: string, apiKey: string): Promise<{ valu
 }
 
 async function getRates(env: Env): Promise<RatesPayload> {
-  const cached = await env.CACHE.get<RatesPayload>("rates:v1", "json");
+  // The cache is an optimisation and a budget guard, never a dependency. If the
+  // binding is missing or KV is having a bad day, we still answer, we just pay
+  // for it upstream. Letting this throw would take out the whole endpoint over
+  // a cache miss.
+  let cached: RatesPayload | null = null;
+  try {
+    cached = await env.CACHE.get<RatesPayload>("rates:v1", "json");
+  } catch {
+    cached = null;
+  }
   if (cached) return cached;
 
   if (!env.FRED_API_KEY) {
@@ -101,7 +110,11 @@ async function getRates(env: Env): Promise<RatesPayload> {
       source: RATE_SOURCE,
     };
 
-    await env.CACHE.put("rates:v1", JSON.stringify(payload), { expirationTtl: RATES_TTL_SECONDS });
+    try {
+      await env.CACHE.put("rates:v1", JSON.stringify(payload), { expirationTtl: RATES_TTL_SECONDS });
+    } catch {
+      // Answer with fresh data even if we could not store it.
+    }
     return payload;
   } catch {
     return { ...RATE_FALLBACK, fifteenYear: RATE_FALLBACK.fifteenYear, stale: true, source: RATE_SOURCE };

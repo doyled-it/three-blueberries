@@ -3,18 +3,28 @@ main = "worker/index.ts"
 compatibility_date = "2026-04-29"
 compatibility_flags = ["nodejs_compat"]
 
+# The public address. `custom_domain = true` makes wrangler create and manage the
+# DNS record itself, so there is no orphaned CNAME to keep in step. It requires
+# doyled-it.com to be a zone on the same Cloudflare account.
+routes = [{ pattern = "blueberries.doyled-it.com", custom_domain = true }]
+
 [assets]
 directory = "./_site"
 binding = "ASSETS"
 # Only the API paths need the worker; everything else is served straight from assets.
 run_worker_first = ["/api/*"]
 
-# Cache for upstream API responses. Doubles as the budget guard for any
-# metered listings API — see worker/index.ts.
+# Cache for upstream API responses. Doubles as the budget guard for any metered
+# listings API, see worker/index.ts.
 #
-# Create it once with:
+# Create it once, before the first deploy:
+#   npx wrangler login
 #   npx wrangler kv namespace create CACHE
-# then paste the returned id below.
+# then paste the returned id here and commit. The id is not a secret; it is an
+# account-scoped handle and is useless without credentials.
+#
+# A deploy with the placeholder still in place fails loudly at the Cloudflare
+# end rather than shipping a broken /api/rates, which is the behaviour we want.
 [[kv_namespaces]]
 binding = "CACHE"
 id = "REPLACE_ME"
