@@ -24,4 +24,9 @@ export default {
   },
   // Bumped by hand when the content changes materially, not on every deploy.
   updated: "2026-08-04",
+  // IndexNow: push a URL to Bing, DuckDuckGo, Yandex and Seznam at once instead
+  // of waiting to be crawled. The key is public by design, it is only proof that
+  // whoever submits controls the site, which is why the matching file has to be
+  // served from the root.
+  indexNowKey: "4cf42b4909f18587512bd67f97629c8f",
 };

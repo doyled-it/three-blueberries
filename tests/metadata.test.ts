@@ -145,3 +145,29 @@ test("the page is still readable with JavaScript switched off", () => {
   assert.equal(headings.filter((h) => h === "1").length, 1, "exactly one h1");
   assert.ok(headings.filter((h) => h === "2").length >= 6, "the sections need real headings");
 });
+
+test("robots.txt welcomes the AI crawlers by name, not only by wildcard", () => {
+  // Cloudflare's zone-level managed robots.txt prepends a block disallowing
+  // these. A wildcard Allow is not enough to argue with a named Disallow, so
+  // each one is named. The owner wants the site findable, including by whatever
+  // answers the question on someone's behalf.
+  const robots = fs.readFileSync(path.join(root, "_site", "robots.txt"), "utf8");
+  for (const bot of ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "CCBot"]) {
+    const group = robots.match(new RegExp(`User-agent: ${bot}\\s*\\n(Allow|Disallow): (\\S+)`));
+    assert.ok(group, `${bot} is not named in robots.txt`);
+    assert.equal(group![1], "Allow", `${bot} is disallowed`);
+  }
+  assert.ok(!/^Disallow: \/$/m.test(robots), "our own robots.txt must not disallow anything");
+  assert.match(robots, /Content-Signal: search=yes/);
+});
+
+test("the IndexNow key file is served and matches the key that will be submitted", () => {
+  // Submitting with a key whose file does not resolve is rejected, silently
+  // enough that it looks like it worked.
+  const keyFiles = fs.readdirSync(path.join(root, "_site")).filter((f) => /^[a-f0-9]{16,128}\.txt$/.test(f));
+  assert.equal(keyFiles.length, 1, "expected exactly one IndexNow key file at the root");
+
+  const key = keyFiles[0]!.replace(/\.txt$/, "");
+  const contents = fs.readFileSync(path.join(root, "_site", keyFiles[0]!), "utf8").trim();
+  assert.equal(contents, key, "the file must contain the key and nothing else");
+});

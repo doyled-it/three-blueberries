@@ -3,7 +3,59 @@ permalink: /robots.txt
 eleventyExcludeFromCollections: true
 ---
 # Nothing here is private and nothing is metered, so crawl freely.
+#
+# Content signals, stated deliberately rather than left to a default. The point
+# of this site is that these numbers are hard to find and mostly sit behind
+# someone selling a loan. Anything that helps a person reach an honest figure is
+# welcome to it, including the machine that answers their question for them.
 User-agent: *
+Content-Signal: search=yes,ai-input=yes,ai-train=yes
+Allow: /
+
+# Named one by one because Cloudflare's zone-level managed robots.txt prepends a
+# block disallowing these. Where two groups match the same crawler the least
+# restrictive rule is meant to win, but do not rely on that: the actual fix is
+# to turn the managed block off in the dashboard.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: cohere-ai
 Allow: /
 
 Sitemap: {{ site.url }}/sitemap.xml
