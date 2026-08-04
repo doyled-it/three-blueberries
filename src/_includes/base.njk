@@ -67,6 +67,7 @@
             "inLanguage": "en-US",
             "isAccessibleForFree": true,
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "sameAs": ["{{ site.repo.url }}"],
             "author": { "@id": "{{ site.author.url }}/#person" },
             "publisher": { "@id": "{{ site.author.url }}/#person" },
             "featureList": [
@@ -101,18 +102,21 @@
     <div class="wrap">
       {{ content | safe }}
       <footer class="site-footer">
-        <p>
+        <p class="site-footer__terms">
           Every figure links to its source, and anything estimated says so. Not advice, and not a quote, only a
-          lender's Loan Estimate is a quote.
+          lender's Loan Estimate is a quote. Your numbers stay in your browser. Nothing is sent anywhere.
         </p>
-        <p>Your numbers stay in your browser. Nothing is sent anywhere.</p>
-        <p class="site-footer__by">
-          Built by <a href="{{ site.author.url }}" rel="author">{{ site.author.name }}</a>, who wanted this to
-          exist and could not find it. Free, no ads, nothing sold.
-          <a class="site-footer__coffee" href="{{ site.author.support }}" rel="noopener" target="_blank">
-            Buy me a coffee
-          </a>
-        </p>
+        <div class="site-footer__by">
+          <p class="site-footer__credit">
+            Built by <a href="{{ site.author.url }}" rel="author">{{ site.author.name }}</a>, who wanted this to
+            exist and could not find it. Free, no ads, nothing sold, and the arithmetic is
+            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">open for anyone to check</a>.
+          </p>
+          <nav class="site-footer__links" aria-label="Elsewhere">
+            <a href="{{ site.repo.url }}" rel="noopener" target="_blank">Source</a>
+            <a href="{{ site.author.support }}" rel="noopener" target="_blank">Buy me a coffee</a>
+          </nav>
+        </div>
       </footer>
     </div>
     <script type="module" src="/assets/js/app.js"></script>

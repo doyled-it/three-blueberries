@@ -22,6 +22,11 @@ export default {
     url: "https://doyled-it.com",
     support: "https://buymeacoffee.com/doyled.it",
   },
+  // Public, because a calculator asking to be trusted about money should be one
+  // whose arithmetic anybody can go and check.
+  repo: {
+    url: "https://github.com/doyled-it/three-blueberries",
+  },
   // Bumped by hand when the content changes materially, not on every deploy.
   updated: "2026-08-04",
   // IndexNow: push a URL to Bing, DuckDuckGo, Yandex and Seznam at once instead

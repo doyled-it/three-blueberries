@@ -102,13 +102,30 @@ test("the structured data parses and names a real author", () => {
   assert.equal((app["offers"] as Record<string, unknown>)["price"], "0");
 });
 
-test("the footer credits its author and links the tip jar", () => {
+test("the footer credits its author and links the source and the tip jar", () => {
   const footer = html.match(/<footer[\s\S]*?<\/footer>/)![0]!;
   assert.match(footer, /Michael Doyle/);
   assert.match(footer, /https:\/\/doyled-it\.com/);
   assert.match(footer, /buymeacoffee\.com\/doyled\.it/);
+  assert.match(footer, /github\.com\/doyled-it\/three-blueberries/);
   // Anything opening a new tab needs this, or the new page can reach back.
   assert.match(footer, /rel="noopener"/);
+});
+
+test("REGRESSION: the byline is laid out as a sentence, not as flex items", () => {
+  // It was a flex container. A flex container makes an anonymous item out of
+  // every text run between its element children and applies the gap to each,
+  // so "Built by | Michael Doyle | , who wanted" rendered with the comma
+  // floating a clear space away from the name.
+  const css = fs.readFileSync(path.join(root, "src", "assets", "css", "main.css"), "utf8");
+  const rule = css.match(/\.site-footer__credit \{([^}]*)\}/)![1]!;
+  assert.ok(!/display:\s*flex/.test(rule), "the sentence must not be a flex container");
+
+  const footer = html.match(/<footer[\s\S]*?<\/footer>/)![0]!;
+  // Every direct child of the flex row is an element, so no anonymous items.
+  const row = footer.match(/<div class="site-footer__by">([\s\S]*?)<\/div>\s*<\/footer>/)![1]!;
+  const stray = row.replace(/<(p|nav)[\s\S]*?<\/\1>/g, "").trim();
+  assert.equal(stray, "", `loose text in the flex row would become its own item: ${stray}`);
 });
 
 test("robots.txt and the sitemap are built and agree with each other", () => {
