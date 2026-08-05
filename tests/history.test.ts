@@ -466,3 +466,30 @@ test("old dollars really were worth more, so the adjustment does something", () 
   // And the latest month should be essentially unchanged.
   assert.ok(Math.abs(real.at(-1)!.homePrice / nominal.at(-1)!.homePrice - 1) < 0.02);
 });
+
+test("REGRESSION: the caveat states the direction of its own bias correctly", () => {
+  // It claimed that carrying income forward flat "if anything understates the
+  // gap". It does the opposite: a flat income makes the affordable line too low,
+  // so the gap comes out bigger than reality. The error survived from the first
+  // commit and it flattered the argument the panel is making, which is the one
+  // direction this project is not entitled to be wrong in.
+  assert.match(BUYING_POWER_CAVEAT, /OVERSTATES the gap/);
+  assert.ok(!/understates the gap/i.test(BUYING_POWER_CAVEAT));
+
+  // And prove the direction rather than trusting the sentence: a higher income
+  // must produce a SMALLER shortfall, so holding income down inflates it.
+  const series = buyingPowerSeries(DEFAULT_COUNTY);
+  const latest = series[series.length - 1]!;
+  const richerBudget = ((latest.income * 1.08) / 12) * AFFORDABILITY_EFFORT;
+  const richerAffordable = affordablePriceAt(richerBudget, latest.rate);
+  assert.ok(
+    latest.homePrice - richerAffordable < latest.shortfall,
+    "if incomes really grew, the true gap is smaller than the one shown"
+  );
+});
+
+test("the caveat says each thing once", () => {
+  // It stated the income source twice, once at the top and once in the middle.
+  const mentions = (BUYING_POWER_CAVEAT.match(/median household income/g) ?? []).length;
+  assert.equal(mentions, 1, `"median household income" appears ${mentions} times`);
+});

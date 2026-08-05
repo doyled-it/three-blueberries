@@ -227,17 +227,25 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
   };
 }
 
-/** Income series ends before the price series; the UI should say so. */
+/**
+ * What this panel is and is not, in the order a sceptical reader would ask.
+ *
+ * It used to state the income source twice and then get the direction of its own
+ * bias backwards: holding income flat after the series ends makes the affordable
+ * line too LOW, so it overstates the gap. It claimed the opposite, which happened
+ * to flatter the argument the panel is making. That is the one direction this
+ * project is not entitled to be wrong in.
+ */
 export const BUYING_POWER_CAVEAT =
-  `The income is STATEWIDE California median household income, so this line answers "could a typical Californian ` +
-  `buy here", not "can the people who live here afford it". Those are different questions and the second one is ` +
-  `answered in the panel below, using each county's own income. ` +
-  `The price line is the FHFA repeat-sales index for your county, which tracks what the same houses resold for, ` +
-  `anchored to Zillow's current typical single-family value there so it reads in dollars. So it is one ` +
-  `representative house through time, not the median listing of each year, and the anchor only moves the dollar ` +
-  `axis. It starts where the income series starts, because every figure here is a ratio of the two. ` +
-  `Income is California median household income, annual, and the series ends in ${SIGNALS_INCOME_LAST_YEAR}, ` +
-  `later months carry the last value forward, which if anything understates the gap. ` +
+  `The income here is STATEWIDE California median household income, so this answers "could a typical Californian ` +
+  `buy here", not "can the people who live here afford it". The panel below answers that one, using each county's ` +
+  `own income. ` +
+  `The price line is the FHFA repeat-sales index for your county, anchored to Zillow's current typical ` +
+  `single-family value so it reads in dollars: one representative house through time, not the median listing of ` +
+  `each year. The anchor moves the dollar axis and nothing else. ` +
+  `The record runs from ${INCOME_STARTS}, where the income series starts, because every figure here is a ratio of ` +
+  `the two. Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is carried forward flat after that, which OVERSTATES ` +
+  `the gap, since incomes kept rising. ` +
   `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
-  `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at that month's prevailing rate. It excludes tax, insurance and everything else, ` +
-  `so it is the most generous possible reading of what a household could carry.`;
+  `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at the prevailing rate, and excludes tax, insurance and ` +
+  `everything else. It is the most generous possible reading of what a household could carry.`;
