@@ -12,6 +12,52 @@
  * were checked against --panel; re-run the validator if --panel changes.
  */
 
+/*
+ * Both typefaces are served from this origin, not from Google.
+ *
+ * The footer claims nothing is sent anywhere. That was true of the form and
+ * false of the page: a <link> to fonts.googleapis.com handed a visitor's IP,
+ * user agent and referrer to a third party on every view, before they had
+ * clicked anything. Self-hosting makes the claim true and removes the only
+ * outbound request the page made.
+ *
+ * Run `npm run data:fonts` to refresh. LATIN SUBSET ONLY, which is 165 KB for
+ * all four files: the page's entire non-ASCII inventory is a minus sign and an
+ * ellipsis. Fraunces is variable across 400-600 and 9-144 optical size, so its
+ * roman and italic are one file each rather than one per weight.
+ *
+ * `font-display: swap` keeps the text readable while they load, which is the
+ * same behaviour the Google stylesheet requested.
+ */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/assets/fonts/fraunces-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/assets/fonts/fraunces-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-500.woff2") format("woff2");
+}
+
 :root {
   --bg: #0c0a12;
   --panel: #17131f;

@@ -108,6 +108,14 @@ export interface LoanFacts {
   ltv: number;
   conformingLimit: number;
   exceedsConformingLimit: boolean;
+  /**
+   * FHA's own one-unit limit for this county, which is a DIFFERENT table from
+   * the conforming limit and frequently a much lower number. Present on every
+   * scenario, not just FHA ones, so the two can be compared.
+   */
+  fhaLimit: number;
+  /** Only meaningful for an FHA loan. Over this, it is not an FHA loan at all. */
+  exceedsFhaLimit: boolean;
 }
 
 export interface MortgageInsuranceResult {

@@ -27,9 +27,9 @@ import {
 } from "./data/ca-property.ts";
 import {
   DTI_CEILINGS,
-  FHA_LIMITS,
+  FHA_NATIONAL_CEILING,
   FHA_UPFRONT_MIP_RATE,
-  fhaLimitStatus,
+  fhaLimitFor,
   PMI_AUTO_TERMINATION_LTV,
   PMI_REQUEST_CANCELLATION_LTV,
   VA_UTILITY_PER_SQFT,
@@ -83,6 +83,9 @@ export function deriveLoanFacts(input: ScenarioInput): LoanFacts {
   }
 
   const conformingLimit = conformingLimitFor(input.county);
+  // FHA's limit is a different table entirely. Carry it on every scenario so the
+  // FHA branch never has to reach for the conforming one by mistake again.
+  const fhaLimit = fhaLimitFor(input.county);
 
   return {
     basePrice: price,
@@ -97,6 +100,8 @@ export function deriveLoanFacts(input: ScenarioInput): LoanFacts {
     ltv: price > 0 ? baseLoanAmount / price : 0,
     conformingLimit,
     exceedsConformingLimit: baseLoanAmount > conformingLimit,
+    fhaLimit,
+    exceedsFhaLimit: baseLoanAmount > fhaLimit,
   };
 }
 
@@ -563,21 +568,17 @@ function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qua
     );
   }
 
-  if (input.loanType === "fha") {
-    const status = fhaLimitStatus(loan.baseLoanAmount);
-    if (status === "over") {
-      warnings.push(
-        `At ${money(loan.baseLoanAmount)}, this is above FHA's national ceiling of ${money(FHA_LIMITS.ceiling)} for a one-unit property, ` +
-          `so it is over the limit in every county in the country. FHA will not insure it at this size. You would need ` +
-          `${money(loan.baseLoanAmount - FHA_LIMITS.ceiling)} more down, or a different loan type.`
-      );
-    } else if (status === "maybe") {
-      warnings.push(
-        `FHA sets its own county limits, and they are not the conforming limits. At ${money(loan.baseLoanAmount)} this sits between FHA's ` +
-          `national floor of ${money(FHA_LIMITS.floor)} and its ceiling of ${money(FHA_LIMITS.ceiling)}, so whether it qualifies depends on ` +
-          `${input.county} County's own FHA limit, which we do not have. Look it up at ${FHA_LIMITS.lookupUrl} before you count on this.`
-      );
-    }
+  if (input.loanType === "fha" && loan.exceedsFhaLimit) {
+    const over = loan.baseLoanAmount - loan.fhaLimit;
+    warnings.push(
+      `At ${money(loan.baseLoanAmount)}, this is above FHA's ${money(loan.fhaLimit)} limit for ${input.county} County, so FHA will not ` +
+        `insure it. That is not a jumbo, it is simply not an FHA loan: you would need ${money(over)} more down, or a different ` +
+        `program. ` +
+        (loan.fhaLimit < loan.conformingLimit
+          ? `Note that FHA's limit here is ${money(loan.conformingLimit - loan.fhaLimit)} BELOW the ${money(loan.conformingLimit)} ` +
+            `conforming limit, because the two agencies use different floors. A loan can clear conforming and fail FHA.`
+          : `FHA is at its national ceiling of ${money(FHA_NATIONAL_CEILING)} here, which is the most it will insure anywhere.`)
+    );
   }
 
   if (input.loanType === "va" && loan.exceedsConformingLimit) {

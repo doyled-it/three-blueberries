@@ -34,12 +34,16 @@
     <meta name="twitter:image" content="{{ site.url }}{{ site.image }}" />
     <meta name="twitter:image:alt" content="{{ site.imageAlt }}" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    {#
+      Fonts are served from this origin. No preconnect to Google, because there
+      is nothing to connect to any more: the page makes no third-party request
+      at all now, which is what the footer has always claimed.
+
+      Preloading the two that appear above the fold. The mono cuts are small and
+      used further down, so they can wait for the stylesheet.
+    #}
+    <link rel="preload" href="/assets/fonts/fraunces-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/assets/fonts/fraunces-italic.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" type="image/svg+xml" href="/assets/icons/berries.svg" />
     <link rel="icon" href="/assets/icons/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/icon-32.png" />
@@ -106,9 +110,8 @@
         <p class="site-footer__terms">
           Every figure traces to a source, and anything estimated says so. Not advice, and not a quote, only a
           lender's Loan Estimate is a quote. Nothing you type is sent anywhere: there is no account, no email
-          gate and no analytics, and every calculation runs in this tab. The page does fetch a mortgage rate
-          from our own worker, and it loads two typefaces from Google Fonts, which is the one third party your
-          browser talks to here.
+          gate, no analytics and no third-party request of any kind. The fonts are served from here, every
+          calculation runs in this tab, and the only thing the page fetches is today's mortgage rate.
         </p>
         <div class="site-footer__by">
           <p class="site-footer__credit">

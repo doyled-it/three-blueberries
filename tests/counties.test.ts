@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import { CA_COUNTIES, conformingLimitFor, type CaCounty } from "../lib/data/ca-loan-limits.ts";
+import {
+  CA_FHA_LIMITS,
+  FHA_NATIONAL_CEILING,
+  FHA_NATIONAL_FLOOR,
+  fhaLimitFor,
+} from "../lib/data/ca-fha-limits.ts";
 import { countyTaxRate, hasCountySpecificTaxRate, DEFAULT_COUNTY_TAX_RATE } from "../lib/data/ca-property.ts";
 import { statutoryRentCap } from "../lib/data/ca-rent-cap.ts";
 import { countyScope } from "../lib/county-scope.ts";
@@ -310,7 +316,65 @@ test("an FHA loan is never called a jumbo", () => {
       fha: { financeUpfrontMip: true },
     });
     for (const w of result.warnings) {
-      assert.ok(!/jumbo/i.test(w), `${county}: FHA loan warned about being a jumbo`);
+      // The only permitted use of the word is the disclaimer itself.
+      if (!/jumbo/i.test(w)) continue;
+      assert.match(w, /not a jumbo/i, `${county}: FHA loan warned about being a jumbo`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// FHA's limits are HUD's, not FHFA's
+// ---------------------------------------------------------------------------
+
+test("every county has an FHA limit inside HUD's published floor and ceiling", () => {
+  assert.equal(Object.keys(CA_FHA_LIMITS).length, 58);
+  for (const county of CA_COUNTIES) {
+    const entry = CA_FHA_LIMITS[county];
+    assert.ok(entry, `${county} has no FHA limit`);
+    assert.ok(
+      entry.limit >= FHA_NATIONAL_FLOOR && entry.limit <= FHA_NATIONAL_CEILING,
+      `${county}: $${entry.limit} is outside HUD's published band`
+    );
+    // 'Standard' means the county is AT the floor. Anything else is a misparse.
+    if (!entry.highCost) assert.equal(entry.limit, FHA_NATIONAL_FLOOR, `${county} is typed Standard`);
+  }
+});
+
+// The engine used to check FHA loans against the conforming table. In 30
+// counties FHA's limit is LOWER, and in Stanislaus it is lower by $287,650, so
+// that overstated what FHA will insure by more than a quarter of a million.
+test("REGRESSION: the FHA limit is never read off the conforming table", () => {
+  const differs = CA_COUNTIES.filter((c) => fhaLimitFor(c) !== conformingLimitFor(c));
+  assert.ok(differs.length > 25, `expected the two tables to diverge widely, got ${differs.length}`);
+  assert.equal(fhaLimitFor("Stanislaus"), 545_100);
+  assert.equal(conformingLimitFor("Stanislaus"), 832_750);
+
+  // A loan that clears conforming and fails FHA must say so, and must not say
+  // "jumbo" while doing it.
+  const result = evaluateScenario({
+    ...input("Stanislaus"),
+    loanType: "fha",
+    purchasePrice: 800_000,
+    downPayment: { kind: "percent", value: 0.035 },
+    fha: { financeUpfrontMip: true },
+  });
+  assert.ok(result.loan.exceedsFhaLimit);
+  assert.ok(!result.loan.exceedsConformingLimit, "this loan is under the conforming limit");
+  const warning = result.warnings.find((w) => /FHA's \$545,100 limit/.test(w));
+  assert.ok(warning, "must warn that the loan is over FHA's own county limit");
+  assert.ok(!/jumbo/i.test(warning!) || /not a jumbo/i.test(warning!));
+});
+
+test("an FHA loan under its county limit gets no limit warning at all", () => {
+  const result = evaluateScenario({
+    ...input("Los Angeles"),
+    loanType: "fha",
+    purchasePrice: 900_000,
+    downPayment: { kind: "percent", value: 0.035 },
+    fha: { financeUpfrontMip: true },
+  });
+  assert.equal(fhaLimitFor("Los Angeles"), FHA_NATIONAL_CEILING);
+  assert.ok(!result.loan.exceedsFhaLimit);
+  assert.ok(!result.warnings.some((w) => /limit/i.test(w) && /FHA/.test(w)));
 });

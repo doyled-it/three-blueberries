@@ -80,6 +80,7 @@ lib/                    the engine, pure TypeScript, no DOM, no I/O
     ca-property.ts      Prop 13, county tax rates, insurance + closing cost defaults
     ca-rent-cap.ts      AB 1482 by CPI region, because the cap is not one number
     ca-insurance.ts     GENERATED. FAIR Plan premium and penetration by county
+    ca-fha-limits.ts    GENERATED from HUD CHUMS. NOT the conforming limits, see below
     federal-tax.ts      standard deduction by filing status, SALT cap and its phase-out
   county-scope.ts       what the county selector does NOT change, said out loud
   insurance.ts          the county FAIR Plan reality check on the premium line
@@ -88,11 +89,14 @@ src/
   index.njk             the form + result panels
   _includes/base.njk
   assets/css/main.css
+  assets/fonts/         Fraunces + IBM Plex Mono, self-hosted. See below.
 worker/index.ts         /api/rates (FRED, KV-cached) + static asset passthrough
 tests/                  node --test, TypeScript run natively via type stripping
 scripts/
   fetch-loan-limits.mjs regenerates ca-loan-limits.ts from FHFA's CSV
   fetch_fair_plan.py    regenerates ca-insurance.ts from FAIR Plan PDFs + DOF E-5
+  fetch_fha_limits.py   regenerates ca-fha-limits.ts from HUD's CHUMS master file
+  fetch_fonts.py        downloads the two typefaces so nothing is loaded from Google
   fetch_history.py      regenerates history.ts: 58 counties from FHFA + Zillow + Census
   build-client.mjs      esbuild bundle
   make-favicon.py       draws the icon PNGs and .ico
@@ -104,7 +108,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           272 tests, no watch mode needed, under a second
+npm test           277 tests, no watch mode needed, under a second
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -166,9 +170,12 @@ reached. **If you can't write that sentence, don't ship the number.** The UI ren
   renders them. It used to compute them and throw them away, which made the limitation invisible on
   the one number people screenshot.
 - **An FHA loan is never a jumbo, and the conforming limit is not its limit.** FHA sets its own
-  county limits. We ship HUD's national floor and ceiling from ML 2025-23 in `FHA_LIMITS` and send
-  the reader to HUD's lookup for the county figure, because that number is derived from area median
-  sale price and is not published as a clean machine-readable file. Do not invent it.
+  county limits, in `lib/data/ca-fha-limits.ts`, generated from HUD's CHUMS master file. Both
+  agencies set a county at 115% of area median sale price capped at 150% of the conforming
+  baseline, but FHFA floors at the baseline and FHA floors at 65% of it, so below the ceiling the
+  two diverge hard: **Stanislaus is $832,750 conforming and $545,100 FHA.** `LoanFacts` carries
+  both `conformingLimit` and `fhaLimit` on every scenario so the FHA branch can never reach for
+  the wrong one again.
 - **The supplemental tax bill warning fires on every scenario.** It is not modeled numerically
   because that requires the seller's old assessed value, which we don't have. Do not fake it.
 
@@ -342,6 +349,7 @@ Two related rules the bridge enforces:
 | County tax rates       | hand-curated estimates               | flagged `estimate`; users should override            |
 | Insurance premium      | market survey                        | flagged `estimate`, STATEWIDE; volatile, warn loudly |
 | FAIR Plan by county    | cfpnet.com quarterly ZIP reports     | `npm run data:insurance`, quarterly                  |
+| FHA county limits      | HUD CHUMS `cy<YEAR>-forward-limits`  | `npm run data:fha-limits`, annually each December   |
 | AB 1482 rent caps      | BLS regional CPI / DIR state CPI     | every May, effective each 1 August                   |
 
 FHFA renames their CSV every year. `scripts/fetch-loan-limits.mjs` has `YEAR` at the top and
@@ -375,6 +383,19 @@ Mac's 30-year average. See section 5 for the sources and the 1991 splice.
 2. **Prop 13 raises the break-even rate.** At a 20% crash, P&I at 9% roughly cancels 6.66%, but
    the permanently lower assessed value still tips the decision toward waiting. This surprised
    the model's author and there is a test pinning it (`Prop 13 pushes the break-even rate higher`).
+
+### No third-party requests, and that is load-bearing
+
+The page fetches **nothing** from another origin. Fonts used to come from Google, which handed a
+visitor's IP, user agent and referrer to an ad company on every view, under a footer promising
+"nothing is sent anywhere". Both families are OFL, so they are committed under
+`src/assets/fonts/` (latin subset only, 165 KB for all four files) and refreshed with
+`npm run data:fonts`.
+
+`tests/metadata.test.ts` asserts this against the BUILT output: no `<link rel=stylesheet|preload>`,
+`<script src>`, `<img src>` or CSS `url()` may point at another origin. **Do not add an analytics
+snippet, a CDN script, or a font link to get around a build problem.** The test will fail, and it
+is meant to.
 
 ### Charts
 

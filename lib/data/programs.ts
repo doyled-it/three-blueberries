@@ -96,48 +96,30 @@ export function fhaMipDurationMonths(ltv: number): number | null {
 
 // ---------------------------------------------------------------------------
 // FHA loan limits
-// Source: hud-ml-2025-23 (published)
+// Source: hud-chums-fha-limits (published)
 // ---------------------------------------------------------------------------
+//
+// The real per-county table lives in `ca-fha-limits.ts`, generated from HUD's
+// own master file. It is re-exported here so callers have one place to look for
+// program rules.
+//
+// FHA has its OWN county limits, and they are not the FHFA conforming limits
+// this project already ships. The engine used to check FHA loans against the
+// conforming table and, when they exceeded it, call them "a jumbo". An FHA loan
+// is never a jumbo: over the FHA limit it is simply not an FHA loan.
+//
+// The two tables diverge badly below the ceiling because they have different
+// floors. In Stanislaus the conforming limit is $832,750 and the FHA limit is
+// $545,100, so the old behaviour overstated what FHA will insure by $287,650.
 
-/**
- * FHA's national floor and ceiling for a one-unit property.
- *
- * FHA has its OWN county limits, and they are not the FHFA conforming limits
- * this project already ships. The engine used to check FHA loans against the
- * conforming limit and, when they exceeded it, call them "a jumbo". An FHA loan
- * is never a jumbo: over the FHA limit it is simply not an FHA loan, which is a
- * different and worse problem for the borrower.
- *
- * The per-county number sits somewhere between these two bounds and is derived
- * from HUD's area median sale price, which is not published as a clean
- * machine-readable file the way FHFA's is. So we state the bounds, which are
- * statutory (the ceiling is 150% of the national conforming limit under the
- * National Housing Act), and send the reader to HUD's own lookup for the exact
- * county figure rather than inventing one.
- */
-export const FHA_LIMITS = {
-  year: 2026,
-  /** Low-cost areas. 65% of the national conforming limit. */
-  floor: 541_287,
-  /** High-cost areas, which is most of coastal California. 150% of it. */
-  ceiling: 1_249_125,
-  lookupUrl: "https://entp.hud.gov/idapp/html/hicostlook.cfm",
-  sourceIds: ["hud-ml-2025-23"] as const,
-} as const;
-
-/**
- * What we can honestly say about an FHA loan of this size.
- *
- * `over` means it is above the national ceiling and therefore over the limit in
- * every county. `maybe` means it is in the band where the county's own figure
- * decides and we do not have it. `under` means it is below the floor and clears
- * everywhere.
- */
-export function fhaLimitStatus(baseLoanAmount: number): "under" | "maybe" | "over" {
-  if (baseLoanAmount > FHA_LIMITS.ceiling) return "over";
-  if (baseLoanAmount > FHA_LIMITS.floor) return "maybe";
-  return "under";
-}
+export {
+  CA_FHA_LIMITS,
+  FHA_LIMIT_YEAR,
+  FHA_NATIONAL_FLOOR,
+  FHA_NATIONAL_CEILING,
+  fhaLimitFor,
+  type FhaCountyLimit,
+} from "./ca-fha-limits.ts";
 
 // ---------------------------------------------------------------------------
 // Conventional PMI

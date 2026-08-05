@@ -41,7 +41,7 @@ state, it relocated to where the work is not.
 
 ```
 npm install
-npm test          # 272 tests, under a second, no framework
+npm test          # 277 tests, under a second, no framework
 npm run dev       # eleventy on :8080 (no /api, the rate fetch falls back)
 npm run typecheck
 npm run build
@@ -85,6 +85,8 @@ date and an honest `kind`. Several data files are generated rather than typed:
 npm run data:loan-limits   # FHFA conforming limits, annually each November
 npm run data:insurance     # California FAIR Plan by county, quarterly
 npm run data:history       # FHFA by county + Zillow anchors + Census income
+npm run data:fha-limits    # HUD's FHA county limits, annually each December
+npm run data:fonts         # the two typefaces, so nothing loads from Google
 npm run data:panel         # 20 metros, for the forecaster
 ```
 
@@ -121,6 +123,8 @@ data files, which come from other people and carry their own terms:
 | House price history | FHFA (metro + county) | US government work, public domain |
 | Price anchors | Zillow ZHVI | free, non-commercial, attribution |
 | County incomes | Census SAIPE | US government work, public domain |
+| FHA county limits | HUD CHUMS | US government work, public domain |
+| Fraunces, IBM Plex Mono | Undercase Type, IBM | SIL Open Font License 1.1 |
 | **Forecaster panel** | **S&P Case-Shiller via FRED** | **see below** |
 
 `data/panel.json` contains S&P CoreLogic Case-Shiller index values for 20 metros.

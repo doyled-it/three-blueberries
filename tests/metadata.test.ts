@@ -232,3 +232,54 @@ test("REGRESSION: reading measures are absolute, not a multiple of the font size
     assert.match(block, /max-width: var\(--measure\)/, `${selector} does not use the shared measure`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// The privacy claim has to be literally true, not nearly true
+// ---------------------------------------------------------------------------
+
+test("the built page makes no third-party request", () => {
+  const html = fs.readFileSync("_site/index.html", "utf8");
+  const css = fs.readFileSync("_site/assets/css/main.css", "utf8");
+
+  // Anything that FETCHES from another origin. An <a href> is a link the reader
+  // chooses to follow and a rel="canonical" is metadata; a stylesheet, preload,
+  // script, image or CSS url() is a request their browser makes without being
+  // asked, which is the thing the footer denies.
+  const FETCHING_RELS = /\b(stylesheet|preload|preconnect|dns-prefetch|prefetch|modulepreload|icon|apple-touch-icon|manifest)\b/;
+  const fetching = [
+    ...[...html.matchAll(/<link\b([^>]*)>/g)]
+      .filter((m) => FETCHING_RELS.test(m[1]!))
+      .map((m) => /\bhref="(https?:\/\/[^"]+)"/.exec(m[1]!)?.[1])
+      .filter((u): u is string => Boolean(u)),
+    ...[...html.matchAll(/<(?:script|img|iframe)\b[^>]*\bsrc="(https?:\/\/[^"]+)"/g)].map((m) => m[1]!),
+    ...[...css.matchAll(/url\(\s*["']?(https?:\/\/[^"')]+)/g)].map((m) => m[1]!),
+  ];
+
+  assert.deepEqual(fetching, [], `the page fetches from other origins: ${fetching.join(", ")}`);
+
+  // Named directly, because "no third-party request" is easy to break by
+  // pasting a font or analytics snippet back in. Comments are stripped first:
+  // the stylesheet explains at length why these hosts are NOT here, and that
+  // explanation is the reason they stay gone.
+  const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "");
+  for (const host of ["fonts.googleapis.com", "fonts.gstatic.com", "google-analytics", "googletagmanager"]) {
+    assert.ok(!code(html).includes(host), `${host} is back in the HTML`);
+    assert.ok(!code(css).includes(host), `${host} is back in the stylesheet`);
+  }
+});
+
+test("the fonts the stylesheet asks for are actually shipped", () => {
+  const css = fs.readFileSync("_site/assets/css/main.css", "utf8");
+  const referenced = [...css.matchAll(/url\("(\/assets\/fonts\/[^"]+)"\)/g)].map((m) => m[1]!);
+  assert.ok(referenced.length >= 4, `expected four self-hosted faces, found ${referenced.length}`);
+  for (const href of referenced) {
+    assert.ok(fs.existsSync(`_site${href}`), `${href} is declared but not built`);
+  }
+  // A preload for a file that does not exist is a wasted round trip and a
+  // console warning on every view.
+  const html = fs.readFileSync("_site/index.html", "utf8");
+  for (const m of html.matchAll(/<link rel="preload" href="([^"]+)"/g)) {
+    assert.ok(fs.existsSync(`_site${m[1]}`), `preloaded ${m[1]} is not built`);
+    assert.ok(referenced.includes(m[1]!), `preloaded ${m[1]} is not used by the stylesheet`);
+  }
+});

@@ -71,7 +71,18 @@ export const SOURCES = {
     asOf: "2025-12-11",
     kind: "published",
     caveat:
-      "Only the national floor ($541,287) and ceiling ($1,249,125) for a one-unit property are shipped here. FHA's per-county limit sits between them and is derived from HUD's area median sale price, which is not published as a machine-readable file. Look your county up at entp.hud.gov rather than assuming either bound applies.",
+      "Sets the national floor ($541,287, being 65% of the conforming baseline) and ceiling ($1,249,125, being 150% of it) for a one-unit property. The per-county figures come from the CHUMS master file below.",
+  },
+
+  "hud-chums-fha-limits": {
+    id: "hud-chums-fha-limits",
+    title: "CY2026 FHA Forward Mortgage Limits (CHUMS master file)",
+    publisher: "U.S. Department of Housing and Urban Development",
+    url: "https://apps.hud.gov/pub/chums/file_layouts.html",
+    asOf: "2026-01-01",
+    kind: "published",
+    caveat:
+      "FHA's county limits are a DIFFERENT table from FHFA's conforming limits and are frequently much lower: Stanislaus is $832,750 conforming and $545,100 FHA. Both are 115% of the area median sale price capped at 150% of the conforming baseline, but FHFA floors at the baseline while FHA floors at 65% of it. A loan can clear conforming and fail FHA.",
   },
 
   "va-funding-fee": {
