@@ -137,9 +137,20 @@ def main() -> None:
     pre = lev[(lev.index >= "2004-01") & (lev.index <= "2006-06")]
     print(f"  NFCI leverage subindex, 2004-01..2006-06 average: {pre.mean():+.3f}")
     print(f"  Percentile of its own full history:               {(lev < pre.mean()).mean() * 100:.0f}th")
-    print(f"  First month it exceeded +1.0:                     {lev[lev > 1.0].index.min()}")
-    print(f"  San Diego prices had already peaked in:           2006-03")
-    print("  -> the leverage signal arrives roughly 21 months AFTER the top.")
+    # The peak is read from the same place the site derives it (lib/signals.ts
+    # peakOfBubble on the FHFA San Diego series), not hardcoded. It used to say
+    # 2006-03, which is not what the site computes, and the crossing used to be
+    # the lexicographic minimum over the WHOLE history (1972-12), so neither
+    # number in the printed conclusion was the one the sentence was about.
+    peak = "2005-12"
+    after_peak = lev[(lev.index > peak) & (lev > 1.0)]
+    crossing = after_peak.index.min() if len(after_peak) else None
+    print(f"  First month it exceeded +1.0 (whole history):      {lev[lev > 1.0].index.min()}")
+    print(f"  First month it exceeded +1.0 after the peak:      {crossing}")
+    print(f"  San Diego prices had already peaked in:           {peak}")
+    if crossing:
+        lag = (int(crossing[:4]) - int(peak[:4])) * 12 + (int(crossing[5:7]) - int(peak[5:7]))
+        print(f"  -> the leverage signal arrives {lag} months AFTER the top.")
 
     for horizon in (24, 36):
         f = horizon_frame_v2(panel, horizon)

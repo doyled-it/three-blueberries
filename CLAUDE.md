@@ -152,14 +152,23 @@ reached. **If you can't write that sentence, don't ship the number.** The UI ren
   That's what the Homeowners Protection Act actually says, and buyers routinely believe otherwise.
 - **FHA MIP duration turns on the down payment, not on equity.** Under 10% down means life of
   loan with no equity exit. This gets a `warning`, not just a note.
-- **VA gets the residual income test, not just DTI.** California is in the West region, which
-  has the highest minimums in the country. VA's 41% DTI is a guideline, not a cap. A VA
-  borrower can be approved well past it if residual income clears.
+- **VA gets the residual income test, not just DTI, and residual income GOVERNS.** California is
+  in the West region, which has the highest minimums in the country. VA's 41% DTI is a guideline
+  with no cap behind it. For a long time the engine reported the residual test and then enforced
+  41% as a gate anyway, so a borrower at 45.2% DTI with $4,091 residual against a $990 requirement
+  was failed and told they needed more income than they earn. `Qualification.passesDti` is now the
+  loan's ACTUAL qualifying test and `dtiIsGuideline` says when the ratio is advisory.
 - **The affordability search is a binary search**, because price feeds back into tax, insurance,
   PMI band, and the jumbo threshold. There's no closed form.
 - **Known limitation:** the affordability search does not apply a jumbo rate premium when the
-  answer crosses the conforming limit. The scenario warns about jumbo status, but the rate
-  used is still the conforming one. Fix this before trusting max-price answers near the limit.
+  answer crosses the conforming limit, so an answer above the limit is an upper bound. This is now
+  SAID ON THE PAGE rather than only here: `maxAffordablePrice` returns `warnings`, and the browser
+  renders them. It used to compute them and throw them away, which made the limitation invisible on
+  the one number people screenshot.
+- **An FHA loan is never a jumbo, and the conforming limit is not its limit.** FHA sets its own
+  county limits. We ship HUD's national floor and ceiling from ML 2025-23 in `FHA_LIMITS` and send
+  the reader to HUD's lookup for the county figure, because that number is derived from area median
+  sale price and is not published as a clean machine-readable file. Do not invent it.
 - **The supplemental tax bill warning fires on every scenario.** It is not modeled numerically
   because that requires the seller's old assessed value, which we don't have. Do not fake it.
 
@@ -195,6 +204,35 @@ is the widest claim that is true everywhere.
 
 **Buying power has not fallen everywhere.** Down 23% in San Diego, UP 27% in Fresno. Any copy
 about the thesis has to handle both directions; `buyingPowerVerdict` does, and a test pins it.
+
+### Prose is data too, and it rots the same way
+
+A multi-agent audit in August 2026 ran every panel by **executing the code** rather than reading
+it, and turned up 91 findings. Almost none were arithmetic. They were sentences that were true
+when they were written and became false when the data underneath moved, mostly at the point every
+county got its own history. The pattern is worth internalising because it will happen again:
+
+- **A number written into a string is a number nobody will ever update.** "The milder of the two
+  declines on record" (17 counties have one, 16 have three), "the 2008 crash was 42%" (24 counties
+  fell further), "74 months, twice as long as 2006-09" (San Diego's own figures are 63 and 1.6x),
+  "n=449" (a monthly-series figure on a quarterly series). Every one of these is now derived.
+- **The tests pinned the wording, so they passed.** `assert.match(basis, /milder/i)` went green for
+  months while the sentence was wrong in 34 counties. A test that asserts prose must assert the
+  prose against the DATA, not against itself. The new tests in `tests/counties.test.ts` sweep all
+  58 and check that no reading names a year that is not that county's own peak or trough.
+- **Errors that flatter the argument are the ones to hunt.** The audit tagged every finding with
+  `flattersTheArgument`, and roughly half did. The buying-power caveat had the direction of its own
+  bias backwards. The forecaster verdict quoted the WORST model's 2008 prediction rather than the
+  best one. "The anchor moves the dollar axis and nothing else" told a sceptical reader not to
+  interrogate the input that sets the panel's biggest stat. None of these were arithmetic mistakes
+  and all of them shaded the same way.
+- **A slider that cannot reach its own preset clamps silently.** Merced's worst decline is 65.7%
+  and the depth slider stopped at 50. Butte's twenty-year appreciation is -1.4% and the slider
+  floored at 0. Both produced a plausible wrong number rather than an error. Widen bounds at render
+  time from whatever the data contains.
+- **Two inputs for the same quantity will disagree.** The page asked for rent twice and defaulted
+  them to $2,750 and $3,290, and the higher one drove the waiting verdict. Mirror one from the
+  other unless the reader deliberately changes it.
 
 ### The sharpest claim on the site: `lib/where-it-works.ts`
 
@@ -330,9 +368,10 @@ Mac's 30-year average. See section 5 for the sources and the 1991 splice.
 
 **Two findings from this data that must not be flattened in the UI:**
 
-1. **Price is not payment.** A 2021 peak buyer paid about what a 2006 peak buyer paid, because
-   the rate was 2.84% instead of 6.24%. Any "wait for prices to drop" framing that ignores rates
-   is wrong.
+1. **Price is not payment.** A 2021 peak buyer in San Diego paid about what a 2006 peak buyer
+   paid, because the rate was 2.84% instead of 6.24%. Any "wait for prices to drop" framing that
+   ignores rates is wrong. Those two figures are **San Diego's**, so the UI derives the equivalent
+   pair from the selected county rather than printing them.
 2. **Prop 13 raises the break-even rate.** At a 20% crash, P&I at 9% roughly cancels 6.66%, but
    the permanently lower assessed value still tips the decision toward waiting. This surprised
    the model's author and there is a test pinning it (`Prop 13 pushes the break-even rate higher`).
