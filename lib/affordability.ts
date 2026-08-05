@@ -18,7 +18,7 @@ export interface AffordabilityResult {
   /** The full evaluated scenario at that price. */
   scenario: ScenarioResult;
   /** Which constraint stopped you from affording more. */
-  bindingConstraint: "dti" | "residual-income" | "none";
+  bindingConstraint: "dti" | "residual-income" | "fha-limit" | "none";
   /** Cash you need on hand at that price. */
   cashRequired: number;
   /**
@@ -40,6 +40,15 @@ export interface AffordabilityResult {
 function passes(result: ScenarioResult): boolean {
   if (!result.qualification.passesDti) return false;
   if (result.qualification.residualIncome && !result.qualification.residualIncome.passes) return false;
+  // FHA's county limit is a HARD stop, not a warning. Over it the loan is not an
+  // FHA loan at all, so a search that only tested income would happily report a
+  // price the program cannot finance: a Fresno household on $200,000 was told
+  // $882,000 when FHA caps their loan at $541,287, about $561,000 of house.
+  //
+  // The conforming limit is deliberately NOT treated this way. Exceeding it
+  // makes a loan a jumbo, which is a worse rate and stricter underwriting, not
+  // an impossibility.
+  if (result.input.loanType === "fha" && result.loan.exceedsFhaLimit) return false;
   return true;
 }
 
@@ -72,7 +81,7 @@ export function maxAffordablePrice(
     return {
       maxPurchasePrice: 0,
       scenario: atFloor,
-      bindingConstraint: atFloor.qualification.passesDti ? "residual-income" : "dti",
+      bindingConstraint: bindingFor(atFloor),
       cashRequired: atFloor.cashToClose.total,
       downPercent: atFloor.loan.downPaymentPercent,
       warnings: atFloor.warnings,
@@ -107,10 +116,7 @@ export function maxAffordablePrice(
 
   // Identify what actually stopped us by probing just above the boundary.
   const justAbove = at(price + tolerance * 4);
-  let bindingConstraint: AffordabilityResult["bindingConstraint"] = "dti";
-  if (justAbove.qualification.passesDti && justAbove.qualification.residualIncome?.passes === false) {
-    bindingConstraint = "residual-income";
-  }
+  const bindingConstraint = bindingFor(justAbove);
 
   return {
     maxPurchasePrice: price,
@@ -125,6 +131,18 @@ export function maxAffordablePrice(
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 /**
+ * Which test a failing scenario failed. Order matters: the FHA limit is checked
+ * first because it is absolute, where the income tests are about this household
+ * and could be fixed by earning more or owing less.
+ */
+function bindingFor(result: ScenarioResult): AffordabilityResult["bindingConstraint"] {
+  if (result.input.loanType === "fha" && result.loan.exceedsFhaLimit) return "fha-limit";
+  if (!result.qualification.passesDti) return "dti";
+  if (result.qualification.residualIncome?.passes === false) return "residual-income";
+  return "none";
+}
+
+/**
  * The scenario's own warnings, plus the two the SEARCH introduces and the
  * scenario cannot know about: the jumbo rate limitation, and the deposit
  * thinning below 20% because the price moved and the cash did not.
@@ -133,6 +151,13 @@ function withSearchCaveats(scenario: ScenarioResult): readonly string[] {
   const out = [...scenario.warnings];
   const down = scenario.loan.downPaymentPercent;
   const downPayment = scenario.loan.downPaymentAmount;
+
+  if (scenario.input.loanType === "fha" && scenario.loan.baseLoanAmount >= scenario.loan.fhaLimit - 1000) {
+    out.push(
+      `This answer is capped by FHA's ${money(scenario.loan.fhaLimit)} limit for ${scenario.input.county} County, not by what ` +
+        `you earn. A conventional loan would let you go higher on the same income, at the cost of a bigger deposit.`
+    );
+  }
 
   if (scenario.loan.exceedsConformingLimit) {
     out.push(

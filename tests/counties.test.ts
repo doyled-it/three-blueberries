@@ -378,3 +378,77 @@ test("an FHA loan under its county limit gets no limit warning at all", () => {
   assert.ok(!result.loan.exceedsFhaLimit);
   assert.ok(!result.warnings.some((w) => /limit/i.test(w) && /FHA/.test(w)));
 });
+
+// The search only ever tested income, so an FHA borrower with plenty of it was
+// told they could buy a house FHA will not finance. Fresno on $200,000 reported
+// $882,000 against a limit that tops out around $561,000 of house.
+test("REGRESSION: the affordability search treats the FHA limit as a hard stop", () => {
+  const base: ScenarioInput = {
+    ...input("Fresno"),
+    loanType: "fha",
+    downPayment: { kind: "percent", value: 0.035 },
+    fha: { financeUpfrontMip: true },
+    household: { grossAnnualIncomes: [200_000], monthlyDebts: 400, size: 2 },
+  };
+
+  const afford = maxAffordablePrice(base);
+  assert.ok(!afford.scenario.loan.exceedsFhaLimit, "the answer must be financeable with an FHA loan");
+  assert.equal(afford.bindingConstraint, "fha-limit");
+  assert.ok(
+    afford.maxPurchasePrice < 600_000,
+    `FHA caps Fresno around $561k of house, got $${afford.maxPurchasePrice}`
+  );
+  assert.ok(
+    afford.warnings.some((w) => /capped by FHA's/.test(w)),
+    "must say the cap is the program's, not the household's"
+  );
+
+  // The same household on a conventional loan is limited by income instead, and
+  // can go considerably higher. That contrast is the point.
+  const conventional = maxAffordablePrice({ ...base, loanType: "conventional" });
+  assert.equal(conventional.bindingConstraint, "dti");
+  assert.ok(conventional.maxPurchasePrice > afford.maxPurchasePrice);
+});
+
+test("every county's FHA affordability answer is actually financeable", () => {
+  for (const county of CA_COUNTIES) {
+    const afford = maxAffordablePrice({
+      ...input(county),
+      loanType: "fha",
+      downPayment: { kind: "percent", value: 0.035 },
+      fha: { financeUpfrontMip: true },
+      household: { grossAnnualIncomes: [400_000], monthlyDebts: 0, size: 1 },
+    });
+    assert.ok(
+      afford.scenario.loan.baseLoanAmount <= fhaLimitFor(county),
+      `${county}: search returned a $${afford.maxPurchasePrice} answer whose loan exceeds FHA's $${fhaLimitFor(county)}`
+    );
+  }
+});
+
+test("every county's FHA note describes that county's actual situation", () => {
+  for (const county of CA_COUNTIES) {
+    const result = evaluateScenario({
+      ...input(county),
+      loanType: "fha",
+      purchasePrice: 500_000,
+      downPayment: { kind: "percent", value: 0.035 },
+      fha: { financeUpfrontMip: true },
+    });
+    const note = result.qualification.notes.find((n) => /FHA caps your loan/.test(n));
+    assert.ok(note, `${county} has no FHA limit note`);
+
+    const limit = fhaLimitFor(county);
+    const conforming = conformingLimitFor(county);
+
+    // It must not claim a difference from conforming that does not exist, and
+    // must not claim they match when they do not.
+    if (limit === conforming) assert.match(note!, /happens to match the conforming limit/);
+    else assert.match(note!, /SEPARATE limit/);
+
+    // The 115%-of-median explanation is only true between the two bounds.
+    if (limit >= FHA_NATIONAL_CEILING) assert.match(note!, /national ceiling/);
+    else if (limit <= FHA_NATIONAL_FLOOR) assert.match(note!, /national floor/);
+    else assert.match(note!, /115% of the county's median/);
+  }
+});

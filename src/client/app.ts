@@ -266,7 +266,13 @@ function render(): void {
           ? `On ${money(haveIncome)}/year, ${
               afford.bindingConstraint === "none"
                 ? "and nothing here binds: this is the top of the search range, not a limit you hit"
-                : `limited by ${afford.bindingConstraint === "residual-income" ? "VA residual income" : "debt-to-income"}`
+                : `limited by ${
+                    afford.bindingConstraint === "residual-income"
+                      ? "VA residual income"
+                      : afford.bindingConstraint === "fha-limit"
+                        ? `FHA's loan limit for this county, not by your income`
+                        : "debt-to-income"
+                  }`
             }. Needs ${money(afford.cashRequired)} cash` +
             (afford.downPercent < 0.2 && input.loanType === "conventional"
               ? `, and at that price your deposit is only ${pct(afford.downPercent, 1)} down, so the answer carries PMI.`

@@ -28,6 +28,7 @@ import {
 import {
   DTI_CEILINGS,
   FHA_NATIONAL_CEILING,
+  FHA_NATIONAL_FLOOR,
   FHA_UPFRONT_MIP_RATE,
   fhaLimitFor,
   PMI_AUTO_TERMINATION_LTV,
@@ -467,6 +468,34 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
   if (input.household.grossAnnualIncomes.length > 1) {
     notes.push(
       `Both incomes count, and so does both people's debt. Two earners raise the ceiling; they don't halve the payment.`
+    );
+  }
+
+  // FHA's limit is pegged to the county's own median sale price, which is not
+  // obvious and changes what the program is FOR. It is not "you cannot use FHA
+  // in an expensive county"; it is "FHA will not take you far above the middle
+  // of whatever market you are in".
+  if (input.loanType === "fha") {
+    const maxPrice = loan.fhaLimit / 0.965;
+    const atCeiling = loan.fhaLimit >= FHA_NATIONAL_CEILING;
+    const atFloor = loan.fhaLimit <= FHA_NATIONAL_FLOOR;
+    notes.push(
+      `FHA caps your loan at ${money(loan.fhaLimit)} in ${input.county} County, about ${money(maxPrice)} of house at the ` +
+        `3.5% minimum down. ` +
+        (loan.fhaLimit === loan.conformingLimit
+          ? `That happens to match the conforming limit here, but they are separate tables and in most of California ` +
+            `FHA's is the lower of the two.`
+          : `That is a SEPARATE limit from the ${money(loan.conformingLimit)} conforming one, and it is ` +
+            `${money(loan.conformingLimit - loan.fhaLimit)} lower.`) +
+        " " +
+        (atCeiling
+          ? `${input.county} is at FHA's national ceiling, the most the program will insure anywhere, so this is as far ` +
+            `as FHA goes no matter how expensive the county gets.`
+          : atFloor
+            ? `${input.county} is at FHA's national floor, the least it will insure anywhere. HUD sets a county at 115% ` +
+              `of its median sale price and this county's median is low enough that the floor takes over.`
+            : `HUD sets it at 115% of the county's median sale price, so it moves with your local market rather than ` +
+              `ruling out expensive places outright. What it rules out is buying well above the middle of your own county.`)
     );
   }
 
