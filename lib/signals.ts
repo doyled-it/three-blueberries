@@ -27,7 +27,7 @@ import {
   SIGNALS_INCOME_LAST_YEAR,
   type SignalRow,
 } from "./data/signals.ts";
-import { DEFAULT_ANCHOR_PRICE } from "./history.ts";
+import { DEFAULT_ANCHOR_PRICE, findDrawdowns } from "./history.ts";
 
 const LONG_MONTHS = [
   "",
@@ -191,9 +191,13 @@ export interface SignalReading {
   label: string;
   now: number | null;
   unit: string;
-  /** What this read at the 2006 peak. */
+  /**
+   * What this read at the county's OWN bubble peak. The month is in
+   * `peakMonth`: it is 2006 in 40 counties and something else in the other 18,
+   * so nothing may label this column "2006".
+   */
   at2006Peak: number | null;
-  /** What this read at the 2009 trough. */
+  /** What this read at the county's own bust trough. See `troughMonth`. */
   at2009Trough: number | null;
   /** "bearish" = leaning toward prices falling; "bullish" = leaning against. */
   lean: "bearish" | "bullish" | "neutral";
@@ -246,6 +250,10 @@ export function crashSignals(
   anchorPrice?: number
 ): {
   readings: SignalReading[];
+  /** The county's own bubble peak, for labelling the comparison column. */
+  peakMonth: string;
+  /** The county's own bust trough. Not 2009 in 54 of 58 counties. */
+  troughMonth: string;
   summary: string;
   caveats: string[];
 } {
@@ -254,6 +262,18 @@ export function crashSignals(
   const at = (month: string) => series.find((p) => p.month === month);
   const PEAK_2006 = peakOfBubble(county);
   const TROUGH_2009 = troughOfBust(county);
+  const peakYear = PEAK_2006.slice(0, 4);
+  const troughYear = TROUGH_2009.slice(0, 4);
+
+  // How many declines this county actually has. "Both declines on record" is
+  // wrong in the 17 counties with one and the 16 with three.
+  const declineCount = findDrawdowns(10, county).length;
+  const declinePhrase =
+    declineCount === 1
+      ? "the one decline on record"
+      : declineCount === 2
+        ? "both declines on record"
+        : `all ${declineCount} declines on record`;
 
   const nowMonth = latest.month;
   const supplyNow = asOf(NEW_HOME_SUPPLY, nowMonth);
@@ -269,8 +289,24 @@ export function crashSignals(
       at2006Peak: (at(PEAK_2006)?.paymentToIncome ?? 0) * 100,
       at2009Trough: (at(TROUGH_2009)?.paymentToIncome ?? 0) * 100,
       lean: "bearish",
-      reading:
-        "About what it cost at the 2006 peak, relative to income. This stretched has preceded both declines on record, and also persisted for years before either broke.",
+      // "About what it cost at the 2006 peak" was hardcoded prose printed over
+      // per-county numbers that contradicted it, and "both declines" is wrong in
+      // the 17 counties with one and the 16 with three.
+      reading: (() => {
+        const then = (at(PEAK_2006)?.paymentToIncome ?? 0) * 100;
+        const now = latest.paymentToIncome * 100;
+        const gap = then > 0 ? now / then - 1 : 0;
+        const versus =
+          Math.abs(gap) < 0.05
+            ? `About what it cost at the ${peakYear} peak`
+            : gap > 0
+              ? `${(gap * 100).toFixed(0)}% MORE than it cost at the ${peakYear} peak`
+              : `${(-gap * 100).toFixed(0)}% less than it cost at the ${peakYear} peak`;
+        return (
+          `${versus}, relative to income. This stretched has preceded ${declinePhrase}, and also persisted for years ` +
+          `before ${declineCount === 1 ? "it" : "any of them"} broke.`
+        );
+      })(),
     },
     {
       key: "priceToIncome",
@@ -284,12 +320,25 @@ export function crashSignals(
       // which was true at one anchor price and printed directly above a card
       // showing a different number at any other.
       reading: (() => {
+        const peak = at(PEAK_2006)?.priceToIncome;
         const trough = at(TROUGH_2009)?.priceToIncome;
-        if (!trough) return "Near the 2006 peak multiple.";
+        const head =
+          peak === undefined
+            ? ""
+            : latest.priceToIncome >= peak
+              ? `Above the ${peakYear} peak multiple of ${peak.toFixed(1)}x. `
+              : `Below the ${peakYear} peak multiple of ${peak.toFixed(1)}x. `;
+        if (!trough) return head || `No comparison available for this county.`;
         const fall = 1 - trough / latest.priceToIncome;
+        // A trough multiple ABOVE today's prints a negative "decline", which is
+        // a rise. Say which it is.
         return (
-          `Near the 2006 peak multiple. The 2009 trough took it back to ${trough.toFixed(1)}x, ` +
-          `which is what a ${(fall * 100).toFixed(0)}% decline looks like from here.`
+          head +
+          (fall >= 0
+            ? `The ${troughYear} trough took it back to ${trough.toFixed(1)}x, which is what a ${(fall * 100).toFixed(0)}% ` +
+              `decline looks like from here.`
+            : `The ${troughYear} trough was ${trough.toFixed(1)}x, HIGHER than today, so getting back there would mean ` +
+              `prices rising ${(-fall * 100).toFixed(0)}% relative to income, not falling.`)
         );
       })(),
     },
@@ -301,8 +350,31 @@ export function crashSignals(
       at2006Peak: asOf(NEW_HOME_SUPPLY, PEAK_2006),
       at2009Trough: asOf(NEW_HOME_SUPPLY, TROUGH_2009),
       lean: "bearish",
-      reading:
-        "Above where it sat at the 2006 peak and near 2009 levels. Of everything here, this has the strongest historical link to what prices did next.",
+      // Both halves of this used to be asserted. "Above the 2006 peak and near
+      // 2009 levels" is false against the card's own numbers in most counties,
+      // and "the strongest historical link" is wrong in four.
+      reading: (() => {
+        const peak = asOf(NEW_HOME_SUPPLY, PEAK_2006);
+        const trough = asOf(NEW_HOME_SUPPLY, TROUGH_2009);
+        const vs = (label: string, then: number | null) =>
+          then === null || supplyNow === null
+            ? null
+            : supplyNow > then * 1.05
+              ? `above ${label}`
+              : supplyNow < then * 0.95
+                ? `below ${label}`
+                : `about level with ${label}`;
+        const parts = [vs(`its ${peakYear} peak reading`, peak), vs(`${troughYear}`, trough)].filter(Boolean);
+        const strongest = leadingIndicators(24, county, anchorPrice).reduce((a, b) =>
+          Math.abs(b.r) > Math.abs(a.r) ? b : a
+        );
+        return (
+          (parts.length ? `Currently ${parts.join(" and ")}. ` : "") +
+          (strongest.key === "supply"
+            ? `Of everything here, this has the strongest historical link to what prices did next in ${county} County.`
+            : `In ${county} County the strongest historical link is ${strongest.label.toLowerCase()}, not this one.`)
+        );
+      })(),
       caveat:
         "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply. The market you actually shop, is around 4.6 months.",
     },
@@ -314,8 +386,21 @@ export function crashSignals(
       at2006Peak: asOf(MORTGAGE_DELINQUENCY, PEAK_2006),
       at2009Trough: asOf(MORTGAGE_DELINQUENCY, TROUGH_2009),
       lean: "bullish",
-      reading:
-        "Near historic lows, and the strongest argument that this isn't 2008. A crash needs forced sellers; borrowers locked into cheap fixed rates aren't defaulting, so the distressed supply that drove the last collapse doesn't exist.",
+      // "Near historic lows" was asserted while 21% of the record sits lower and
+      // the peak-year reading was lower still. Derive the percentile.
+      reading: (() => {
+        const lower = delinqNow === null ? 0 : MORTGAGE_DELINQUENCY.filter((r) => r[1] < delinqNow).length;
+        const share = MORTGAGE_DELINQUENCY.length ? lower / MORTGAGE_DELINQUENCY.length : 0;
+        const peak = asOf(MORTGAGE_DELINQUENCY, PEAK_2006);
+        return (
+          `Lower than ${((1 - share) * 100).toFixed(0)}% of the record` +
+          (peak !== null && delinqNow !== null && peak < delinqNow
+            ? `, though the ${peakYear} peak itself read lower still at ${peak.toFixed(2)}%. `
+            : `. `) +
+          `Still the strongest argument that this isn't 2008: a crash needs forced sellers, and borrowers locked into ` +
+          `cheap fixed rates aren't defaulting, so the distressed supply that drove the last collapse doesn't exist.`
+        );
+      })(),
     },
     {
       key: "unemployment",
@@ -324,24 +409,53 @@ export function crashSignals(
       unit: "%",
       at2006Peak: asOf(CA_UNEMPLOYMENT, PEAK_2006),
       at2009Trough: asOf(CA_UNEMPLOYMENT, TROUGH_2009),
-      lean: "bullish",
-      reading:
-        "Low. Job losses turn a slowdown into a cascade, people sell because they must. It also decides whether you could buy a dip: you have to still be employed at the bottom.",
+      // "Low" and bullish while sitting ABOVE the peak-year reading in 51
+      // counties is not a read, it is a label. Derive the lean too.
+      lean: (() => {
+        const peak = asOf(CA_UNEMPLOYMENT, PEAK_2006);
+        return peak !== null && unempNow !== null && unempNow > peak * 1.1 ? "neutral" : "bullish";
+      })(),
+      reading: (() => {
+        const peak = asOf(CA_UNEMPLOYMENT, PEAK_2006);
+        const head =
+          peak === null || unempNow === null
+            ? ""
+            : unempNow > peak * 1.1
+              ? `At ${unempNow.toFixed(1)}%, higher than the ${peak.toFixed(1)}% California carried into the ${peakYear} peak. `
+              : `At ${unempNow.toFixed(1)}%, at or below the ${peak.toFixed(1)}% California carried into the ${peakYear} peak. `;
+        return (
+          head +
+          `Job losses turn a slowdown into a cascade: people sell because they must. It also decides whether you could ` +
+          `buy a dip, because you have to still be employed at the bottom. This series is STATEWIDE California, not ` +
+          `${county} County.`
+        );
+      })(),
     },
   ];
 
   const summary =
-    "Valuation says stretched; credit says stable. Both prior declines needed stretched valuations AND a trigger. A recession in 1990, a credit collapse in 2008. Today the valuation is here and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.";
+    `Valuation says stretched; credit says stable. ${declinePhrase[0]!.toUpperCase()}${declinePhrase.slice(1)} needed ` +
+    `stretched valuations AND a trigger: a recession in 1990, a credit collapse in 2008. Today the valuation is here ` +
+    `and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.`;
 
   return {
     readings,
+    peakMonth: PEAK_2006,
+    troughMonth: TROUGH_2009,
     summary,
     caveats: [
-      `Two or three declines over 10% in fifty years is the entire sample. Any "formula" fitted to it is fitted to noise, including the correlations quoted here.`,
-      "Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat a reported n of 449 as closer to 19 real observations.",
-      "Supply and delinquency are national; only unemployment is San Diego. Income is statewide California, annual, ending " +
+      `${declineCount === 1 ? "One decline" : `${declineCount} declines`} over 10% in ${county} County's whole record is the entire sample. Any "formula" fitted to it is fitted to noise, including the correlations quoted here.`,
+      // The n was quoted as 449, a monthly-series figure no indicator produces
+      // now that the series is quarterly or annual. Derive both numbers.
+      (() => {
+        const c = leadingIndicators(24, county, anchorPrice)[0];
+        return c
+          ? `Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat the reported n of ${c.observations} as closer to ${c.effectiveObservations} real observations.`
+          : "Forward correlations use overlapping windows, which inflates the apparent sample size.";
+      })(),
+      "Supply and delinquency are national, and unemployment is STATEWIDE California, not your county. Income is statewide California too, annual, ending " +
         SIGNALS_INCOME_LAST_YEAR +
-        ", carried forward after that, which slightly overstates the burden.",
+        ", carried forward after that, which OVERSTATES the burden since incomes kept rising.",
       "Every indicator here is backward-looking. Markets turn on things that have not happened yet.",
     ],
   };
@@ -403,7 +517,7 @@ export function leadingIndicators(
     priceToIncome: "Price vs income",
     supply: "New-home months' supply",
     delinquency: "Mortgage delinquency",
-    unemployment: "San Diego unemployment",
+    unemployment: "California unemployment",
     rate: "Mortgage rate",
   };
 

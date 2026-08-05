@@ -6,7 +6,9 @@ import { CA_COUNTIES, conformingLimitFor, type CaCounty } from "../lib/data/ca-l
 import { countyTaxRate, hasCountySpecificTaxRate, DEFAULT_COUNTY_TAX_RATE } from "../lib/data/ca-property.ts";
 import { statutoryRentCap } from "../lib/data/ca-rent-cap.ts";
 import { countyScope } from "../lib/county-scope.ts";
-import { BUYING_POWER_CAVEAT, buyingPowerVerdict } from "../lib/buying-power.ts";
+import { BUYING_POWER_CAVEAT, buyingPowerCaveat, buyingPowerVerdict } from "../lib/buying-power.ts";
+import { crashSignals, leadingIndicators } from "../lib/signals.ts";
+import { crashPresets, findDrawdowns } from "../lib/history.ts";
 import { countyStanding, payTrap } from "../lib/where-it-works.ts";
 import { evaluateScenario } from "../lib/mortgage.ts";
 import { maxAffordablePrice } from "../lib/affordability.ts";
@@ -210,4 +212,105 @@ test("REGRESSION: the statewide-income panel says it is statewide", () => {
   const rising = buyingPowerVerdict("Fresno");
   assert.ok(!/incomes here have kept up/.test(rising.headline), "that claim needs local income, which that panel lacks");
   assert.match(rising.blueberries, /STATEWIDE/);
+});
+
+// ---------------------------------------------------------------------------
+// No county may be shown another county's numbers or another county's prose.
+//
+// An audit that executed the code rather than reading it found the same class of
+// bug in six separate panels: a string written when San Diego was the only
+// county, still printed to all 58. These pin the ones that were fixed.
+// ---------------------------------------------------------------------------
+
+test("no signal reading names a year that is not this county's own peak or trough", () => {
+  for (const county of CA_COUNTIES) {
+    const { readings, peakMonth, troughMonth } = crashSignals(county);
+    const peakYear = peakMonth.slice(0, 4);
+    const troughYear = troughMonth.slice(0, 4);
+    for (const r of readings) {
+      for (const year of r.reading.match(/\b(19|20)\d{2}\b/g) ?? []) {
+        assert.ok(
+          year === peakYear || year === troughYear || year === "1990" || year === "2008",
+          `${county}/${r.key} names ${year}; its peak is ${peakYear} and its trough is ${troughYear}`
+        );
+      }
+    }
+  }
+});
+
+test("the overlapping-window caveat quotes a sample size the indicators produce", () => {
+  for (const county of CA_COUNTIES) {
+    const { caveats } = crashSignals(county);
+    const quoted = caveats.find((c) => /overlapping/i.test(c));
+    assert.ok(quoted, `${county} lost its overlapping-window caveat`);
+    const n = leadingIndicators(24, county)[0]!.observations;
+    assert.match(quoted!, new RegExp(`\\b${n}\\b`), `${county} quotes an n no indicator produces`);
+  }
+});
+
+test("crash presets and the history panel are the same county's", () => {
+  for (const county of CA_COUNTIES) {
+    const presets = crashPresets(county);
+    const worst = Math.min(...findDrawdowns(10, county).map((d) => d.depthPercent));
+    const severe = presets.find((p) => p.id === "severe") ?? presets.find((p) => p.id === "mild")!;
+    assert.equal(
+      severe.depthPercent,
+      Math.round(Math.abs(worst)),
+      `${county}'s worst preset is not its worst decline`
+    );
+  }
+});
+
+test("the buying-power caveat states the county's own start year", () => {
+  for (const county of CA_COUNTIES) {
+    const caveat = buyingPowerCaveat(county);
+    const start = buyingPowerVerdict(county).first.month.slice(0, 4);
+    assert.match(caveat, new RegExp(`The record starts in ${start}`), `${county} caveat has the wrong start year`);
+  }
+});
+
+test("REGRESSION: the caveat never claims the anchor is free of consequences", () => {
+  const caveat = buyingPowerCaveat();
+  assert.ok(
+    !/anchor moves the dollar axis and nothing else/i.test(caveat),
+    "only the price line is anchored, so the anchor moves every dollar figure and the last-affordable date"
+  );
+  assert.match(caveat, /the anchor moves the GAP/);
+});
+
+test("VA borrowers are judged on residual income, not on the 41% guideline", () => {
+  // 45.2% DTI, but residual income clears comfortably. VA approves this.
+  const result = evaluateScenario({
+    ...input("San Diego"),
+    loanType: "va",
+    purchasePrice: 900_000,
+    downPayment: { kind: "amount", value: 0 },
+    va: { firstUse: true, disabilityExempt: false, financeFundingFee: true },
+    household: { grossAnnualIncomes: [200_000], monthlyDebts: 600, size: 3 },
+    squareFeet: 1500,
+  });
+  assert.ok(result.qualification.backEndDti > 0.41, "the setup needs to exceed the guideline");
+  assert.ok(result.qualification.residualIncome!.passes, "and clear residual income");
+  assert.ok(result.qualification.passesDti, "so the engine must not fail it");
+  assert.ok(result.qualification.dtiIsGuideline);
+  // And it must not demand more income than the household already earns.
+  assert.ok(
+    result.qualification.incomeRequiredAnnual < 200_000,
+    `asked for ${result.qualification.incomeRequiredAnnual} from a household earning 200,000`
+  );
+});
+
+test("an FHA loan is never called a jumbo", () => {
+  for (const county of ["San Diego", "Fresno", "Los Angeles"] as const) {
+    const result = evaluateScenario({
+      ...input(county),
+      loanType: "fha",
+      purchasePrice: 900_000,
+      downPayment: { kind: "percent", value: 0.035 },
+      fha: { financeUpfrontMip: true },
+    });
+    for (const w of result.warnings) {
+      assert.ok(!/jumbo/i.test(w), `${county}: FHA loan warned about being a jumbo`);
+    }
+  }
 });

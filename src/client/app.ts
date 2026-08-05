@@ -30,6 +30,7 @@ import {
   earliestCohortMonth,
   latestCohortMonth,
   BEST_REFI,
+  REFI_WINDOW,
 } from "../../lib/cohort.ts";
 import {
   crashSignals,
@@ -449,9 +450,14 @@ function renderCohort(input: ScenarioInput): void {
     return;
   }
 
+  // A 2020 or 2021 buyer bought INSIDE the cheap window, so telling them they
+  // were too late to catch it is backwards. Three cases, not two.
+  const boughtInWindow = purchaseMonth >= REFI_WINDOW.from && purchaseMonth <= REFI_WINDOW.to;
   const refiNote = c.refinancedMonth
     ? ` and refinanced their remaining balance to ${pct(c.effectiveRate)} in ${longMonth(c.refinancedMonth)}. The cheapest month on record`
-    : ` at ${pct(c.rateThen)}, too late to catch the 2020-21 refinance window`;
+    : boughtInWindow
+      ? ` at ${pct(c.rateThen)}, straight into the cheap-money window, so they never needed to refinance`
+      : ` at ${pct(c.rateThen)}, after the ${REFI_WINDOW.from.slice(0, 4)}-${REFI_WINDOW.to.slice(0, 4)} refinance window had closed`;
 
   $("cohort").innerHTML = `
     <div class="stat stat--wide">
@@ -622,6 +628,31 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 
+/**
+ * Move the three sliders onto an assumption set, widening them first.
+ *
+ * Butte's twenty-year appreciation is -1.4% and its last decade is 0.7%. A
+ * slider that floors at 0 silently clamps both, which is the same class of bug
+ * as the earlier 14.7%/12% clamp: the number the panel computes and the number
+ * it uses stop being the same number, with nothing on screen to say so.
+ */
+function applyAssumptionSet(set: { id: string; homeAppreciation: number; investmentReturn: number; rentGrowth: number; basis: string }): void {
+  const put = (id: string, value: number) => {
+    const el = $<HTMLInputElement>(id);
+    const scaled = Math.round(value * 1000);
+    if (scaled < Number(el.min)) el.min = String(scaled);
+    if (scaled > Number(el.max)) el.max = String(scaled);
+    el.value = String(scaled);
+  };
+  put("appreciation", set.homeAppreciation);
+  put("investReturn", set.investmentReturn);
+  put("rentGrowth", set.rentGrowth);
+  for (const b of document.querySelectorAll(".preset[data-assumptions]")) {
+    b.classList.toggle("preset--on", (b as HTMLElement).dataset["assumptions"] === set.id);
+  }
+  $("assumptionBasis").textContent = set.basis;
+}
+
 function renderRentVsBuy(input: ScenarioInput): void {
   const result = evaluateScenario(input);
 
@@ -650,26 +681,41 @@ function renderRentVsBuy(input: ScenarioInput): void {
   });
   const { base: sweepBase, costs: scaling, downPercent, closingCostRate } = bridge;
 
+  const r = compareRentVsBuy(bridge.itemised);
+
   const priceToRent = rent > 0 ? input.purchasePrice / (rent * 12) : Infinity;
   const ratioVerdict =
     priceToRent < 15
-      ? { label: "buying territory", cls: "stat--pass" }
+      ? { label: "buying territory", cls: "stat--pass", favours: "buy" }
       : priceToRent < 20
-        ? { label: "genuinely a toss-up", cls: "" }
-        : { label: "renting territory", cls: "stat--fail" };
+        ? { label: "genuinely a toss-up", cls: "", favours: "either" }
+        : { label: "renting territory", cls: "stat--fail", favours: "rent" };
+
+  // The heuristic and the model can disagree, and the page used to print both
+  // verdicts inches apart without acknowledging it: "renting territory" beside
+  // a chart saying buying wins in year six. Say which one to believe.
+  const modelSaysBuy = r.breakevenYear !== null && r.breakevenYear <= Number($<HTMLInputElement>("holdYears").value);
+  const disagrees =
+    (ratioVerdict.favours === "rent" && modelSaysBuy) || (ratioVerdict.favours === "buy" && !modelSaysBuy);
 
   $("rentRatio").innerHTML = `
-    <div class="stat stat--wide ${ratioVerdict.cls}">
+    <div class="stat stat--wide ${disagrees ? "" : ratioVerdict.cls}">
       <span class="stat__label">Price to rent</span>
       <span class="stat__value">${Number.isFinite(priceToRent) ? priceToRent.toFixed(1) + "x" : "n/a"}<span class="stat__unit"> ${ratioVerdict.label}</span></span>
       <span class="stat__note">
-        The purchase price divided by a year of your rent. Under 15 favours buying, over 20 favours renting, and it is
-        the single strongest predictor of which way this comes out. Yours: ${money(input.purchasePrice)} against
-        ${money(rent)}/month.
+        The purchase price divided by a year of your rent. Under 15 favours buying, over 20 favours renting. Yours:
+        ${money(input.purchasePrice)} against ${money(rent)}/month.
+        ${
+          disagrees
+            ? `That is a rule of thumb and it disagrees with the full comparison below, which ${
+                modelSaysBuy
+                  ? `has buying ahead by year ${r.breakevenYear}`
+                  : `never has buying catch up inside your horizon`
+              }. Believe the itemised one: the ratio ignores your rate, your deposit, mortgage insurance and the tax relief.`
+            : `The full comparison below agrees, and it is the one that counts the rate, the deposit and the tax relief.`
+        }
       </span>
     </div>`;
-
-  const r = compareRentVsBuy(bridge.itemised);
 
   const f = r.firstYear;
   $("burnCompare").innerHTML = `
@@ -740,8 +786,12 @@ function renderRentVsBuy(input: ScenarioInput): void {
   }
 
   $("rentBuyVerdict").textContent = r.verdict;
+  // Colour against the reader's OWN horizon, not a hardcoded ten years. Somebody
+  // who told the page they are staying twenty-five was shown a red verdict on a
+  // house that breaks even in year fourteen.
+  const readerHold = Number($<HTMLInputElement>("holdYears").value);
   $("rentBuyVerdict").className =
-    `verdict ${r.breakevenYear && r.breakevenYear <= 10 ? "verdict--yes" : "verdict--no"}`;
+    `verdict ${r.breakevenYear && r.breakevenYear <= readerHold ? "verdict--yes" : "verdict--no"}`;
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
   if ($("assumptionSets").dataset["county"] !== input.county) {
@@ -756,19 +806,20 @@ function renderRentVsBuy(input: ScenarioInput): void {
       (a) =>
         `<button type="button" class="preset${a.id === opening.id ? " preset--on" : ""}" data-assumptions="${a.id}">${a.label}</button>`
     ).join("");
-    $("assumptionBasis").textContent = opening.basis;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-assumptions]")) {
       button.addEventListener("click", () => {
         const set = assumptionSets(readInput().county).find((a) => a.id === button.dataset["assumptions"])!;
-        $<HTMLInputElement>("appreciation").value = String(Math.round(set.homeAppreciation * 1000));
-        $<HTMLInputElement>("investReturn").value = String(Math.round(set.investmentReturn * 1000));
-        $<HTMLInputElement>("rentGrowth").value = String(Math.round(set.rentGrowth * 1000));
-        for (const b of document.querySelectorAll(".preset[data-assumptions]")) b.classList.remove("preset--on");
-        button.classList.add("preset--on");
-        $("assumptionBasis").textContent = set.basis;
+        applyAssumptionSet(set);
         renderRentVsBuy(readInput());
       });
     }
+    // Changing the county used to relabel these buttons and rewrite the basis
+    // text, and leave the three sliders exactly where they were. San Diego's
+    // 6.5% then sat under a button reading "Long run" for a Butte reader whose
+    // long run is 3.3%.
+    applyAssumptionSet(opening);
+    renderRentVsBuy(input);
+    return;
   }
 
   // --- how long would you have to stay? ---
@@ -957,8 +1008,12 @@ function renderRentVsBuy(input: ScenarioInput): void {
     `Where the blue line sits below the orange one, buying wins over your horizon. California caps annual rent ` +
     `increases at ${pct(statutoryRentCap(input.county), 1)} in ${input.county} County under AB 1482 ` +
     `(5% plus the CPI for ${capRegion.label}, never above 10%), but that is a ceiling, not a forecast: most ` +
-    `sitting tenants see far less, and single-family homes, condos not owned by a corporation, and anything built ` +
-    `in the last 15 years are exempt entirely.`;
+    // Both conditions matter and both were dropped. A single-family home is only
+    // exempt if it is NOT corporate-owned AND the lease gave the required
+    // notice; without them the sentence exempts most of the rental stock.
+    `sitting tenants see far less. The exemptions are broad but conditional: a single-family home or condo is exempt ` +
+    `only if it is not owned by a corporation or REIT AND the lease carries the statutory exemption notice. New ` +
+    `construction is exempt for its first 15 years, which is a rolling window, not a fixed build date.`;
 
   // --- the savings treadmill ---
   const race = savingsRace({
@@ -1021,7 +1076,7 @@ function renderBuyingPower(county: CaCounty): void {
       },
       {
         key: "afford",
-        label: `What a median income could buy${unit}`,
+        label: `What a median CALIFORNIA income could buy${unit}`,
         color: SERIES_PAYMENT,
         points: series.map((p) => ({ month: p.month, value: p.affordablePrice })),
       },
@@ -1054,7 +1109,7 @@ function renderBuyingPower(county: CaCounty): void {
         },
         {
           key: "afford",
-          label: "A median income buys",
+          label: "A median CA income buys",
           color: SERIES_PAYMENT,
           points: series.map((p) => ({ month: p.month, value: p.affordablePrice })),
         },
@@ -1184,7 +1239,7 @@ function renderSignals(county: CaCounty): void {
   $("worstTime").textContent = verdict.answer;
   $("worstTime").className = `verdict ${verdict.rank === 1 ? "verdict--no" : "verdict--yes"}`;
 
-  const { readings, summary, caveats } = crashSignals(county);
+  const { readings, summary, caveats, peakMonth, troughMonth } = crashSignals(county);
   const fmt = (v: number | null, unit: string) =>
     v === null ? ", " : unit.startsWith("x") ? `${v.toFixed(1)}x` : `${v.toFixed(1)}${unit.startsWith("%") ? "%" : ""}`;
 
@@ -1198,8 +1253,8 @@ function renderSignals(county: CaCounty): void {
         </div>
         <span class="signal__value">${fmt(r.now, r.unit)}<span class="signal__unit">${r.unit.replace(/^[x%]\s*/, " ")}</span></span>
         <div class="signal__compare">
-          <span><em>2006 peak</em> ${fmt(r.at2006Peak, r.unit)}</span>
-          <span><em>2009 bottom</em> ${fmt(r.at2009Trough, r.unit)}</span>
+          <span><em>${peakMonth.slice(0, 4)} peak</em> ${fmt(r.at2006Peak, r.unit)}</span>
+          <span><em>${troughMonth.slice(0, 4)} bottom</em> ${fmt(r.at2009Trough, r.unit)}</span>
         </div>
         <p class="signal__reading">${r.reading}</p>
         ${r.caveat ? `<p class="line__warning">${r.caveat}</p>` : ""}
@@ -1298,7 +1353,9 @@ function renderForecast(): void {
         <span class="stat__value">${(r.current.gradientBoosting * 100).toFixed(1)}%<span class="stat__unit"> price change</span></span>
         <span class="stat__note">
           Crash probability ${(r.current.crashProbabilityGbm * 100).toFixed(0)}%.
-          Same model, judged on 2004-2006, said ${(r.classifier.preCrashProbability * 100).toFixed(0)}% right before prices fell.
+          Same model, judged on 2004-2006, said ${(r.classifier.preCrashProbability * 100).toFixed(0)}% right before
+          ${(r.classifier.preCrashActual * 100).toFixed(0)}% of those windows went on to fall 10% or more.
+          Case-Shiller San Diego, not your county.
         </span>
       </div>`
     )
@@ -1504,6 +1561,21 @@ function init(): void {
   for (const id of ["appreciation", "investReturn", "rentGrowth", "holdYears", "rentalIncome", "excludeRental"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => renderRentVsBuy(readInput()));
   }
+
+  // The page used to ask for rent twice and default the two to different numbers
+  // ($2,750 on the form, $3,290 here), and the higher one drove the waiting
+  // verdict, which made waiting look worse than the reader's own figure implies.
+  // Mirror the form's rent until they deliberately change this one.
+  $<HTMLInputElement>("waitRent").addEventListener("input", () => {
+    $<HTMLInputElement>("waitRent").dataset["touched"] = "1";
+  });
+  $<HTMLInputElement>("currentRent").addEventListener("input", () => {
+    if ($<HTMLInputElement>("waitRent").dataset["touched"] !== "1") {
+      $<HTMLInputElement>("waitRent").value = $<HTMLInputElement>("currentRent").value;
+      renderWaiting(readInput());
+    }
+  });
+  $<HTMLInputElement>("waitRent").value = $<HTMLInputElement>("currentRent").value;
 
   for (const id of ["cohortYear", "crashDepth", "crashMonths", "crashRate", "waitRent", "waitSavings"]) {
     $<HTMLInputElement>(id).addEventListener("input", () => {

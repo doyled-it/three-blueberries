@@ -394,10 +394,14 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
 
   let verdict: string;
   if (losingGround) {
+    // "No amount of discipline fixes it" was wrong on this function's own terms:
+    // savingsGrowBy is monthlySavings * 12 plus the return, so saving more IS the
+    // lever, and the number below says exactly how much more.
     verdict =
       `The target is moving away from you. The cash you need grows by about ${money(targetGrowsBy)} a year at this ` +
-      `appreciation rate, while your savings grow by about ${money(savingsGrowBy)}. This is the treadmill, and no amount ` +
-      `of discipline fixes it. Only a bigger gap between saving and prices does.`;
+      `appreciation rate, while your savings grow by about ${money(savingsGrowBy)}. You would have to put away another ` +
+      `${money((targetGrowsBy - savingsGrowBy) / 12)} a month just to stop losing ground, before saving anything toward ` +
+      `the deposit itself. That is the treadmill: the price of standing still.`;
   } else if (yearsToAfford === null) {
     verdict = `You are gaining ground, but not fast enough to reach the target inside ${maxYears} years.`;
   } else {
@@ -769,7 +773,7 @@ export function decide(args: {
       reachable: breakevenYear !== null && breakevenYear <= 30,
       note:
         breakevenYear === null
-          ? "Staying longer does not fix it. Past about 15 years the constraint is price to rent, not patience."
+          ? "Staying longer does not fix it. This runs the full 30 years and buying never catches renting, so the binding constraint is the price against the rent, not how long you are willing to stay."
           : breakevenYear <= holdYears
             ? "Already there."
             : `${breakevenYear - holdYears} more years than you planned.`,
@@ -931,9 +935,12 @@ export interface AssumptionSet {
  * dividends. Matching the periods is the difference between an argument and a
  * comparison.
  *
- * The useful result is that once they ARE matched, the answer barely moves. Every
- * set below lands within a narrow band, which is a far stronger conclusion than
- * any single run.
+ * What matching does NOT do is collapse the answer. This comment used to claim
+ * "once they ARE matched, the answer barely moves", which was true of the three
+ * hardcoded San Diego figures and is false now that each county supplies its own:
+ * Butte's sets run 3.3%, 0.7% and -1.4% appreciation, which is a different
+ * decision, not a narrow band. The sets exist so a reader can see how much the
+ * answer depends on the period, not to demonstrate that it doesn't.
  */
 /**
  * Annualised appreciation for a county over the last `years`, from its own
@@ -989,7 +996,16 @@ export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet
       rentGrowth: 0.05,
       basis:
         `Both from the last ten years: ${county} housing at ${pct(decade)}, the S&P 500 at about 13.2% before ` +
-        `dividends and roughly 14.7% with them. A strong decade for housing was a far stronger one for stocks.`,
+        `dividends and roughly 14.7% with them. ` +
+        // Butte ran 0.7% over the last decade, so "a strong decade for housing"
+        // was printed under a number that was nothing of the kind.
+        (decade >= 0.147
+          ? `${county} housing beat equities over that stretch, which is unusual and worth not assuming repeats.`
+          : decade >= 0.07
+            ? `A strong decade for housing was a far stronger one for stocks.`
+            : decade > 0
+              ? `Housing barely moved here while stocks ran. That gap is the whole argument for renting and investing the difference.`
+              : `Housing went backwards here while stocks ran.`),
     },
     {
       id: "cautious",
@@ -999,7 +1015,9 @@ export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet
       rentGrowth: 0.023,
       basis:
         `${county}'s last twenty years, which include a full crash, at ${pct(twenty)}, against a deliberately ` +
-        `conservative 7% on equities. Rent grows at the rate yours actually has.`,
+        `conservative 7% on equities. The 2.3% rent growth is an ASSUMPTION, not a measurement: there is no ` +
+        `county-level California rent series in this project, so all three sets pick a rate rather than derive one. ` +
+        `Override it with what your own rent has actually done.`,
     },
   ];
 }
@@ -1019,4 +1037,8 @@ export const RENT_VS_BUY_CAVEAT =
   "combined marginal rate, counting only the part that clears the standard deduction, which for a high California " +
   "earner is most of it. It still ignores tax on investment gains, which helps owning further, though less if your " +
   "savings sit in retirement accounts, and it models California and federal tax as one blended rate rather than " +
-  "separately. It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";
+  "separately. Insurance, tax and upkeep are escalated together at the Prop 13 2% cap for the whole 30 years, which " +
+  "is right for the tax line and optimistic for the other two: California insurance has been moving far faster than " +
+  "that, and every year it does is a year this understates the cost of owning. Rent growth is an assumption too, " +
+  "with no California rent series behind it. " +
+  "It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";

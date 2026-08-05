@@ -5,9 +5,13 @@
  * out to be true in 24 counties and FALSE in 34, which sounds like it weakens
  * the argument. It does the opposite, once you look at which counties are which.
  *
- * The counties where a median income still buys a median house are Lassen,
- * Modoc, Trinity, Siskiyou, Sierra. The counties where it does not are San
- * Francisco, Santa Clara, San Mateo, Marin, Orange.
+ * The five counties where a median income buys most easily are Lassen (3.1x),
+ * Modoc (3.8x), Siskiyou and Trinity (4.9x) and Sierra (5.0x). The five where it
+ * buys least are San Francisco (12.5x), Orange and Marin (11.9x), and Santa
+ * Barbara and Santa Cruz (11.8x). This list is derived; it used to name Santa
+ * Clara and San Mateo, which are not in the worst five, and omit the two that
+ * are. Recheck it against `allStandings()` after any data refresh rather than
+ * trusting these names.
  *
  * So affordability did not disappear from California. It relocated to where the
  * work is not. And the sharpest way to see that is to correlate what a county
@@ -128,6 +132,8 @@ export function payTrap(sampleSize = 10): PayTrap {
 export const WHERE_IT_WORKS_CAVEAT =
   `Home values are Zillow's typical single-family value today. Incomes are the Census Bureau's ${COUNTY_INCOME_YEAR} ` +
   `median household income for each county, which is what the people who already live and work there actually earn, ` +
-  `not a statewide figure. Both are a snapshot: this shows where things stand, not which way they are moving, and it ` +
+  `not a statewide figure. The two are not the same instant: the values are current and the incomes are from ` +
+  `${COUNTY_INCOME_YEAR}, which is the most recent SAIPE year, so every multiple here is slightly HIGH. Both are a ` +
+  `snapshot: this shows where things stand, not which way they are moving, and it ` +
   `cannot tell you whether jobs are arriving or leaving. It also says nothing about whether you would want to live in ` +
   `any of these places, which is the question it most obviously invites and the one arithmetic is worst at.`;

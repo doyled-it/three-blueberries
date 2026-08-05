@@ -120,9 +120,11 @@ test("supply is the strongest single historical relationship", () => {
 test("the caveats travel with the numbers as data, not prose the UI can drop", () => {
   const { caveats, summary } = crashSignals();
   assert.ok(caveats.length >= 4);
+  // The count is per county now: 17 have one decline, 25 two, 16 three. It used
+  // to say "two or three" to everybody.
   assert.ok(
-    caveats.some((c) => /two or three declines/i.test(c)),
-    "the N=2 problem must be stated"
+    caveats.some((c) => /(One decline|\d+ declines) over 10%/.test(c)),
+    "the small-sample problem must be stated, with this county's actual count"
   );
   assert.ok(
     caveats.some((c) => /overlapping/i.test(c)),

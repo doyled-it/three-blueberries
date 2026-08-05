@@ -99,6 +99,13 @@ export interface Drawdown {
   monthsTroughToRecovery: number | null;
   /** How long you'd have been underwater buying the peak. */
   monthsUnderwater: number | null;
+  /**
+   * True when the "trough" is simply the newest reading, so the decline has not
+   * been shown to have bottomed. Sierra's most recent decline reported
+   * "bottoming 2025-12" for a fall that is still going, which is a
+   * completed-crash claim about an ongoing one.
+   */
+  inProgress: boolean;
 }
 
 /**
@@ -120,6 +127,7 @@ export function findDrawdowns(minDepthPercent = 10, county: CaCounty = DEFAULT_C
     const depth = ((trough[1] - peak[1]) / peak[1]) * 100;
     if (depth <= -minDepthPercent) {
       const recovered = rows.slice(troughIdx).find((r) => r[1] >= peak[1]) ?? null;
+      const inProgress = troughIdx === rows.length - 1;
       out.push({
         peakMonth: peak[0],
         peakIndex: peak[1],
@@ -130,6 +138,7 @@ export function findDrawdowns(minDepthPercent = 10, county: CaCounty = DEFAULT_C
         recoveredMonth: recovered ? recovered[0] : null,
         monthsTroughToRecovery: recovered ? monthsBetween(trough[0], recovered[0]) : null,
         monthsUnderwater: recovered ? monthsBetween(peak[0], recovered[0]) : null,
+        inProgress,
       });
     }
     troughIdx = null;
@@ -406,6 +415,12 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
   const severe = sorted[sorted.length - 1]!;
   const n = sorted.length;
 
+  // A decline whose trough is the newest reading has not been shown to have
+  // bottomed. Say "still falling" rather than announcing a bottom that has not
+  // happened.
+  const bottomPhrase = (d: Drawdown) =>
+    d.inProgress ? `and still falling as of ${d.troughMonth}` : `bottoming ${d.troughMonth}`;
+
   // The longest decline on record, which is what "long stagnation" should be
   // anchored to. Not always the deepest one.
   const longest = [...drops].sort((a, b) => b.monthsPeakToTrough - a.monthsPeakToTrough)[0]!;
@@ -429,7 +444,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
             depthPercent: Math.round(worstDepth),
             monthsToBottom: mild.monthsPeakToTrough,
             rateAtBottom: rateAtTroughOf(mild),
-            basis: `The only decline over 10% in ${place}'s record: ${worstDepth.toFixed(1)}% over ${mild.monthsPeakToTrough} months, bottoming ${mild.troughMonth}. Rates at that trough averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%. One event is not a distribution, so treat this as an anecdote with a date on it.`,
+            basis: `The only decline over 10% in ${place}'s record: ${worstDepth.toFixed(1)}% over ${mild.monthsPeakToTrough} months, ${bottomPhrase(mild)}. Rates ${mild.inProgress ? "there" : "at that trough"} averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%. One event is not a distribution, so treat this as an anecdote with a date on it.`,
           },
         ]
       : [
@@ -439,7 +454,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
             depthPercent: Math.round(Math.abs(mild.depthPercent)),
             monthsToBottom: mild.monthsPeakToTrough,
             rateAtBottom: rateAtTroughOf(mild),
-            basis: `In ${place}, ${declineCount}: ${Math.abs(mild.depthPercent).toFixed(1)}% over ${mild.monthsPeakToTrough} months, bottoming ${mild.troughMonth}. Rates at that trough averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%.`,
+            basis: `In ${place}, ${declineCount}: ${Math.abs(mild.depthPercent).toFixed(1)}% over ${mild.monthsPeakToTrough} months, ${bottomPhrase(mild)}. Rates ${mild.inProgress ? "there" : "at that trough"} averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%.`,
           },
           {
             id: "severe",
@@ -447,7 +462,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
             depthPercent: Math.round(worstDepth),
             monthsToBottom: severe.monthsPeakToTrough,
             rateAtBottom: rateAtTroughOf(severe),
-            basis: `${place}'s worst decline on record: ${worstDepth.toFixed(1)}% over ${severe.monthsPeakToTrough} months, bottoming ${severe.troughMonth}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then. The crash and the rate relief arrived together.`,
+            basis: `${place}'s worst decline on record: ${worstDepth.toFixed(1)}% over ${severe.monthsPeakToTrough} months, ${bottomPhrase(severe)}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then. The crash and the rate relief arrived together.`,
           },
         ];
 

@@ -179,7 +179,16 @@ export function verdict(horizon = 24): Verdict {
     );
   }
 
-  const worstPreCrash = r.preCrash.length ? r.preCrash.reduce((a, b) => (b.predicted > a.predicted ? b : a)) : null;
+  // Quote the BEST-SCORING model, not the worst. Picking the family with the
+  // most embarrassing 2008 prediction cherry-picked in the site's own favour,
+  // which is the one direction this project is not entitled to shade.
+  const bestPreCrash = r.preCrash.find((p) => p.family === r.best.family) ?? r.preCrash[0] ?? null;
+  const spread = r.preCrash.length
+    ? {
+        low: Math.min(...r.preCrash.map((p) => p.predicted)),
+        high: Math.max(...r.preCrash.map((p) => p.predicted)),
+      }
+    : null;
 
   return {
     trustworthy: failures.length === 0,
@@ -193,7 +202,16 @@ export function verdict(horizon = 24): Verdict {
     headline:
       failures.length === 0
         ? "This model clears every pre-registered check. Treat it as weak evidence, not a prophecy."
-        : `The model does not work, and the clearest demonstration is 2008: trained only on data available at the time, it went into the largest housing crash in modern history predicting ${worstPreCrash ? `${(worstPreCrash.predicted * 100).toFixed(0)}% growth` : "growth"} and a ${pct(r.classifier.preCrashProbability)} chance of a decline. Turning points are exactly what you would want a forecaster for, and they are exactly what it cannot see.`,
+        : `The model does not work, and the clearest demonstration is 2008: trained only on data available at the ` +
+          `time, the best-scoring family went into the largest housing crash in modern history predicting ` +
+          `${bestPreCrash ? `${(bestPreCrash.predicted * 100).toFixed(0)}% growth` : "growth"}` +
+          (spread && spread.high - spread.low > 0.01
+            ? ` (the three families spanned ${(spread.low * 100).toFixed(0)}% to ${(spread.high * 100).toFixed(0)}%, all of them positive)`
+            : "") +
+          ` and a ${pct(r.classifier.preCrashProbability)} chance of a decline. What actually followed was the ` +
+          `crash: ${pct(r.classifier.preCrashActual)} of those windows went on to fall ` +
+          `${Math.abs(DRAWDOWN_THRESHOLD * 100)}% or more. Turning points are exactly what you would want a ` +
+          `forecaster for, and they are exactly what it cannot see.`,
   };
 }
 

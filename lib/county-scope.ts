@@ -8,9 +8,14 @@
  * are getting and why, because that is the honest remaining caveat.
  *
  * FHFA publishes 28 California metros quarterly and all 58 counties annually.
- * A county inside a metro gets the quarterly series, which starts in the 1970s.
- * The rural remainder gets its own annual series. Nobody gets somebody else's
- * market any more.
+ * A county inside a metro gets the quarterly series, most of which start in the
+ * 1970s; four start later, so the start year is read off the data rather than
+ * asserted here. The rural remainder gets its own annual series. Nobody gets
+ * somebody else's market any more.
+ *
+ * Two counties' series stop early. Alpine ends in 2022 and Trinity in 2024,
+ * because FHFA suppresses a county-year with too few transactions to publish.
+ * The note says so: a reader whose "today" is four years old should know it.
  */
 
 import { historyFor } from "./data/history.ts";
@@ -41,6 +46,15 @@ export function countyScope(county: CaCounty): CountyScope {
         `${county} is not inside a metropolitan area, and FHFA publishes quarterly data only for metros, ` +
         `so this is the finest resolution that exists for where you are buying.`;
 
+  // A series that stops years ago is presented as current everywhere else on the
+  // page. Say it here, where the resolution caveat already lives.
+  const lastMonth = rows[rows.length - 1]![0];
+  const staleness =
+    lastMonth < "2025-06"
+      ? ` It also STOPS in ${YEAR(lastMonth)}: FHFA suppresses a county-year with too few sales to publish, and ` +
+        `${county} County has not had enough since. Everything downstream that says "today" means ${YEAR(lastMonth)} here.`
+      : "";
+
   const seam = spliceMonth
     ? ` One seam worth knowing about: readings before ${spliceMonth} come from FHFA's longer all-transactions ` +
       `index, chain-linked on, because the more accurate expanded-data series only starts then. The two ` +
@@ -48,5 +62,5 @@ export function countyScope(county: CaCounty): CountyScope {
       `rather than as a precise measurement.`
     : "";
 
-  return { county, place, stepMonths, spliceMonth, note: resolution + seam };
+  return { county, place, stepMonths, spliceMonth, note: resolution + staleness + seam };
 }

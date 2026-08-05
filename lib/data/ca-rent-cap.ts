@@ -8,7 +8,7 @@
  * Labor Statistics publishes no regional index.
  *
  * BLS publishes four California metropolitan indexes, which is why there are
- * exactly four named regions here and one fallback covering the other 44
+ * exactly four named regions here and one fallback covering the other 48
  * counties. Hardcoding San Diego's figure told a reader in Riverside that their
  * ceiling was 8.2% when it is 8.1%, and a reader in Alameda 8.2% when it is 8.8%.
  *

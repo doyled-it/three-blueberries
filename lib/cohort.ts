@@ -134,7 +134,11 @@ export const BEST_REFI = (() => {
  * window? Only if they already owned before it opened.
  */
 export function refinanceOpportunity(purchaseMonth: string): { month: string; rate: number } | null {
-  return purchaseMonth < REFI_WINDOW.from ? BEST_REFI : null;
+  // The test is whether the cheap month came AFTER you bought, not whether you
+  // bought before the window opened. A June 2020 buyer was denied the December
+  // 2020 refinance they could plainly have taken, which understated the whole
+  // 2020-21 cohort's carrying advantage.
+  return purchaseMonth < BEST_REFI.month ? BEST_REFI : null;
 }
 
 /**
