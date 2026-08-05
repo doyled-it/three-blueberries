@@ -15,9 +15,14 @@ import type { SourceId } from "./sources.ts";
 // ---------------------------------------------------------------------------
 
 /**
- * The one-time fee that funds the VA loan program. Note the cliff: the fee more
- * than doubles for subsequent use at zero down, but 5% down flattens first-use
- * and subsequent-use to the same number.
+ * The one-time fee that funds the VA loan program. Note the cliff: at zero down,
+ * subsequent use costs 3.30% against first use's 2.15%, half as much again. Put
+ * 5% down and both collapse to 1.50%, so for a repeat borrower that deposit
+ * more than halves the fee.
+ *
+ * ("More than doubles" was the old wording. It is 1.53x, not 2x. The comparison
+ * that really doubles is subsequent-use zero-down against subsequent-use at 5%
+ * down, which is a statement about the deposit, not about repeat use.)
  *
  * A service-connected disability rating at ANY level waives this entirely,
  * which is frequently worth five figures.
@@ -90,6 +95,51 @@ export function fhaMipDurationMonths(ltv: number): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// FHA loan limits
+// Source: hud-ml-2025-23 (published)
+// ---------------------------------------------------------------------------
+
+/**
+ * FHA's national floor and ceiling for a one-unit property.
+ *
+ * FHA has its OWN county limits, and they are not the FHFA conforming limits
+ * this project already ships. The engine used to check FHA loans against the
+ * conforming limit and, when they exceeded it, call them "a jumbo". An FHA loan
+ * is never a jumbo: over the FHA limit it is simply not an FHA loan, which is a
+ * different and worse problem for the borrower.
+ *
+ * The per-county number sits somewhere between these two bounds and is derived
+ * from HUD's area median sale price, which is not published as a clean
+ * machine-readable file the way FHFA's is. So we state the bounds, which are
+ * statutory (the ceiling is 150% of the national conforming limit under the
+ * National Housing Act), and send the reader to HUD's own lookup for the exact
+ * county figure rather than inventing one.
+ */
+export const FHA_LIMITS = {
+  year: 2026,
+  /** Low-cost areas. 65% of the national conforming limit. */
+  floor: 541_287,
+  /** High-cost areas, which is most of coastal California. 150% of it. */
+  ceiling: 1_249_125,
+  lookupUrl: "https://entp.hud.gov/idapp/html/hicostlook.cfm",
+  sourceIds: ["hud-ml-2025-23"] as const,
+} as const;
+
+/**
+ * What we can honestly say about an FHA loan of this size.
+ *
+ * `over` means it is above the national ceiling and therefore over the limit in
+ * every county. `maybe` means it is in the band where the county's own figure
+ * decides and we do not have it. `under` means it is below the floor and clears
+ * everywhere.
+ */
+export function fhaLimitStatus(baseLoanAmount: number): "under" | "maybe" | "over" {
+  if (baseLoanAmount > FHA_LIMITS.ceiling) return "over";
+  if (baseLoanAmount > FHA_LIMITS.floor) return "maybe";
+  return "under";
+}
+
+// ---------------------------------------------------------------------------
 // Conventional PMI
 // Source: pmi-rate-bands (ESTIMATE, insurer rate cards are not public)
 // ---------------------------------------------------------------------------
@@ -98,12 +148,17 @@ export function fhaMipDurationMonths(ltv: number): number | null {
  * Representative annual PMI rates by LTV band and credit score.
  *
  * These are NOT a quote. Mortgage insurers price off proprietary rate cards
- * that lenders don't publish. These bands sit inside the 0.46%-1.50% range the
- * Urban Institute observes in the market and are good to roughly a tenth of a
- * point, which is enough to plan with and not enough to sign with.
+ * that lenders don't publish. The table spans 0.19% to 1.85%, which is WIDER
+ * than the 0.46%-1.50% band the Urban Institute reports as typical: the cheap
+ * end is a 760+ borrower a hair under 20% down, and the expensive end is a
+ * sub-640 borrower at 97% LTV. Both tails are real and both sit outside what a
+ * "typical" range describes, which is why this file used to claim containment it
+ * did not have. Good to roughly a tenth of a point, which is enough to plan with
+ * and not enough to sign with.
  *
- * The shape of the table is the real lesson: at 3% down with a 640 score you
- * pay roughly nine times the rate of a 20%-adjacent borrower with a 760.
+ * The shape of the table is the real lesson: at 3% down with a 640 score you pay
+ * 1.60%, against 0.19% for a 20%-adjacent borrower with a 760. Eight and a half
+ * times the rate, for the same house.
  */
 const PMI_BANDS: ReadonlyArray<{
   maxLtv: number;
@@ -204,13 +259,18 @@ export const DTI_CEILINGS: Record<
   jumbo: {
     typical: 0.4,
     max: 0.43,
-    sourceIds: ["fannie-b3-6-02"],
-    note: "Jumbo loans are held on the lender's own books, so they set their own rules. 43% is a common ceiling and reserves of 6-12 months are typical.",
+    // NOT Fannie Mae. Jumbo loans are non-agency and Fannie does not buy them,
+    // so its Selling Guide has nothing to say about their ratios. This entry
+    // used to cite it anyway.
+    sourceIds: ["jumbo-lender-overlays"],
+    note: "Jumbo loans are held on the lender's own books, so they set their own rules. 43% is a common ceiling because it is Regulation Z's Qualified Mortgage threshold, and reserves of 6-12 months are typical. There is no published agency number here.",
   },
   fha: {
     typical: 0.45,
     max: 0.5699,
-    sourceIds: ["fannie-b3-6-02"],
+    // FHA's ratios are HUD's, from Handbook 4000.1. Fannie's Selling Guide does
+    // not cover FHA loans.
+    sourceIds: ["hud-4000-1-dti"],
     note: "FHA's manual ceiling is 43%, but automated approval with compensating factors reaches 56.99%. That is an underwriting limit, not a lifestyle recommendation.",
   },
   va: {

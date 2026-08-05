@@ -63,6 +63,17 @@ export const SOURCES = {
       "The rate table is still in force. The loan-size threshold in the letter was the conforming limit at the time; it tracks the current-year conforming baseline.",
   },
 
+  "hud-ml-2025-23": {
+    id: "hud-ml-2025-23",
+    title: "Mortgagee Letter 2025-23: 2026 Nationwide Forward Mortgage Limits",
+    publisher: "U.S. Department of Housing and Urban Development",
+    url: "https://www.hud.gov/sites/dfiles/hudclips/documents/2025-23hsgml.pdf",
+    asOf: "2025-12-11",
+    kind: "published",
+    caveat:
+      "Only the national floor ($541,287) and ceiling ($1,249,125) for a one-unit property are shipped here. FHA's per-county limit sits between them and is derived from HUD's area median sale price, which is not published as a machine-readable file. Look your county up at entp.hud.gov rather than assuming either bound applies.",
+  },
+
   "va-funding-fee": {
     id: "va-funding-fee",
     title: "VA funding fee and loan closing costs",
@@ -91,6 +102,28 @@ export const SOURCES = {
     kind: "published",
     caveat:
       "50% is the ceiling for loans run through Desktop Underwriter. Manually underwritten loans cap at 36%, or 45% with reserves and a strong credit profile. Hitting the ceiling is not the same as being comfortable.",
+  },
+
+  "hud-4000-1-dti": {
+    id: "hud-4000-1-dti",
+    title: "Single Family Housing Policy Handbook 4000.1, II.A.5: Qualifying Ratios",
+    publisher: "U.S. Department of Housing and Urban Development",
+    url: "https://www.hud.gov/hud-partners/single-family-4000-1",
+    asOf: "2026-01-01",
+    kind: "published",
+    caveat:
+      "43% is FHA's manual-underwriting ceiling. TOTAL Scorecard approvals with documented compensating factors run higher, and 56.99% is the practical maximum lenders will process. FHA's ratios come from HUD, not from Fannie Mae's Selling Guide, which does not cover FHA loans at all.",
+  },
+
+  "jumbo-lender-overlays": {
+    id: "jumbo-lender-overlays",
+    title: "Jumbo debt-to-income ceilings, compiled from lender guidelines",
+    publisher: "Compiled from published non-agency lender guidelines",
+    url: "https://www.consumerfinance.gov/rules-policy/regulations/1026/43/",
+    asOf: "2026-01-01",
+    kind: "estimate",
+    caveat:
+      "Jumbo loans are non-agency: Fannie Mae does not buy them and publishes no ratio for them, so citing the Selling Guide here was citing a document that says nothing about these loans. Each lender sets its own ceiling. 43% is common because it is the Qualified Mortgage threshold in Regulation Z, and 6-12 months of reserves is typical, but there is no single published number and this one is an estimate.",
   },
 
   "prop-13": {
@@ -156,7 +189,7 @@ export const SOURCES = {
     asOf: "2026-01-01",
     kind: "estimate",
     caveat:
-      "PMI is priced by the individual insurer your lender uses, and the card is not public. These bands sit inside the observed 0.46%-1.50% market range and are right to within roughly a tenth of a point, but only a real quote is real.",
+      "PMI is priced by the individual insurer your lender uses, and the card is not public. The table runs 0.19% to 1.85%, wider than the 0.46%-1.50% band the Urban Institute reports as typical, because both tails (a 760+ borrower just under 20% down, and a sub-640 borrower at 97% LTV) sit outside it. Right to within roughly a tenth of a point, but only a real quote is real.",
   },
 
   "pmi-cancellation": {

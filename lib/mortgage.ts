@@ -27,7 +27,9 @@ import {
 } from "./data/ca-property.ts";
 import {
   DTI_CEILINGS,
+  FHA_LIMITS,
   FHA_UPFRONT_MIP_RATE,
+  fhaLimitStatus,
   PMI_AUTO_TERMINATION_LTV,
   PMI_REQUEST_CANCELLATION_LTV,
   VA_UTILITY_PER_SQFT,
@@ -147,18 +149,32 @@ export function computeMortgageInsurance(input: ScenarioInput, loan: LoanFacts):
 
   const years = (m: number) => (m / 12).toFixed(1);
 
+  // The Homeowners Protection Act has TWO automatic terminations, and the engine
+  // only modelled one. Whichever comes first governs: 78% LTV on the original
+  // schedule, or the midpoint of the amortization period, which is what actually
+  // rescues a borrower whose schedule never reaches 78% (a 40-year term, or a
+  // rate high enough that principal barely moves early on).
+  const midpointMonth = Math.ceil((input.termYears * 12) / 2);
+  const terminates = endsAfterMonths === null ? midpointMonth : Math.min(endsAfterMonths, midpointMonth);
+  const byMidpoint = endsAfterMonths === null || midpointMonth < endsAfterMonths;
+
   return {
     monthly: (loan.totalLoanAmount * rate) / 12,
     annualRate: rate,
-    endsAfterMonths,
+    endsAfterMonths: terminates,
     explanation:
       `PMI at an estimated ${pct(rate)}/year, based on ${pct(loan.ltv, 1)} LTV and a ${input.creditScore} credit score. ` +
       (requestAt !== null
         ? `You can request cancellation at 80% LTV around month ${requestAt} (${years(requestAt)} years). `
         : "") +
-      (endsAfterMonths !== null
-        ? `It terminates automatically at 78% LTV around month ${endsAfterMonths} (${years(endsAfterMonths)} years) on the original schedule, appreciation does not count.`
-        : "It does not reach the 78% automatic termination point within the loan term."),
+      (byMidpoint
+        ? `It terminates automatically at month ${terminates} (${years(terminates)} years), the midpoint of the amortization ` +
+          `period. The Homeowners Protection Act requires termination there regardless of LTV` +
+          (endsAfterMonths === null
+            ? `, and this schedule never reaches 78% within the term, so the midpoint is the only exit.`
+            : `, and that arrives before the 78% point at month ${endsAfterMonths}.`)
+        : `It terminates automatically at 78% LTV around month ${terminates} (${years(terminates)} years) on the original ` +
+          `schedule, appreciation does not count.`),
     sourceIds: ["pmi-rate-bands", "pmi-cancellation"],
   };
 }
@@ -180,9 +196,12 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     annual: pi * 12,
     basis:
       `${money(loan.totalLoanAmount)} borrowed at ${pct(input.interestRate, 3)} over ${input.termYears} years. ` +
-      `Total interest across the full term: ${money(lifetimeInterest)}.`,
-    confidence: "market",
-    sourceIds: ["freddie-pmms"],
+      `Total interest across the full term: ${money(lifetimeInterest)}. ` +
+      (input.rateIsUserSupplied
+        ? `That rate is the one you entered, not the market average.`
+        : `That rate is Freddie Mac's weekly national average for a well-qualified borrower. Yours will differ.`),
+    confidence: input.rateIsUserSupplied ? "user" : "market",
+    sourceIds: input.rateIsUserSupplied ? [] : ["freddie-pmms"],
   });
 
   // --- Property tax ---------------------------------------------------------
@@ -201,12 +220,27 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     basis:
       `Prop 13 reassesses to your purchase price when you buy, so the assessed value is ${money(input.purchasePrice)}` +
       (exemption ? ` less the ${money(exemption)} homeowners' exemption` : "") +
-      `, taxed at ${pct(rate)}. That rate is the 1% statutory base plus ${pct(rate - 0.01)} in voter-approved bonds and local assessments.`,
+      `, taxed at ${pct(rate)}. ` +
+      // A user-entered rate under 1% used to print a NEGATIVE bond component,
+      // because the 1% base is the statutory floor for an ad valorem levy and
+      // anything below it is not a base-plus-bonds rate at all.
+      (rate >= 0.01
+        ? `That rate is the 1% statutory base plus ${pct(rate - 0.01)} in voter-approved bonds and local assessments.`
+        : `That is below the 1% Prop 13 statutory base, so it is not a base-plus-bonds rate. If you typed it, check it: ` +
+          `an effective rate under 1% usually means an assessed value well below the purchase price, which a new purchase resets.`) +
+      // The fallback is a STATEWIDE number, not this county's typical. Calling it
+      // the latter and then warning that we have no county rate said two
+      // different things on the same card.
+      (usingCountyDefault && !hasCountySpecificTaxRate(input.county)
+        ? ` We have no rate on file for ${input.county} County, so this is the statewide fallback.`
+        : ""),
     confidence: usingCountyDefault ? "estimated" : "user",
     sourceIds: ["prop-13", "ca-county-tax-rates", ...(exemption ? (["ca-homeowners-exemption"] as const) : [])],
-    warning: usingCountyDefault
-      ? `Typical rate for ${input.county} County, not your rate. Rates vary by tax rate area within a county. Check your county assessor's parcel lookup.`
-      : undefined,
+    warning: !usingCountyDefault
+      ? undefined
+      : hasCountySpecificTaxRate(input.county)
+        ? `Typical rate for ${input.county} County, not your rate. Rates vary by tax rate area within a county. Check your county assessor's parcel lookup.`
+        : `This is the STATEWIDE fallback, not a ${input.county} County figure. We do not have one for this county. Look your parcel up at the county assessor before you rely on it.`,
   });
 
   // --- Homeowners insurance -------------------------------------------------
@@ -439,34 +473,76 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
     backEndDti,
     dtiCeiling,
     passesDti: backEndDti <= dtiCeiling,
+    dtiIsGuideline: false,
     incomeRequiredAnnual,
     notes,
   };
 
-  // VA's real test is residual income, not DTI.
+  // VA's real test is residual income, not DTI. It has to GOVERN, not merely be
+  // reported alongside a DTI gate: this file used to fail a VA borrower at 45%
+  // DTI while the residual test on the same screen passed with $4,091 against a
+  // $990 requirement, and then told them they needed more income than they earn.
   if (input.loanType === "va") {
     const squareFeet = input.squareFeet ?? 1500;
     const utilityAllowance = squareFeet * VA_UTILITY_PER_SQFT;
     const taxes = grossMonthlyIncome * estimateTaxWithholdingRate(grossAnnual);
     const available = grossMonthlyIncome - taxes - housingPayment - input.household.monthlyDebts - utilityAllowance;
     const required = vaResidualIncomeRequired(input.household.size, loan.totalLoanAmount);
+    const passes = available >= required;
 
     qualification.residualIncome = {
       available,
       required,
-      passes: available >= required,
+      passes,
       explanation:
         `VA requires ${money(required)}/month left over for a household of ${input.household.size} in the West region, ` +
         `the highest minimums in the country. After an estimated ${money(taxes)} in taxes, ${money(housingPayment)} in housing, ` +
         `${money(input.household.monthlyDebts)} in other debt, and VA's fixed ${money(utilityAllowance)} utility allowance ` +
         `(${squareFeet.toLocaleString("en-US")} sq ft at $${VA_UTILITY_PER_SQFT}/sq ft), you would have ${money(available)}.`,
     };
+
+    qualification.dtiIsGuideline = true;
+    // Past DTI_CEILINGS.va.max VA underwriting stops being plausible even with
+    // residual income clearing, so that IS a wall. Between the guideline and
+    // that ceiling, residual income decides.
+    qualification.passesDti = passes && backEndDti <= ceilingInfo.max;
+    qualification.incomeRequiredAnnual = vaIncomeRequired(
+      required,
+      housingPayment,
+      input.household.monthlyDebts,
+      utilityAllowance
+    );
+
     notes.push(
-      "VA weighs residual income above DTI. Clearing it can carry an approval well past 41%; failing it sinks one that looks fine."
+      `VA weighs residual income above DTI. Clearing it can carry an approval well past ${(dtiCeiling * 100).toFixed(0)}%; ` +
+        `failing it sinks one that looks fine. The income figure here is what VA's residual test needs, not what ` +
+        `${(dtiCeiling * 100).toFixed(0)}% DTI would need.`
     );
   }
 
   return qualification;
+}
+
+/**
+ * Gross annual income that clears VA's residual requirement.
+ *
+ * Solved rather than closed-form because the withholding estimate is bracketed
+ * on gross income, so the answer feeds its own input. Three passes converge to
+ * well under a dollar.
+ */
+function vaIncomeRequired(
+  residualRequired: number,
+  housingPayment: number,
+  monthlyDebts: number,
+  utilityAllowance: number
+): number {
+  const netNeeded = residualRequired + housingPayment + monthlyDebts + utilityAllowance;
+  let annual = netNeeded * 12;
+  for (let i = 0; i < 5; i++) {
+    const rate = estimateTaxWithholdingRate(annual);
+    annual = (netNeeded / (1 - rate)) * 12;
+  }
+  return annual;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,12 +552,32 @@ function computeQualification(input: ScenarioInput, loan: LoanFacts, housingPaym
 function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qualification): string[] {
   const warnings: string[] = [];
 
-  if (loan.exceedsConformingLimit && input.loanType !== "va") {
+  // An FHA loan is NEVER a jumbo, and the conforming limit is not the limit it is
+  // measured against. This branch used to catch FHA and tell the borrower they
+  // had a jumbo, checked against the wrong table entirely.
+  if (loan.exceedsConformingLimit && input.loanType !== "va" && input.loanType !== "fha") {
     warnings.push(
       `At ${money(loan.baseLoanAmount)}, this loan is above the ${money(loan.conformingLimit)} conforming limit for ${input.county} County, ` +
         `which makes it a jumbo. Expect stricter underwriting, a larger down payment requirement, cash reserves, and a rate that no longer ` +
         `tracks the conforming market. Putting ${money(loan.baseLoanAmount - loan.conformingLimit)} more down would bring it back under.`
     );
+  }
+
+  if (input.loanType === "fha") {
+    const status = fhaLimitStatus(loan.baseLoanAmount);
+    if (status === "over") {
+      warnings.push(
+        `At ${money(loan.baseLoanAmount)}, this is above FHA's national ceiling of ${money(FHA_LIMITS.ceiling)} for a one-unit property, ` +
+          `so it is over the limit in every county in the country. FHA will not insure it at this size. You would need ` +
+          `${money(loan.baseLoanAmount - FHA_LIMITS.ceiling)} more down, or a different loan type.`
+      );
+    } else if (status === "maybe") {
+      warnings.push(
+        `FHA sets its own county limits, and they are not the conforming limits. At ${money(loan.baseLoanAmount)} this sits between FHA's ` +
+          `national floor of ${money(FHA_LIMITS.floor)} and its ceiling of ${money(FHA_LIMITS.ceiling)}, so whether it qualifies depends on ` +
+          `${input.county} County's own FHA limit, which we do not have. Look it up at ${FHA_LIMITS.lookupUrl} before you count on this.`
+      );
+    }
   }
 
   if (input.loanType === "va" && loan.exceedsConformingLimit) {
@@ -503,7 +599,21 @@ function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qua
     );
   }
 
-  if (!qualification.passesDti) {
+  // For VA the DTI figure is a guideline, so exceeding it is a note rather than a
+  // failure. Emitting the standard warning here told a borrower who clears VA's
+  // actual test that they needed more income than they already earn.
+  if (qualification.dtiIsGuideline) {
+    if (qualification.backEndDti > qualification.dtiCeiling) {
+      warnings.push(
+        `At ${pct(qualification.backEndDti, 1)}, you are above VA's ${pct(qualification.dtiCeiling, 0)} guideline. That is not a cap. ` +
+          (qualification.residualIncome?.passes
+            ? `Residual income is what VA actually underwrites, and this clears it by ` +
+              `${money(qualification.residualIncome.available - qualification.residualIncome.required)}/month. Expect the lender to ` +
+              `document the compensating factors rather than decline it.`
+            : `Residual income is what VA actually underwrites, and this does not clear it.`)
+      );
+    }
+  } else if (!qualification.passesDti) {
     warnings.push(
       `At ${pct(qualification.backEndDti, 1)}, your debt-to-income ratio is above the ${pct(qualification.dtiCeiling, 0)} ceiling this ` +
         `program typically approves. You would need ${money(qualification.incomeRequiredAnnual)}/year, or less monthly debt, or a cheaper house.`

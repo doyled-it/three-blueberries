@@ -877,25 +877,34 @@ export function buyZone(
  *
  * Answers "what does waiting for a better rate actually buy me", which is the
  * only version of the timing question with a checkable answer.
+ *
+ * `closingCostRate` sits in slot five to match `maxPriceForHoldPeriod` and
+ * `buyZone`. It used to be `step` there, and the browser passed the real closing
+ * cost rate into it positionally, so the "next half point down" figure was
+ * computed on a 3.1-point cut and came out roughly twelve times too big. Keep
+ * the shared parameters in the same order across all three or that returns.
  */
 export function rateSensitivity(
   base: SweepBase,
   costs: ScalingCosts,
   holdYears: number,
   downPercent: number,
+  closingCostRate = 0.025,
   step = 0.005
-): { perQuarterPoint: number; atCurrent: number | null; atLower: number | null } {
-  const atCurrent = maxPriceForHoldPeriod(base, costs, holdYears, downPercent);
+): { perQuarterPoint: number; atCurrent: number | null; atLower: number | null; step: number } {
+  const atCurrent = maxPriceForHoldPeriod(base, costs, holdYears, downPercent, closingCostRate);
   const atLower = maxPriceForHoldPeriod(
     { ...base, interestRate: base.interestRate - step },
     costs,
     holdYears,
-    downPercent
+    downPercent,
+    closingCostRate
   );
   return {
     perQuarterPoint: atCurrent !== null && atLower !== null ? atLower - atCurrent : 0,
     atCurrent,
     atLower,
+    step,
   };
 }
 

@@ -2,8 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { burdenSeries, crashSignals, leadingIndicators, worstTimeToBuy } from "../lib/signals.ts";
-import { crashPresets } from "../lib/history.ts";
+import { crashPresets, findDrawdowns } from "../lib/history.ts";
 import { CA_MEDIAN_INCOME, NEW_HOME_SUPPLY } from "../lib/data/signals.ts";
+import { CA_COUNTIES } from "../lib/data/ca-loan-limits.ts";
 
 test("the burden series is complete and plausible", () => {
   const s = burdenSeries();
@@ -144,8 +145,38 @@ test("extreme scenarios exist and are ordered sensibly", () => {
 
 test("the beyond-historical scenario admits it is beyond historical", () => {
   const worst = crashPresets().find((p) => p.id === "worse-than-2008")!;
-  assert.match(worst.basis, /Beyond anything in the California record/i);
+  assert.match(worst.basis, /Beyond anything in .+'s record/i);
   assert.match(worst.basis, /because you asked for the tail, not because anything in the data points here/i);
+});
+
+// A flat 50% used to be the tail preset for every county. Merced's own record is
+// 65.7%, so the "worse than" button offered a milder crash than the one that
+// already happened there.
+test("the tail preset is worse than the county's own worst, in every county", () => {
+  for (const county of CA_COUNTIES) {
+    const tail = crashPresets(county).find((p) => p.id === "worse-than-2008")!;
+    const worst = Math.abs(findDrawdowns(10, county)[0] ? Math.min(...findDrawdowns(10, county).map((d) => d.depthPercent)) : 0);
+    assert.ok(tail.depthPercent > worst, `${county}: tail ${tail.depthPercent}% is not worse than its record ${worst.toFixed(1)}%`);
+  }
+});
+
+// "The milder of the two declines on record" was hardcoded. 17 counties have one
+// decline and 16 have three, and in the one-decline counties the mild and severe
+// presets were the same event with contradictory descriptions.
+test("preset copy never claims a decline count the county does not have", () => {
+  for (const county of CA_COUNTIES) {
+    const n = findDrawdowns(10, county).length;
+    const presets = crashPresets(county);
+    const real = presets.filter((p) => p.id === "mild" || p.id === "severe");
+    assert.equal(real.length, n === 1 ? 1 : 2, `${county} has ${n} declines but ${real.length} real presets`);
+    if (n === 1) {
+      assert.match(real[0]!.basis, /only decline over 10%/i);
+    } else if (n === 2) {
+      assert.match(presets.find((p) => p.id === "mild")!.basis, /milder of the two/i);
+    } else {
+      assert.match(presets.find((p) => p.id === "mild")!.basis, new RegExp(`shallowest of the ${n} declines`, "i"));
+    }
+  }
 });
 
 test("the recession scenario cites a real published forecast rather than a round number", () => {
@@ -154,17 +185,29 @@ test("the recession scenario cites a real published forecast rather than a round
   assert.ok(r.depthPercent >= 15 && r.depthPercent <= 20, "should sit in the published 15-20% band");
 });
 
-test("long stagnation is slower than either real crash, by design", () => {
-  const japan = crashPresets().find((p) => p.id === "japan")!;
-  assert.ok(japan.monthsToBottom >= 74, "must be at least as slow as the 1990-96 decline");
-  assert.ok(japan.depthPercent < 42);
+// The basis used to quote "74 months, twice as long as 2006-09". San Diego's own
+// drawdown finder says 63 months and 1.6x, and no county produces 74.
+test("long stagnation quotes the county's own longest decline, not a remembered one", () => {
+  for (const county of CA_COUNTIES) {
+    const japan = crashPresets(county).find((p) => p.id === "japan")!;
+    const drops = findDrawdowns(10, county);
+    const longest = Math.max(...drops.map((d) => d.monthsPeakToTrough));
+    assert.equal(japan.monthsToBottom, Math.min(120, longest), `${county} stagnation duration is not its longest decline`);
+    assert.match(japan.basis, new RegExp(`${Math.min(120, longest)} months to bottom`));
+  }
 });
 
-test("every preset fits the UI slider ranges", () => {
-  for (const p of crashPresets()) {
-    assert.ok(p.depthPercent >= 0 && p.depthPercent <= 50, `${p.id} depth ${p.depthPercent} is off-slider`);
-    assert.ok(p.monthsToBottom >= 6 && p.monthsToBottom <= 84, `${p.id} duration ${p.monthsToBottom} is off-slider`);
-    assert.ok(p.rateAtBottom >= 0.03 && p.rateAtBottom <= 0.11, `${p.id} rate ${p.rateAtBottom} is off-slider`);
+// The sliders are widened at render time to reach whatever the presets contain,
+// so the assertion is that presets stay physically sane, not that they fit the
+// HTML defaults. A preset the slider cannot reach used to be silently clamped.
+test("every preset in every county is a physically possible scenario", () => {
+  for (const county of CA_COUNTIES) {
+    for (const p of crashPresets(county)) {
+      assert.ok(p.depthPercent >= 0 && p.depthPercent < 100, `${county}/${p.id} depth ${p.depthPercent}`);
+      // Merced's 1980 decline was 15.5% in a single quarter, so 3 is a real answer.
+      assert.ok(p.monthsToBottom >= 3 && p.monthsToBottom <= 240, `${county}/${p.id} duration ${p.monthsToBottom}`);
+      assert.ok(p.rateAtBottom >= 0.02 && p.rateAtBottom <= 0.2, `${county}/${p.id} rate ${p.rateAtBottom}`);
+    }
   }
 });
 

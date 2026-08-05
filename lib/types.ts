@@ -63,6 +63,12 @@ export interface ScenarioInput {
   termYears: number;
   /** Annual rate as a decimal: 6.66% is 0.0666. */
   interestRate: number;
+  /**
+   * True when the reader typed the rate rather than accepting the live feed.
+   * The P&I line used to be badged "live market" and cited to Freddie Mac even
+   * when the number came from the reader's own lender quote.
+   */
+  rateIsUserSupplied?: boolean;
   creditScore: number;
   county: CaCounty;
 
@@ -132,8 +138,24 @@ export interface Qualification {
   frontEndDti: number;
   backEndDti: number;
   dtiCeiling: number;
+  /**
+   * Whether the loan's ACTUAL qualifying test passes. For every loan type but VA
+   * that is the DTI ceiling. For VA it is residual income: VA's 41% is a
+   * guideline with no hard cap behind it, and treating it as a gate told
+   * borrowers who clear VA's real test that they had failed, on the same screen
+   * that explained the test does not exist.
+   */
   passesDti: boolean;
-  /** Gross annual household income needed to clear the DTI ceiling. */
+  /**
+   * True when `dtiCeiling` is advisory rather than binding, so the UI can stop
+   * printing it as a wall. VA only.
+   */
+  dtiIsGuideline: boolean;
+  /**
+   * Gross annual household income needed to qualify, measured against whichever
+   * test actually binds. For VA that is the residual income requirement, not the
+   * 41% guideline.
+   */
   incomeRequiredAnnual: number;
   /** VA only: the residual income test, which is the one VA actually cares about. */
   residualIncome?: {

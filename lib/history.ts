@@ -2,20 +2,28 @@
  * Decades of California housing history, per county, and what it can and cannot
  * tell you about waiting for a crash.
  *
- * The central lesson buried in this data: **price is not payment**. A buyer at
- * the 2021 peak paid about the same monthly as a buyer at the 2006 peak, because
- * rates were 2.84% instead of 6.24%. Prices and rates move against each other
- * often enough that "wait for prices to fall" and "wait for it to get cheaper"
- * are different bets.
+ * The central lesson buried in this data: **price is not payment**. In San Diego
+ * a buyer at the 2021 peak paid about the same monthly as a buyer at the 2006
+ * peak, because rates were 2.84% instead of 6.24%. Prices and rates move against
+ * each other often enough that "wait for prices to fall" and "wait for it to get
+ * cheaper" are different bets. Those two figures are San Diego's, so the UI copy
+ * derives the equivalent pair from whichever county is selected rather than
+ * printing these.
  *
- * The second lesson: most California counties have had two or three declines
- * over 10% in fifty years. That is not a sample you can forecast from. Everything
+ * The second lesson: a California county has had between one and three declines
+ * over 10% in its record. That is not a sample you can forecast from. Everything
  * here is history, not prediction, and the UI says so.
  */
 
 import { monthlyPayment } from "./amortization.ts";
 import { DEFAULT_COUNTY, historyFor, type CountyHistory, type HistoryRow } from "./data/history.ts";
 import type { CaCounty } from "./data/ca-loan-limits.ts";
+
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/** n rows span n-1 steps, not n. Counting rows overstated every record by a period. */
+const yearsOfData = (rowCount: number, stepMonths: number): number =>
+  Math.round(((rowCount - 1) * stepMonths) / 12);
 
 export interface MonthPoint {
   month: string;
@@ -148,8 +156,16 @@ export interface CurrentStatus {
   recentPeakMonth: string;
   recentPeakIndex: number;
   percentOffRecentPeak: number;
-  /** Consecutive months of decline ending at the latest reading. */
+  /**
+   * Consecutive PERIODS of decline ending at the latest reading. A period is a
+   * quarter or a year depending on the county, never a month. The UI called
+   * these "consecutive monthly declines" on a series that has no monthly rows.
+   */
   consecutiveDeclines: number;
+  /** "quarterly" or "annual", so callers can name the period they are counting. */
+  periodLabel: "quarterly" | "annual";
+  /** Singular period noun: "quarter" or "year". */
+  periodNoun: "quarter" | "year";
   /** Latest 12 months, oldest first, for a sparkline. */
   trailing12: ReadonlyArray<{ month: string; index: number; changePercent: number }>;
 }
@@ -190,6 +206,8 @@ export function currentStatus(lookbackMonths = 36, county: CaCounty = DEFAULT_CO
     recentPeakIndex: peak[1],
     percentOffRecentPeak: ((latest[1] - peak[1]) / peak[1]) * 100,
     consecutiveDeclines,
+    periodLabel: stepMonths === 12 ? "annual" : "quarterly",
+    periodNoun: stepMonths === 12 ? "year" : "quarter",
     trailing12,
   };
 }
@@ -361,15 +379,22 @@ export interface CrashPreset {
 /**
  * Scenario presets derived from what actually happened, not from a hunch.
  *
- * The default is deliberately the MILDER of the two real declines rather than
- * their average. Averaging a 16.7% event and a 42.2% event produces a ~29%
- * "typical crash" that has never once occurred, and dressing up a two-item
- * sample as a central tendency is exactly the kind of false precision this
- * project exists to avoid. The 2008 case is offered as its own preset so the
- * severe tail is one click away rather than baked into the default.
+ * The default is deliberately the SHALLOWEST real decline rather than an average
+ * of them. Averaging a 12.5% event and a 41.9% event produces a ~27% "typical
+ * crash" that has never once occurred, and dressing up a two-item sample as a
+ * central tendency is exactly the kind of false precision this project exists to
+ * avoid. The worst case is offered as its own preset so the severe tail is one
+ * click away rather than baked into the default.
+ *
+ * Everything here is per county and NOTHING may be hardcoded from San Diego's
+ * record. Three separate strings used to be: "the milder of the two declines"
+ * (17 counties have one decline, 16 have three), "the 2008 crash was 42%" (24
+ * counties fell further than the 50% this preset offers), and "74 months, twice
+ * as long as 2006-09" (San Diego's own figures are 63 months and 1.6x). All of
+ * them are derived now.
  */
 export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
-  const { rows } = historyFor(county);
+  const { rows, place } = historyFor(county);
   const drops = findDrawdowns(10, county);
   const rateAtTroughOf = (d: (typeof drops)[number]) => {
     const row = rows.find((r) => r[0] === d.troughMonth);
@@ -379,24 +404,55 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
   const sorted = [...drops].sort((a, b) => b.depthPercent - a.depthPercent);
   const mild = sorted[0]!;
   const severe = sorted[sorted.length - 1]!;
+  const n = sorted.length;
+
+  // The longest decline on record, which is what "long stagnation" should be
+  // anchored to. Not always the deepest one.
+  const longest = [...drops].sort((a, b) => b.monthsPeakToTrough - a.monthsPeakToTrough)[0]!;
+  const shortest = [...drops].sort((a, b) => a.monthsPeakToTrough - b.monthsPeakToTrough)[0]!;
+  const stretchFactor = shortest.monthsPeakToTrough > 0 ? longest.monthsPeakToTrough / shortest.monthsPeakToTrough : 1;
+
+  const worstDepth = Math.abs(severe.depthPercent);
+  // "Worse than" has to actually be worse than this county's own record. In
+  // Merced the record is 65.7%, so a flat 50% would have been the mild case.
+  const tailDepth = Math.max(50, Math.ceil((worstDepth + 8) / 5) * 5);
+
+  const declineCount =
+    n === 1 ? "the only decline over 10% in the record" : n === 2 ? "the milder of the two declines on record" : `the shallowest of the ${n} declines on record`;
+
+  const real: CrashPreset[] =
+    n === 1
+      ? [
+          {
+            id: "mild",
+            label: `Repeat of ${mild.peakMonth.slice(0, 4)}`,
+            depthPercent: Math.round(worstDepth),
+            monthsToBottom: mild.monthsPeakToTrough,
+            rateAtBottom: rateAtTroughOf(mild),
+            basis: `The only decline over 10% in ${place}'s record: ${worstDepth.toFixed(1)}% over ${mild.monthsPeakToTrough} months, bottoming ${mild.troughMonth}. Rates at that trough averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%. One event is not a distribution, so treat this as an anecdote with a date on it.`,
+          },
+        ]
+      : [
+          {
+            id: "mild",
+            label: `Repeat of ${mild.peakMonth.slice(0, 4)}`,
+            depthPercent: Math.round(Math.abs(mild.depthPercent)),
+            monthsToBottom: mild.monthsPeakToTrough,
+            rateAtBottom: rateAtTroughOf(mild),
+            basis: `In ${place}, ${declineCount}: ${Math.abs(mild.depthPercent).toFixed(1)}% over ${mild.monthsPeakToTrough} months, bottoming ${mild.troughMonth}. Rates at that trough averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%.`,
+          },
+          {
+            id: "severe",
+            label: `Repeat of ${severe.peakMonth.slice(0, 4)}`,
+            depthPercent: Math.round(worstDepth),
+            monthsToBottom: severe.monthsPeakToTrough,
+            rateAtBottom: rateAtTroughOf(severe),
+            basis: `${place}'s worst decline on record: ${worstDepth.toFixed(1)}% over ${severe.monthsPeakToTrough} months, bottoming ${severe.troughMonth}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then. The crash and the rate relief arrived together.`,
+          },
+        ];
 
   return [
-    {
-      id: "mild",
-      label: `Repeat of ${mild.peakMonth.slice(0, 4)}`,
-      depthPercent: Math.round(Math.abs(mild.depthPercent)),
-      monthsToBottom: mild.monthsPeakToTrough,
-      rateAtBottom: rateAtTroughOf(mild),
-      basis: `The milder of the two declines on record: ${Math.abs(mild.depthPercent).toFixed(1)}% over ${mild.monthsPeakToTrough} months, bottoming ${mild.troughMonth}. Rates at that trough averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%.`,
-    },
-    {
-      id: "severe",
-      label: `Repeat of ${severe.peakMonth.slice(0, 4)}`,
-      depthPercent: Math.round(Math.abs(severe.depthPercent)),
-      monthsToBottom: severe.monthsPeakToTrough,
-      rateAtBottom: rateAtTroughOf(severe),
-      basis: `The worst decline on record: ${Math.abs(severe.depthPercent).toFixed(1)}% over ${severe.monthsPeakToTrough} months, bottoming ${severe.troughMonth}. Rates had fallen to ${(rateAtTroughOf(severe) * 100).toFixed(2)}% by then. The crash and the rate relief arrived together.`,
-    },
+    ...real,
     {
       id: "soft",
       label: "No crash, rates ease",
@@ -426,28 +482,30 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
     },
     {
       id: "worse-than-2008",
-      label: "Worse than 2008",
-      depthPercent: 50,
+      label: `Worse than ${severe.peakMonth.slice(0, 4)}`,
+      depthPercent: tailDepth,
       monthsToBottom: 48,
       rateAtBottom: 0.04,
-      basis:
-        "Beyond anything in the California record. The 2008 crash was 42% in San Diego. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and today's mortgage delinquency rate is near a historic low rather than climbing.",
+      basis: `Beyond anything in ${place}'s record, whose worst was ${worstDepth.toFixed(1)}% from the ${severe.peakMonth.slice(0, 4)} peak. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and mortgage delinquency is nowhere near where it sat going into that one.`,
     },
     {
       id: "japan",
       label: "Long stagnation",
       depthPercent: 15,
-      monthsToBottom: 84,
+      monthsToBottom: Math.min(120, longest.monthsPeakToTrough),
       rateAtBottom: 0.045,
       basis:
-        "Not a crash, a grind. Prices drift down modestly over seven years while rates ease. Japan after 1991 and California through the 1990s both looked more like this than like 2008: the 1990-96 decline took 74 months to bottom, twice as long as 2006-09.",
+        `Not a crash, a grind. Prices drift down modestly while rates ease. Japan after 1991 and California through the 1990s both looked more like this than like 2008: ` +
+        (n > 1
+          ? `${place}'s ${longest.peakMonth.slice(0, 4)} decline took ${longest.monthsPeakToTrough} months to bottom, ${stretchFactor.toFixed(1)}x as long as its ${shortest.peakMonth.slice(0, 4)} one.`
+          : `${place}'s ${longest.peakMonth.slice(0, 4)} decline took ${longest.monthsPeakToTrough} months to bottom.`),
     },
   ];
 }
 
 /** The preset the UI opens on. See crashPresets() for why it's the mild one. */
-export function defaultCrashPreset(): CrashPreset {
-  return crashPresets()[0]!;
+export function defaultCrashPreset(county: CaCounty = DEFAULT_COUNTY): CrashPreset {
+  return crashPresets(county)[0]!;
 }
 
 /**
@@ -462,17 +520,40 @@ export function historicalContext(county: CaCounty = DEFAULT_COUNTY) {
   const status = currentStatus(36, county);
   const extremes = paymentExtremes(county);
 
+  // "Price is not payment" used to quote San Diego's 2.84% and 6.24% at every
+  // county. Derive it instead: the month with the highest PRICE against the
+  // month with the highest PAYMENT. When those are different months, the point
+  // makes itself.
+  const series = buildSeries(county);
+  let dearestPrice = series[0]!;
+  for (const p of series) if (p.price > dearestPrice.price) dearestPrice = p;
+  const dearestPayment = extremes.priciest;
+  const priceNotPayment =
+    dearestPrice.month === dearestPayment.month
+      ? `Price is not payment. The rate decides as much as the sticker does, and a decline that arrives with rate cuts is worth far less than the same decline at today's rate.`
+      : `Price is not payment. ${place}'s most expensive month to BUY was ${dearestPrice.month.slice(0, 4)} at ` +
+        `${money(dearestPrice.price)}, but its most expensive month to OWN was ${dearestPayment.month.slice(0, 4)}, ` +
+        `when the same house cost ${money(dearestPayment.price)} at ${(dearestPayment.rate * 100).toFixed(2)}% ` +
+        `instead of ${(dearestPrice.rate * 100).toFixed(2)}%. And if a recession cracks prices, rate cuts are what ` +
+        `stop the cracking.`;
+
+  const declineCaveat =
+    drops.length === 1
+      ? `One decline over 10% in ${yearsOfData(rows.length, stepMonths)} years is an anecdote, not a sample. Anyone who says they know what happens next is selling something.`
+      : `${drops.length} declines over 10% in ${yearsOfData(rows.length, stepMonths)} years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.`;
+
   return {
     place,
-    // Rows are quarters or years, so the row count is not a month count.
-    yearsOfData: Math.round((rows.length * stepMonths) / 12),
+    // n rows span n-1 steps. Counting the row count overstated every record by
+    // one period, so "50 years" was really 49 and change.
+    yearsOfData: yearsOfData(rows.length, stepMonths),
     declines: drops,
     worst,
     status,
     extremes,
     caveats: [
-      "Two or three declines over 10% in fifty years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.",
-      "Price is not payment. A 2021 peak buyer paid about what a 2006 peak buyer paid, because the rate was 2.84% not 6.24%. And if a recession cracks prices, rate cuts are what stop the cracking.",
+      declineCaveat,
+      priceNotPayment,
       "You have to still have a job at the bottom. California unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
       "Credit tightens exactly when prices fall. In 2009 private lenders went back to 20% down; FHA at 3.5% and VA at zero stayed open.",
       "In California, buying lower is permanent. Prop 13 locks your assessed value to your price and caps growth at 2%/year, so a cheaper entry keeps paying you back for as long as you own it.",

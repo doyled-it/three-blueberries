@@ -21,6 +21,20 @@ export interface AffordabilityResult {
   bindingConstraint: "dti" | "residual-income" | "none";
   /** Cash you need on hand at that price. */
   cashRequired: number;
+  /**
+   * The down payment as a share of the MAX price, not of the price on the form.
+   * The search holds the deposit fixed and raises the price, so the deposit
+   * quietly thins: $180,000 is 20% of $900,000 and 14% of $1.3M, and at 14% the
+   * answer carries PMI that the form's scenario did not. The panel says so now.
+   */
+  downPercent: number;
+  /**
+   * Warnings from the scenario AT THE MAX PRICE, which are not the same as the
+   * warnings for the price on the form. These used to be computed and discarded,
+   * so the known jumbo limitation, the FHA MIP-for-life rule and the county tax
+   * fallback were all invisible on the one number people screenshot.
+   */
+  warnings: readonly string[];
 }
 
 function passes(result: ScenarioResult): boolean {
@@ -32,8 +46,14 @@ function passes(result: ScenarioResult): boolean {
 /**
  * Binary search for the highest purchase price that still qualifies.
  *
- * Every constraint is monotonic in price. A more expensive house is never
- * easier to afford, so bisection is safe and converges in about 25 steps.
+ * Every constraint is monotonic in price. A more expensive house is never easier
+ * to afford, so bisection is safe. Over the default $50k-$10M range at $500
+ * tolerance that is log2(9,950,000/500), about 15 steps, not the 25 this comment
+ * used to claim.
+ *
+ * KNOWN LIMITATION, and it is now stated in the UI rather than only here: the
+ * search uses the conforming rate at every price, so an answer above the county
+ * conforming limit is quoted at a rate the borrower could not actually get.
  */
 export function maxAffordablePrice(
   base: ScenarioInput,
@@ -54,6 +74,8 @@ export function maxAffordablePrice(
       scenario: atFloor,
       bindingConstraint: atFloor.qualification.passesDti ? "residual-income" : "dti",
       cashRequired: atFloor.cashToClose.total,
+      downPercent: atFloor.loan.downPaymentPercent,
+      warnings: atFloor.warnings,
     };
   }
 
@@ -68,6 +90,8 @@ export function maxAffordablePrice(
       scenario: result,
       bindingConstraint: "none",
       cashRequired: result.cashToClose.total,
+      downPercent: result.loan.downPaymentPercent,
+      warnings: withSearchCaveats(result),
     };
   }
 
@@ -88,7 +112,44 @@ export function maxAffordablePrice(
     bindingConstraint = "residual-income";
   }
 
-  return { maxPurchasePrice: price, scenario, bindingConstraint, cashRequired: scenario.cashToClose.total };
+  return {
+    maxPurchasePrice: price,
+    scenario,
+    bindingConstraint,
+    cashRequired: scenario.cashToClose.total,
+    downPercent: scenario.loan.downPaymentPercent,
+    warnings: withSearchCaveats(scenario),
+  };
+}
+
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * The scenario's own warnings, plus the two the SEARCH introduces and the
+ * scenario cannot know about: the jumbo rate limitation, and the deposit
+ * thinning below 20% because the price moved and the cash did not.
+ */
+function withSearchCaveats(scenario: ScenarioResult): readonly string[] {
+  const out = [...scenario.warnings];
+  const down = scenario.loan.downPaymentPercent;
+  const downPayment = scenario.loan.downPaymentAmount;
+
+  if (scenario.loan.exceedsConformingLimit) {
+    out.push(
+      `This answer is above ${scenario.input.county} County's ${money(scenario.loan.conformingLimit)} conforming limit, and the search ` +
+        `priced every step at the conforming rate. A real jumbo quote runs higher, so treat this number as an upper bound rather than ` +
+        `a target. The honest max is somewhere at or below it.`
+    );
+  }
+
+  if (scenario.input.loanType === "conventional" && down < 0.2 && down > 0) {
+    out.push(
+      `At this price your ${money(downPayment)} deposit is ${(down * 100).toFixed(1)}% down, not 20%. The search raises the price and ` +
+        `leaves the cash where it is, so the answer carries PMI that a 20%-down purchase would not.`
+    );
+  }
+
+  return out;
 }
 
 /**

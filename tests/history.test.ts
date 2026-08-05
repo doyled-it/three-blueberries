@@ -357,14 +357,16 @@ test("crash presets are derived from real drawdowns, not invented round numbers"
   }
 });
 
-test("the default preset is the milder decline, not an average of the two", () => {
+test("the default preset is the shallowest real decline, not an average of them", () => {
   const preset = defaultCrashPreset();
   const drops = findDrawdowns(10);
   const mildest = drops.reduce((a, b) => (b.depthPercent > a.depthPercent ? b : a));
   assert.equal(preset.depthPercent, Math.round(Math.abs(mildest.depthPercent)));
-  // An average of -16.7 and -42.2 would be ~29. A crash that has never happened.
-  assert.notEqual(preset.depthPercent, 29);
-  assert.match(preset.basis, /milder/i);
+  // Averaging -12.5 and -41.9 would be ~27. A crash that has never happened.
+  assert.notEqual(preset.depthPercent, 27);
+  // The copy has to name the actual count. San Diego has three declines, so
+  // "the milder of the two" was wrong here and in 33 other counties.
+  assert.match(preset.basis, /milder of the two|shallowest of the \d+ declines|only decline over 10%/i);
 });
 
 test("every preset explains where its numbers came from", () => {
@@ -432,7 +434,9 @@ test("buying power today is far below where the record started", () => {
 test("the thesis copy states the relative claim, not just 'houses are expensive'", () => {
   const v = buyingPowerVerdict();
   assert.match(v.headline, /faster than incomes/i);
-  assert.match(v.blueberries, /years of median household income/i);
+  // Both branches must say STATEWIDE. The falling branch dropped it, directly
+  // above a panel that uses LOCAL income.
+  assert.match(v.blueberries, /years of STATEWIDE median household income/i);
 });
 
 test("the buying-power caveat discloses the generous assumptions", () => {

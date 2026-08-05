@@ -24,7 +24,13 @@ import {
   findDrawdowns,
   historicalContext,
 } from "../../lib/history.ts";
-import { compareToCohort, refinanceOpportunity, BEST_REFI } from "../../lib/cohort.ts";
+import {
+  compareToCohort,
+  refinanceOpportunity,
+  earliestCohortMonth,
+  latestCohortMonth,
+  BEST_REFI,
+} from "../../lib/cohort.ts";
 import {
   crashSignals,
   leadingIndicators,
@@ -35,8 +41,9 @@ import {
 } from "../../lib/signals.ts";
 import { MODEL_META, horizonReports, learnedWeights, verdict } from "../../lib/forecast.ts";
 import { INSTRUMENTS, WATCHLIST_DISCIPLINE, WATCHLIST_PREAMBLE } from "../../lib/instruments.ts";
-import { BUYING_POWER_CAVEAT, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
+import { buyingPowerCaveat, buyingPowerSeries, buyingPowerVerdict } from "../../lib/buying-power.ts";
 import { DEFAULT_ANCHOR_PRICE } from "../../lib/history.ts";
+import { historyFor } from "../../lib/data/history.ts";
 import { countyTaxRate } from "../../lib/data/ca-property.ts";
 import { countyScope } from "../../lib/county-scope.ts";
 import { WHERE_IT_WORKS_CAVEAT, allStandings, countyStanding, payTrap } from "../../lib/where-it-works.ts";
@@ -136,6 +143,7 @@ function readInput(): ScenarioInput {
     loanType,
     termYears: Number($<HTMLSelectElement>("termYears").value),
     interestRate: num("interestRate", 6.66) / 100,
+    rateIsUserSupplied: $<HTMLInputElement>("interestRate").dataset["touched"] === "1",
     creditScore: num("creditScore", 740),
     county: $<HTMLSelectElement>("county").value as CaCounty,
     claimHomeownersExemption: $<HTMLInputElement>("homeownersExemption").checked,
@@ -235,18 +243,33 @@ function render(): void {
   const haveIncome = input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0);
   const afford = maxAffordablePrice(input);
 
+  // Empty-state cards used to render a literal ", " as their value, which is the
+  // separator from an earlier template left behind by an edit.
+  const NOT_AVAILABLE = "&mdash;".replace("&mdash;", "—");
+
   $("qualification").innerHTML = `
     <div class="stat">
       <span class="stat__label">Income needed for this house</span>
       <span class="stat__value">${money(q.incomeRequiredAnnual)}<span class="stat__unit">/year</span></span>
-      <span class="stat__note">To stay at or under a ${pct(q.dtiCeiling, 0)} debt-to-income ratio.</span>
+      <span class="stat__note">${
+        q.dtiIsGuideline
+          ? `To clear VA's residual income test, which is what VA actually underwrites. The ${pct(q.dtiCeiling, 0)} DTI figure is a guideline with no cap behind it.`
+          : `To stay at or under a ${pct(q.dtiCeiling, 0)} debt-to-income ratio.`
+      }</span>
     </div>
     <div class="stat">
       <span class="stat__label">Most house you can buy</span>
-      <span class="stat__value">${afford.maxPurchasePrice > 0 ? money(afford.maxPurchasePrice) : ", "}</span>
+      <span class="stat__value">${afford.maxPurchasePrice > 0 ? money(afford.maxPurchasePrice) : NOT_AVAILABLE}</span>
       <span class="stat__note">${
         afford.maxPurchasePrice > 0
-          ? `On ${money(haveIncome)}/year, limited by ${afford.bindingConstraint === "residual-income" ? "VA residual income" : "debt-to-income"}. Needs ${money(afford.cashRequired)} cash.`
+          ? `On ${money(haveIncome)}/year, ${
+              afford.bindingConstraint === "none"
+                ? "and nothing here binds: this is the top of the search range, not a limit you hit"
+                : `limited by ${afford.bindingConstraint === "residual-income" ? "VA residual income" : "debt-to-income"}`
+            }. Needs ${money(afford.cashRequired)} cash` +
+            (afford.downPercent < 0.2 && input.loanType === "conventional"
+              ? `, and at that price your deposit is only ${pct(afford.downPercent, 1)} down, so the answer carries PMI.`
+              : ".")
           : "This household does not clear the ceiling at any price with these inputs."
       }</span>
     </div>
@@ -255,10 +278,14 @@ function render(): void {
       <span class="stat__value">${money(result.cashToClose.total)}</span>
       <span class="stat__note">${money(result.cashToClose.downPayment)} down, plus closing costs and impound seeding.</span>
     </div>
-    <div class="stat ${q.passesDti ? "stat--pass" : "stat--fail"}">
+    <div class="stat ${q.dtiIsGuideline ? "" : q.passesDti ? "stat--pass" : "stat--fail"}">
       <span class="stat__label">Your debt-to-income</span>
-      <span class="stat__value">${Number.isFinite(q.backEndDti) ? pct(q.backEndDti, 1) : ", "}</span>
-      <span class="stat__note">${q.passesDti ? "Within" : "Above"} the ${pct(q.dtiCeiling, 0)} ceiling for this program.</span>
+      <span class="stat__value">${Number.isFinite(q.backEndDti) ? pct(q.backEndDti, 1) : NOT_AVAILABLE}</span>
+      <span class="stat__note">${
+        q.dtiIsGuideline
+          ? `VA's guideline is ${pct(q.dtiCeiling, 0)}, and it is not a ceiling. The card below is the test that decides.`
+          : `${q.passesDti ? "Within" : "Above"} the ${pct(q.dtiCeiling, 0)} ceiling for this program.`
+      }</span>
     </div>
     ${
       q.residualIncome
@@ -271,7 +298,16 @@ function render(): void {
     }`;
 
   $("notes").innerHTML = q.notes.map((n) => `<li>${n}</li>`).join("");
-  $("warnings").innerHTML = result.warnings.map((w) => `<li>${w}</li>`).join("");
+
+  // The max-price answer has warnings of its own, and they are not the warnings
+  // for the price on the form. They used to be computed and discarded, so the
+  // jumbo-rate limitation was invisible on the one number people screenshot.
+  const seen = new Set(result.warnings);
+  const affordOnly = afford.maxPurchasePrice > 0 ? afford.warnings.filter((w) => !seen.has(w)) : [];
+  $("warnings").innerHTML = [
+    ...result.warnings.map((w) => `<li>${w}</li>`),
+    ...affordOnly.map((w) => `<li><strong>On the ${money(afford.maxPurchasePrice)} answer above:</strong> ${w}</li>`),
+  ].join("");
 
   renderRentVsBuy(input);
   // The thesis panel is a claim about the median San Diego home, so it must use
@@ -293,7 +329,7 @@ function render(): void {
   renderSignals(input.county);
   renderInstruments();
   renderForecast();
-  renderPresets();
+  renderPresets(input.county);
   renderWaiting(input);
 }
 
@@ -320,19 +356,35 @@ const COHORT_SERIES = [
 const COHORT_FIRST_YEAR = 1990;
 
 function renderCohort(input: ScenarioInput): void {
-  const year = Number($<HTMLInputElement>("cohortYear").value);
-  $("cohortYearOut").textContent = String(year);
-
+  // The county HAS to be threaded through here. Without it compareToCohort falls
+  // back to DEFAULT_COUNTY and every reader was priced off San Diego's index
+  // under a note naming their own county.
   const shared = {
+    county: input.county,
     currentPrice: input.purchasePrice,
     currentRate: input.interestRate,
     downPercent: 0.2,
     propertyTaxRate: input.propertyTaxRate ?? countyTaxRate(input.county),
   };
 
-  const lastYear = Number(BEST_REFI.month.slice(0, 4)) + 4;
+  // Rural counties are annual and several start in the 1990s, so the cohort
+  // range is the county's own record, not a hardcoded 1990.
+  const firstYear = Math.max(COHORT_FIRST_YEAR, Number(earliestCohortMonth(input.county).slice(0, 4)));
+  const lastYear = Math.min(
+    Number(BEST_REFI.month.slice(0, 4)) + 4,
+    Number(latestCohortMonth(input.county).slice(0, 4))
+  );
   const years: number[] = [];
-  for (let y = COHORT_FIRST_YEAR; y <= lastYear; y++) years.push(y);
+  for (let y = firstYear; y <= lastYear; y++) years.push(y);
+
+  // Clamp the slider to that range before reading it, so a county whose record
+  // starts in 1993 cannot be asked about 1990 and answer with an empty panel.
+  const slider = $<HTMLInputElement>("cohortYear");
+  slider.min = String(firstYear);
+  slider.max = String(lastYear);
+  const year = Math.min(lastYear, Math.max(firstYear, Number(slider.value)));
+  slider.value = String(year);
+  $("cohortYearOut").textContent = String(year);
 
   const columns: StackColumn[] = [];
   let yourPayment = 0;
@@ -494,10 +546,13 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
         format: compact,
         bands,
         markers: [
-          { month: worst.peakMonth, label: "2006 peak" },
+          // The peak is whatever this county's worst decline started from. It is
+          // 1981 in some counties and 2006 in others, so it cannot be labelled
+          // "2006 peak".
+          { month: worst.peakMonth, label: `${worst.peakMonth.slice(0, 4)} peak` },
           { month: worst.troughMonth, label: `${worst.depthPercent.toFixed(0)}%` },
         ],
-        description: `San Diego home prices from ${series[0]!.month} to ${series[series.length - 1]!.month}, scaled to today's dollars.`,
+        description: `${ctx.place} home prices from ${longMonth(series[0]!.month)} to ${longMonth(series[series.length - 1]!.month)}, scaled to today's dollars.`,
       })}
     </div>
     <div class="chart-block">
@@ -507,11 +562,14 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
         color: SERIES_PAYMENT,
         format: (n) => `$${Math.round(n / 1000)}k`,
         bands,
+        // Both of these used to be hardcoded months. A quarterly series has no
+        // 2021-08 and an annual one has no 2023-10, so they marked nothing; and
+        // "worst ever" was asserted rather than found.
         markers: [
-          { month: "2021-08", label: "2021: cheap money" },
-          { month: "2023-10", label: "worst ever" },
+          { month: ctx.extremes.cheapest.month, label: `cheapest to own` },
+          { month: ctx.extremes.priciest.month, label: `dearest to own` },
         ],
-        description: `Monthly principal and interest on the same San Diego home, at each month's prevailing rate.`,
+        description: `Monthly principal and interest on the same ${ctx.place} home, at each month's prevailing rate.`,
       })}
     </div>
     <div class="stats">
@@ -537,8 +595,18 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
         <span class="stat__label">Right now</span>
         <span class="stat__value">${status.percentOffRecentPeak.toFixed(1)}%<span class="stat__unit"> off peak</span></span>
         <span class="stat__note">
-          ${status.consecutiveDeclines} consecutive monthly ${status.consecutiveDeclines === 1 ? "decline" : "declines"}
-          through ${longMonth(status.month)}. Real, but small. The 2006 crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
+          ${
+            status.consecutiveDeclines === 0
+              ? `No consecutive ${status.periodLabel} declines`
+              : `${status.consecutiveDeclines} consecutive ${status.periodLabel} ${status.consecutiveDeclines === 1 ? "decline" : "declines"}`
+          }
+          through ${longMonth(status.month)}.
+          ${
+            status.percentOffRecentPeak > -1
+              ? `Nothing is falling here yet.`
+              : `Real, but small.`
+          }
+          The ${worst.peakMonth.slice(0, 4)} crash fell ${Math.abs(worst.depthPercent).toFixed(0)}%.
         </span>
       </div>
     </div>`;
@@ -770,7 +838,8 @@ function renderRentVsBuy(input: ScenarioInput): void {
   const rates: number[] = [];
   for (let rate = 0.03; rate <= 0.1001; rate += 0.0025) rates.push(rate);
   const zone = buyZone(sweepBase, scaling, rates, holdYears, downPercent, closingCostRate);
-  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, downPercent, closingCostRate);
+  const RATE_STEP = 0.005;
+  const sensitivity = rateSensitivity(sweepBase, scaling, holdYears, downPercent, closingCostRate, RATE_STEP);
 
   // Use the exact ceiling at the actual rate. Reading it off the nearest sampled
   // point on the curve produced a figure that disagreed with the stat card above.
@@ -963,7 +1032,8 @@ function renderBuyingPower(county: CaCounty): void {
       ? [{ seriesKey: "price", month: v.lastAffordableMonth, label: "last month it worked" }]
       : [],
     description:
-      "What one San Diego house cost through time, against what a median California household could afford, 1987 to today.",
+      `What one ${historyFor(county).place} house cost from ${longMonth(series[0]!.month)} to ` +
+      `${longMonth(series[series.length - 1]!.month)}, against what a median California household could afford.`,
   });
 
   if (!buyingPowerWired) {
@@ -996,10 +1066,17 @@ function renderBuyingPower(county: CaCounty): void {
 
   $("buyingPowerHeadline").textContent = v.headline;
 
+  // In 34 counties a median statewide income still clears the local price, so
+  // the last affordable month is the current one. "The last month the math
+  // worked: March 2026" reads as an obituary for something that is still alive.
+  const stillWorks = v.lastAffordableMonth === v.latest.month;
+
   $("buyingPower").innerHTML = `
     <div class="stat stat--wide">
-      <span class="stat__label">The last month the math worked</span>
-      <span class="stat__value">${v.lastAffordableMonth ? longMonth(v.lastAffordableMonth) : "never"}</span>
+      <span class="stat__label">${stillWorks ? "The math still works here" : "The last month the math worked"}</span>
+      <span class="stat__value">${
+        stillWorks ? "today" : v.lastAffordableMonth ? longMonth(v.lastAffordableMonth) : "never"
+      }</span>
       <span class="stat__note">${v.blueberries}</span>
     </div>
     <div class="stat">
@@ -1008,8 +1085,8 @@ function renderBuyingPower(county: CaCounty): void {
       <span class="stat__note">It was ${v.first.yearsOfIncome.toFixed(1)} in ${v.first.month.slice(0, 4)}.</span>
     </div>
     <div class="stat">
-      <span class="stat__label">Buying power lost</span>
-      <span class="stat__value">${(v.powerLost * 100).toFixed(0)}%</span>
+      <span class="stat__label">Buying power ${v.powerLost > 0 ? "lost" : "gained"}</span>
+      <span class="stat__value">${(Math.abs(v.powerLost) * 100).toFixed(0)}%</span>
       <span class="stat__note">Since ${v.first.month.slice(0, 4)}, holding the effort fixed at 30% of income.</span>
     </div>
     <div class="stat">
@@ -1018,7 +1095,7 @@ function renderBuyingPower(county: CaCounty): void {
       <span class="stat__note">Worst was ${v.worst.purchasingRatio.toFixed(2)}x in ${longMonth(v.worst.month)}. Today: ${v.latest.purchasingRatio.toFixed(2)}x.</span>
     </div>`;
 
-  $("buyingPowerCaveat").textContent = BUYING_POWER_CAVEAT;
+  $("buyingPowerCaveat").textContent = buyingPowerCaveat(county);
   renderWhereItWorks(county);
 }
 
@@ -1271,14 +1348,25 @@ function renderForecast(): void {
     </div>`;
 }
 
-let presetsRendered = false;
+let presetCounty: CaCounty | null = null;
 
-function applyPreset(id: string): void {
-  const preset = crashPresets().find((p) => p.id === id);
+function applyPreset(id: string, county: CaCounty): void {
+  const preset = crashPresets(county).find((p) => p.id === id);
   if (!preset) return;
-  $<HTMLInputElement>("crashDepth").value = String(preset.depthPercent);
-  $<HTMLInputElement>("crashMonths").value = String(Math.min(preset.monthsToBottom, 84));
-  $<HTMLInputElement>("crashRate").value = String(Math.round(preset.rateAtBottom * 10000));
+  // Widen the sliders to reach the preset before setting them. Merced's worst
+  // decline is 65.7% and the depth slider stopped at 50, so the preset button
+  // and the slider under it disagreed by sixteen points.
+  const depth = $<HTMLInputElement>("crashDepth");
+  const months = $<HTMLInputElement>("crashMonths");
+  const rate = $<HTMLInputElement>("crashRate");
+  depth.max = String(Math.max(Number(depth.max), preset.depthPercent));
+  months.max = String(Math.max(Number(months.max), preset.monthsToBottom));
+  rate.max = String(Math.max(Number(rate.max), Math.round(preset.rateAtBottom * 10000)));
+  rate.min = String(Math.min(Number(rate.min), Math.round(preset.rateAtBottom * 10000)));
+
+  depth.value = String(preset.depthPercent);
+  months.value = String(preset.monthsToBottom);
+  rate.value = String(Math.round(preset.rateAtBottom * 10000));
   $("presetBasis").textContent = preset.basis;
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-preset]")) {
     b.classList.toggle("preset--on", b.dataset["preset"] === id);
@@ -1286,19 +1374,21 @@ function applyPreset(id: string): void {
   renderWaiting(readInput());
 }
 
-function renderPresets(): void {
-  if (presetsRendered) return;
-  presetsRendered = true;
+function renderPresets(county: CaCounty): void {
+  // Rebuild whenever the county changes: the labels, the depths and the basis
+  // are all that county's own record.
+  if (presetCounty === county) return;
+  presetCounty = county;
 
-  const presets = crashPresets();
+  const presets = crashPresets(county);
   $("presets").innerHTML = presets
     .map((p) => `<button type="button" class="preset" data-preset="${p.id}">${p.label}</button>`)
     .join("");
 
   for (const b of document.querySelectorAll<HTMLButtonElement>("[data-preset]")) {
-    b.addEventListener("click", () => applyPreset(b.dataset["preset"]!));
+    b.addEventListener("click", () => applyPreset(b.dataset["preset"]!, county));
   }
-  applyPreset(presets[0]!.id);
+  applyPreset(presets[0]!.id, county);
 }
 
 function renderWaiting(input: ScenarioInput): void {

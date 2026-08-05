@@ -56,16 +56,20 @@ export interface BuyingPowerPoint {
 }
 
 /**
- * The income series runs 1984 to 2024. Outside it, carry the NEAREST END
- * forward or backward rather than always the last value: dividing a 1975 house
+ * Income for a calendar year, or the last measured year when the price series
+ * runs past the income series.
+ *
+ * There is no backward carry and there must not be one: dividing a 1975 house
  * price by a 2024 income produced a 3% burden and made 1975 look like the best
- * time to buy in history, which is an artefact, not a finding.
+ * time to buy in history. `INCOME_STARTS` below solves that by cutting the panel
+ * to the years income is actually measured, so this function is only ever asked
+ * about years at or past the START of the series.
  */
 const incomeForYear = (year: string): number => {
   const exact = CA_MEDIAN_INCOME.find((r) => r[0].startsWith(year));
   if (exact) return exact[1];
-  // Past the END of the series only. Holding income flat overstates the burden
-  // slightly, which is the conservative direction.
+  // Past the END of the series only. Holding income flat overstates the burden,
+  // because incomes kept rising. The caveat says so.
   return CA_MEDIAN_INCOME[CA_MEDIAN_INCOME.length - 1]![1];
 };
 
@@ -216,7 +220,7 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
           `that, and whether you would want to, are the next two questions, and they are below.`,
     blueberries:
       powerLost > 0
-        ? `That house costs ${latest.yearsOfIncome.toFixed(1)} years of median household income today. In ` +
+        ? `That house costs ${latest.yearsOfIncome.toFixed(1)} years of STATEWIDE median household income today. In ` +
           `${first.month.slice(0, 4)} it cost ${first.yearsOfIncome.toFixed(1)} years. To buy the same house on ` +
           `the same terms your parents did, a household would need to earn ${money(incomeNeededToday)} instead ` +
           `of ${money(latest.income)}.`
@@ -228,24 +232,56 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
 }
 
 /**
+ * Both branches must carry the STATEWIDE qualifier. The rising branch shouted it
+ * and the falling branch dropped it, directly above a panel that uses LOCAL
+ * income, which is exactly the blur `where-it-works.ts` exists to prevent.
+ */
+
+/**
  * What this panel is and is not, in the order a sceptical reader would ask.
  *
- * It used to state the income source twice and then get the direction of its own
- * bias backwards: holding income flat after the series ends makes the affordable
- * line too LOW, so it overstates the gap. It claimed the opposite, which happened
- * to flatter the argument the panel is making. That is the one direction this
- * project is not entitled to be wrong in.
+ * Two errors have been fixed here and both flattered the panel's own argument,
+ * which is the one direction this project is not entitled to be wrong in.
+ *
+ * 1. It got the direction of its own bias backwards. Holding income flat after
+ *    the series ends makes the affordable line too LOW, so it OVERSTATES the
+ *    gap. It claimed the opposite.
+ * 2. It said "the anchor moves the dollar axis and nothing else", which told a
+ *    sceptical reader not to interrogate the one input that sets the panel's
+ *    biggest stat tile. Only the price line is anchored; the affordable line is
+ *    derived from income and rate alone. So the anchor moves the GAP between
+ *    them, and with it "the last month the math worked", by years. Only the
+ *    percentage change in buying power survives it.
+ *
+ * It is a function of county because the record does NOT start in 1984
+ * everywhere: eleven counties' price series begin as late as 1993.
  */
-export const BUYING_POWER_CAVEAT =
-  `The income here is STATEWIDE California median household income, so this answers "could a typical Californian ` +
-  `buy here", not "can the people who live here afford it". The panel below answers that one, using each county's ` +
-  `own income. ` +
-  `The price line is the FHFA repeat-sales index for your county, anchored to Zillow's current typical ` +
-  `single-family value so it reads in dollars: one representative house through time, not the median listing of ` +
-  `each year. The anchor moves the dollar axis and nothing else. ` +
-  `The record runs from ${INCOME_STARTS}, where the income series starts, because every figure here is a ratio of ` +
-  `the two. Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is carried forward flat after that, which OVERSTATES ` +
-  `the gap, since incomes kept rising. ` +
-  `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
-  `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at the prevailing rate, and excludes tax, insurance and ` +
-  `everything else. It is the most generous possible reading of what a household could carry.`;
+export function buyingPowerCaveat(county: CaCounty = DEFAULT_COUNTY): string {
+  const series = buyingPowerSeries(county);
+  const startYear = series[0]!.month.slice(0, 4);
+  const { spliceMonth } = historyFor(county);
+
+  return (
+    `The income here is STATEWIDE California median household income, so this answers "could a typical Californian ` +
+    `buy here", not "can the people who live here afford it". The panel below answers that one, using each county's ` +
+    `own income. ` +
+    `The price line is the FHFA repeat-sales index for your county, anchored to Zillow's current typical ` +
+    `single-family value so it reads in dollars: one representative house through time, not the median listing of ` +
+    `each year. Only the price line is anchored, so the anchor moves the GAP: every dollar figure here and the ` +
+    `"last month it worked" date scale with Zillow's estimate. The percentage change in buying power does not. ` +
+    `The record starts in ${startYear}` +
+    (startYear === INCOME_STARTS
+      ? `, where the income series starts, because every figure here is a ratio of the two. `
+      : `, where this county's price series starts. The income series begins in ${INCOME_STARTS}, so counties with ` +
+        `a longer price record get a longer panel. `) +
+    (spliceMonth ? `Prices before ${spliceMonth.slice(0, 4)} are chain-linked from a coarser FHFA series. ` : "") +
+    `Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is carried forward flat after that, which OVERSTATES ` +
+    `the gap, since incomes kept rising. ` +
+    `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
+    `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at the prevailing rate, and excludes tax, insurance and ` +
+    `everything else. It is the most generous possible reading of what a household could carry.`
+  );
+}
+
+/** @deprecated Use buyingPowerCaveat(county). Kept so nothing renders undefined. */
+export const BUYING_POWER_CAVEAT = buyingPowerCaveat(DEFAULT_COUNTY);
