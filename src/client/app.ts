@@ -64,6 +64,7 @@ import {
   statutoryRentCap,
 } from "../../lib/rent-vs-buy.ts";
 import { bridgeScenario } from "../../lib/scenario-bridge.ts";
+import { recommend } from "../../lib/recommendation.ts";
 import {
   attachChartHover,
   attachStackHover,
@@ -345,6 +346,17 @@ function render(): void {
 // ---------------------------------------------------------------------------
 
 const SERIES_PRICE = "#3987e5";
+
+/**
+ * Axis labels for a dollar series that may live in the hundreds.
+ *
+ * `$${Math.round(n/1000)}k` collapses $500 to "$1k", identical to the $1,000
+ * gridline above it, so in 15 low-priced counties two gridlines carried the
+ * same label and the $500 line read as $1,000: a 2x error on the payment axis.
+ * Keep a decimal below $10k so adjacent gridlines never share a label.
+ */
+const moneyAxis = (n: number): string =>
+  n >= 10_000 ? `$${Math.round(n / 1000)}k` : n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${Math.round(n)}`;
 const SERIES_PAYMENT = "#d95926";
 
 /**
@@ -564,7 +576,11 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
           { month: worst.peakMonth, label: `${worst.peakMonth.slice(0, 4)} peak` },
           { month: worst.troughMonth, label: `${worst.depthPercent.toFixed(0)}%` },
         ],
-        description: `${ctx.place} home prices from ${longMonth(series[0]!.month)} to ${longMonth(series[series.length - 1]!.month)}, scaled to today's dollars.`,
+        // NOT "scaled to today's dollars". buildSeries applies no CPI term, so
+        // this is nominal: the dollars of each year, indexed to a typical home
+        // today. Claiming real dollars overstated the rise about threefold to a
+        // screen-reader user, in the one description a sighted reader cannot see.
+        description: `${ctx.place} home prices from ${longMonth(series[0]!.month)} to ${longMonth(series[series.length - 1]!.month)}, in the dollars of each year, indexed to a ${money(anchorPrice)} home today.`,
       })}
     </div>
     <div class="chart-block">
@@ -572,7 +588,7 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
       ${renderChart({
         points: paymentPoints,
         color: SERIES_PAYMENT,
-        format: (n) => `$${Math.round(n / 1000)}k`,
+        format: moneyAxis,
         bands,
         // Both of these used to be hardcoded months. A quarterly series has no
         // 2021-08 and an annual one has no 2023-10, so they marked nothing; and
@@ -990,6 +1006,61 @@ function renderRentVsBuy(input: ScenarioInput): void {
   $("decisionVerdict").textContent = decision.verdict;
   $("decisionVerdict").className = `verdict ${decision.worthIt ? "verdict--yes" : "verdict--no"}`;
 
+  // The actual answer to the question the panel asks, rendered ABOVE all of
+  // this rather than under it. It combines the two hard gates (will a lender
+  // lend, is the cash there) with this rent-versus-buy result, because a reader
+  // asking "should I buy it" is asking about all three and only the third is
+  // assumption-heavy.
+  const rec = recommend(
+    input,
+    result,
+    decision,
+    holdYears,
+    {
+      currentSavings: num("currentSavings", 0),
+      monthlySavings: num("monthlySavings", 0),
+      savingsReturn: num("investReturn", 100) / 1000,
+      currentRent: rent,
+      rentGrowth,
+    },
+    appreciation
+  );
+
+  const ANSWER_CLASS: Record<typeof rec.answer, string> = {
+    yes: "recommendation--yes",
+    conditional: "recommendation--maybe",
+    "not-yet": "recommendation--maybe",
+    no: "recommendation--no",
+  };
+  const ANSWER_WORD: Record<typeof rec.answer, string> = {
+    yes: "Yes",
+    conditional: "Only if",
+    "not-yet": "Not yet",
+    no: "No",
+  };
+
+  $("recommendation").className = `recommendation ${ANSWER_CLASS[rec.answer]}`;
+  $("recommendation").innerHTML = `
+    <p class="recommendation__answer">
+      <span class="recommendation__word">${ANSWER_WORD[rec.answer]}</span>
+      ${rec.headline}
+    </p>
+    <ul class="recommendation__because">
+      ${rec.because.map((b) => `<li>${b}</li>`).join("")}
+    </ul>
+    ${
+      rec.conditions.length
+        ? `<div class="recommendation__conditions">
+             <h4>What would change it</h4>
+             <ul>${rec.conditions.map((c) => `<li>${c}</li>`).join("")}</ul>
+           </div>`
+        : ""
+    }
+    <details class="recommendation__caveats">
+      <summary>What this answer cannot see</summary>
+      <ul>${rec.caveats.map((c) => `<li>${c}</li>`).join("")}</ul>
+    </details>`;
+
   $("decisionLevers").innerHTML = decision.levers
     .map((l) => {
       const done = l.note === "Already there." || l.note === "Not needed.";
@@ -1126,6 +1197,11 @@ function renderBuyingPower(county: CaCounty): void {
   }
 
   $("buyingPowerHeadline").textContent = v.headline;
+  // Colour from the data, not baked into the template. In 34 counties buying
+  // power went UP, and a hardcoded verdict--no painted every one of those
+  // "120% MORE" headlines with the red failure border, always in the direction
+  // of the thesis.
+  $("buyingPowerHeadline").className = `verdict ${v.powerLost > 0 ? "verdict--no" : "verdict--yes"}`;
 
   // In 34 counties a median statewide income still clears the local price, so
   // the last affordable month is the current one. "The last month the math

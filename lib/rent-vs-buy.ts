@@ -19,7 +19,23 @@
 
 import { balanceAfter, monthlyPayment } from "./amortization.ts";
 import { DEFAULT_COUNTY, historyFor } from "./data/history.ts";
+import { CA_MEDIAN_INCOME } from "./data/signals.ts";
 import type { CaCounty } from "./data/ca-loan-limits.ts";
+
+/**
+ * Long-run nominal growth in California median household income, derived from the
+ * income series rather than guessed: $25,290 in 1984 to $100,600 in 2024 is
+ * 3.51% a year. It sits right on top of the 3.5% default rent growth, which is
+ * the whole reason the deposit race is a genuine race rather than a rout: when
+ * rent and wages move together the saver treads water, and it is only when rent
+ * pulls ahead that the ground moves.
+ */
+export const LONG_RUN_WAGE_GROWTH = (() => {
+  const first = CA_MEDIAN_INCOME[0]!;
+  const last = CA_MEDIAN_INCOME[CA_MEDIAN_INCOME.length - 1]!;
+  const years = Number(last[0].slice(0, 4)) - Number(first[0].slice(0, 4));
+  return Math.pow(last[1] / first[1], 1 / years) - 1;
+})();
 
 export interface RentVsBuyInput {
   purchasePrice: number;
@@ -329,6 +345,18 @@ export interface SavingsRaceInput {
   monthlySavings: number;
   savingsReturn: number;
   homeAppreciation: number;
+  /**
+   * What the saver pays in rent now, and how fast it rises. The deposit race
+   * used to hold `monthlySavings` fixed for up to thirty years, which silently
+   * assumed rent never moved. Rising rent eats saving capacity: every extra
+   * dollar to the landlord is a dollar that does not reach the deposit. Omit
+   * both and the drag is not modelled (the old behaviour), which OVERSTATES how
+   * fast a renter closes the gap.
+   */
+  currentRent?: number;
+  rentGrowth?: number;
+  /** Nominal income growth. Defaults to the long-run California figure. */
+  wageGrowth?: number;
   maxYears?: number;
 }
 
@@ -370,11 +398,33 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
   let cashNeededThen: number | null = null;
   let priceThen: number | null = null;
 
+  // How the monthly saving rate itself moves.
+  //
+  // If non-rent spending tracks wages, next year's saving capacity works out to
+  //   savings*(1 + wage) + rent*(wage - rent_growth)
+  // which is exact, not a fudge: income and non-rent spending both scale with
+  // wages and cancel, leaving the rent term as the only mover. When rent grows
+  // faster than wages that term is negative and the saving rate falls; when it
+  // grows slower the saver gets a raise. Rent moving with wages (the default,
+  // both near 3.5%) leaves the rate growing at wages, which is the honest
+  // "treads water in real terms" case.
+  const rentGrowth = input.rentGrowth ?? 0;
+  const wageGrowth = input.wageGrowth ?? LONG_RUN_WAGE_GROWTH;
+  let monthlySavings = input.monthlySavings;
+  let rent = input.currentRent ?? 0;
+
   for (let year = 1; year <= maxYears; year++) {
     for (let m = 0; m < 12; m++) {
-      saved = saved * (1 + monthlyReturn) + input.monthlySavings;
+      saved = saved * (1 + monthlyReturn) + monthlySavings;
     }
     price *= 1 + input.homeAppreciation;
+    // Only advance the saving rate when rent is being modelled at all. Without a
+    // rent figure this is the old fixed-rate behaviour.
+    if (input.currentRent !== undefined) {
+      monthlySavings = monthlySavings * (1 + wageGrowth) + (rent / 12) * (wageGrowth - rentGrowth);
+      monthlySavings = Math.max(0, monthlySavings);
+      rent *= 1 + rentGrowth;
+    }
     const needed = price * cashRate;
     path.push({ year, saved, needed });
 
@@ -387,7 +437,11 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
 
   // First-year rates of change, which is what determines whether you gain ground.
   const targetGrowsBy = cashNeededToday * input.homeAppreciation;
-  const savingsGrowBy = input.monthlySavings * 12 + input.currentSavings * input.savingsReturn;
+  // The saving side is credited with the same rent drag the loop uses, so the
+  // headline "losing ground" verdict agrees with the year-by-year path.
+  const rentDragAnnual =
+    input.currentRent !== undefined ? input.monthlySavings * 12 * wageGrowth + input.currentRent * (wageGrowth - rentGrowth) : 0;
+  const savingsGrowBy = input.monthlySavings * 12 + input.currentSavings * input.savingsReturn + rentDragAnnual;
   const losingGround = targetGrowsBy > savingsGrowBy;
 
   const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;

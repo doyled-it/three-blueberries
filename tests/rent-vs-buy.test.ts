@@ -14,6 +14,7 @@ import {
   requiredRate,
   maxPriceForHoldPeriod,
   savingsRace,
+  LONG_RUN_WAGE_GROWTH,
   assumptionSets,
   statutoryRentCap,
   AB_1482,
@@ -135,6 +136,69 @@ test("saving faster than prices rise reaches the target, and reports the moved g
   // The target must be reported as it will be then, not as it is now.
   assert.ok(winning.cashNeededThen! > winning.cashNeededToday);
   assert.ok(winning.priceThen! > 1_200_000);
+});
+
+test("rising rent slows the deposit race, and never speeds it up", () => {
+  // The reader flagged that rent was held stagnant. It eats saving capacity: a
+  // renter whose rent outruns wages has less each month to put aside. The race
+  // must move monotonically the WRONG way as rent growth rises, never the right.
+  const base = {
+    targetPrice: 700_000,
+    downPaymentPercent: 0.2,
+    closingCostRate: 0.03,
+    currentSavings: 20_000,
+    monthlySavings: 900,
+    savingsReturn: 0.05,
+    homeAppreciation: 0.04,
+    currentRent: 3_200,
+  } as const;
+
+  const years = (rentGrowth: number) => {
+    const r = savingsRace({ ...base, rentGrowth });
+    return r.yearsToAfford ?? 99;
+  };
+
+  const slow = years(0.02);
+  const fast = years(0.07);
+  assert.ok(fast >= slow, `rent at 7% (${fast}y) must not close the gap faster than rent at 2% (${slow}y)`);
+  assert.ok(fast > slow, "over a long enough race the drag should actually show");
+});
+
+test("rent moving with wages leaves the saver treading water, not sinking", () => {
+  // When rent grows at the wage rate the rent term cancels and the saving rate
+  // grows at wages. So a modelled-rent race at ~3.5% must not be dramatically
+  // worse than one that ignores rent (which also ignores wage growth).
+  const base = {
+    targetPrice: 800_000,
+    downPaymentPercent: 0.2,
+    closingCostRate: 0.03,
+    currentSavings: 50_000,
+    monthlySavings: 2_500,
+    savingsReturn: 0.06,
+    homeAppreciation: 0.045,
+  } as const;
+
+  const withRent = savingsRace({ ...base, currentRent: 2_800, rentGrowth: LONG_RUN_WAGE_GROWTH });
+  const ignored = savingsRace(base);
+  // Rent-at-wages is never SLOWER than the flat-savings model, because the flat
+  // model gives the saver no raise at all.
+  assert.ok((withRent.yearsToAfford ?? 99) <= (ignored.yearsToAfford ?? 99));
+});
+
+test("omitting rent reproduces the old fixed-rate behaviour exactly", () => {
+  // So the change is additive: a caller that does not pass rent is unaffected.
+  const base = {
+    targetPrice: 900_000,
+    downPaymentPercent: 0.2,
+    closingCostRate: 0.03,
+    currentSavings: 40_000,
+    monthlySavings: 2_000,
+    savingsReturn: 0.07,
+    homeAppreciation: 0.05,
+  } as const;
+  const a = savingsRace(base);
+  const b = savingsRace({ ...base, currentRent: undefined, rentGrowth: 0.05 });
+  assert.equal(a.yearsToAfford, b.yearsToAfford);
 });
 
 test("a zero-down loan still needs closing costs saved", () => {

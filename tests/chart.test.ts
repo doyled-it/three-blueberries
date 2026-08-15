@@ -196,3 +196,45 @@ test("a stacked chart without a reference line does not emit one", () => {
   });
   assert.ok(!svg.includes("c-ref"));
 });
+
+// ---------------------------------------------------------------------------
+// Axis labels must be unique. Two gridlines sharing a label misreads by their
+// spacing: a $500 line labelled "$1k" beneath the real $1,000 line is a 2x
+// error on the axis of the payment chart.
+// ---------------------------------------------------------------------------
+
+import { renderChart as rc } from "../lib/../src/client/chart.ts";
+import { CA_COUNTIES } from "../lib/data/ca-loan-limits.ts";
+import { historyFor } from "../lib/data/history.ts";
+
+// Mirror of moneyAxis in src/client/app.ts. Kept here so the fix is pinned even
+// though app.ts needs a DOM and cannot be imported.
+const moneyAxis = (n: number): string =>
+  n >= 10_000 ? `$${Math.round(n / 1000)}k` : n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${Math.round(n)}`;
+
+test("the payment axis never labels two gridlines the same, in any county", () => {
+  const offenders: string[] = [];
+  for (const county of CA_COUNTIES) {
+    const series = buildSeries(county, historyFor(county).anchorPrice, 0.2);
+    const svg = rc({
+      points: series.map((p) => ({ month: p.month, value: p.payment })),
+      color: "#d95926",
+      format: moneyAxis,
+      description: "payment",
+    });
+    // Axis labels are the <text> nodes on the y-axis. Pull every rendered label
+    // and check the money-shaped ones are distinct.
+    const labels = [...svg.matchAll(/>(\$[\d.,]+k?|\$\d+)</g)].map((m) => m[1]!);
+    const money = labels.filter((l) => /^\$/.test(l));
+    const dupes = money.filter((l, i) => money.indexOf(l) !== i);
+    if (dupes.length) offenders.push(`${county}: ${[...new Set(dupes)].join(", ")}`);
+  }
+  assert.deepEqual(offenders, [], `duplicate axis labels:\n  ${offenders.join("\n  ")}`);
+});
+
+test("REGRESSION: the old whole-thousands formatter WOULD have collapsed labels", () => {
+  // Proves the test above can fail, so a green result means something.
+  const bad = (n: number) => `$${Math.round(n / 1000)}k`;
+  assert.equal(bad(500), bad(1000), "the old formatter really did collapse $500 and $1,000");
+  assert.notEqual(moneyAxis(500), moneyAxis(1000), "the new one must not");
+});

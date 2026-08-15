@@ -604,6 +604,102 @@ input::placeholder {
   border-left-color: var(--bad);
 }
 
+/* ---------- the recommendation: the answer, first ---------- */
+/* This is the one place on the page that commits to a yes or no, so it is
+   styled to be read before anything around it: a heavier left rule, the answer
+   word set large in the display face, the reasoning and conditions below it. */
+.recommendation {
+  max-width: var(--measure);
+  margin: 4px 0 30px;
+  padding: 22px 24px;
+  background: var(--panel);
+  border-left: 4px solid var(--rule);
+  border-radius: 0 4px 4px 0;
+}
+.recommendation--yes {
+  border-left-color: var(--good);
+  background: color-mix(in oklab, var(--good) 7%, var(--panel));
+}
+.recommendation--maybe {
+  border-left-color: var(--warn);
+  background: color-mix(in oklab, var(--warn) 7%, var(--panel));
+}
+.recommendation--no {
+  border-left-color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 7%, var(--panel));
+}
+.recommendation__answer {
+  margin: 0;
+  font-size: 1.06rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.recommendation__word {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+.recommendation--yes .recommendation__word {
+  color: var(--good);
+}
+.recommendation--maybe .recommendation__word {
+  color: var(--warn);
+}
+.recommendation--no .recommendation__word {
+  color: var(--bad);
+}
+.recommendation__because {
+  margin: 16px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.recommendation__because li {
+  margin: 5px 0;
+}
+.recommendation__conditions {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.recommendation__conditions h4 {
+  margin: 0 0 6px;
+  color: var(--ink-4);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.recommendation__conditions ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.recommendation__caveats {
+  margin-top: 16px;
+  font-size: 0.85rem;
+}
+.recommendation__caveats summary {
+  cursor: pointer;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.recommendation__caveats ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+.recommendation__caveats li {
+  margin: 6px 0;
+}
+
 /* ---------- charts ---------- */
 .chart-block {
   margin-bottom: 30px;
@@ -1265,14 +1361,37 @@ input[type="range"] {
   font-family: var(--sans);
 }
 
-@media (min-width: 1180px) {
+/*
+ * The rail lives in the gutter beside the 980px column, so it may only appear
+ * when the gutter is actually wide enough to hold it. It used to switch on at
+ * 1180px and position itself with max(20px, ...), which pinned it to the
+ * viewport edge and drove its right edge straight through the column's left
+ * edge from 1180px to about 1360px.
+ *
+ * The geometry, named once. The gutter on each side is (100vw - column) / 2.
+ * The rail needs its own width plus a gap from the column and a gap from the
+ * viewport edge. The breakpoint is exactly the width at which that fits, so
+ * there is no band where it is visible and overlapping.
+ */
+:root {
+  --toc-width: 170px;
+  --toc-gap: 28px; /* rail to column */
+  --toc-edge: 20px; /* rail to viewport edge */
+  --column: 980px;
+}
+
+@media (min-width: 1416px) {
+  /* 1416 = column + 2 * (toc-width + toc-gap + toc-edge). Below it the rail
+     would not clear the column, so the bottom bar stays instead. */
   .toc {
     display: block;
     position: fixed;
     top: 50%;
     transform: translateY(-50%);
-    left: max(20px, calc((100vw - 980px) / 2 - 190px));
-    width: 170px;
+    /* Sit just left of the column with a fixed gap, wherever the column lands.
+       Never keyed to the viewport edge, so it cannot ride up onto the text. */
+    left: calc((100vw - var(--column)) / 2 - var(--toc-width) - var(--toc-gap));
+    width: var(--toc-width);
     z-index: 5;
   }
   .tocbar {

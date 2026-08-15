@@ -72,6 +72,7 @@ lib/                    the engine, pure TypeScript, no DOM, no I/O
   amortization.ts       payment / balance / schedule / LTV milestones
   mortgage.ts           evaluateScenario(), the heart
   affordability.ts      the engine run backwards (binary search on price)
+  recommendation.ts     the "should you buy it" answer: three gates, one verdict
   scenario-bridge.ts    THE ONLY join between a scenario and rent-vs-buy. See below.
   data/
     sources.ts          THE CITATION REGISTRY, every number traces here
@@ -108,7 +109,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           277 tests, no watch mode needed, under a second
+npm test           302 tests, no watch mode needed, under a second
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -240,6 +241,48 @@ county got its own history. The pattern is worth internalising because it will h
 - **Two inputs for the same quantity will disagree.** The page asked for rent twice and defaulted
   them to $2,750 and $3,290, and the higher one drove the waiting verdict. Mirror one from the
   other unless the reader deliberately changes it.
+
+### The prose lint: tests/prose.test.ts, and why it is the real fix
+
+The three audits kept finding the same thing, so the fourth pass built a machine
+for it. `tests/prose-surface.ts` RUNS THE ENGINE for a county and collects every
+sentence it renders. `tests/prose.test.ts` then checks each string against the
+DATA it is about, across all 58 counties: no sentence may name a year the
+county's own history cannot justify, claim a decline count it does not have,
+describe the quarterly/annual series as monthly, quote a dollar figure that
+differs from the one it derived, or name the wrong county.
+
+This is different in kind from `assert.match(basis, /milder/i)`, which passed for
+months while wrong in 34 counties because it checked the wording against itself.
+The lint checks wording against data, so a new sentence is covered the moment it
+exists. When you add a panel, add its strings to `prose-surface.ts`; a coverage
+test fails if the surface stops reaching a panel.
+
+The browser layer (`src/client/app.ts`) needs a DOM and cannot be run this way,
+so it gets a narrow STATIC lint in the same file: no hardcoded county name in
+copy (with a tiny default-deny allowlist for the forecaster's genuine San Diego
+disclosure), no `${...} monthly declines` on a quarterly series, no hardcoded
+peak/trough year. Validate changes with the mutation script in scratchpad:
+reintroduce a bug an audit found and confirm the lint goes red. It runs from a
+GREEN baseline only, because a red baseline reports every mutation as caught.
+
+### Should you buy it? `lib/recommendation.ts`
+
+The panel used to refuse to answer ("Not a yes or no: that depends on
+assumptions nobody can pin down"). That is true of the rent-versus-buy half and
+FALSE of the two gates that stop most purchases: will a lender lend, and is the
+cash there. Both are arithmetic. `recommend()` returns a clear `yes` /
+`conditional` / `not-yet` / `no`, the binding number in the headline, the reasons
+most-binding-first, what would change it, and caveats that are never dropped
+(they travel as data, so the UI cannot render the answer without them). The one
+genuinely uncertain gate, rent-versus-buy, is the only one whose answer is
+hedged, and the hedge names the assumption rather than gesturing at it.
+
+The deposit timeline it quotes models RENT RISING: saving capacity evolves as
+`savings*(1+wage) + rent*(wage - rentGrowth)`, derived not fudged, so a renter
+whose rent outruns wages closes the gap slower. `LONG_RUN_WAGE_GROWTH` is the
+3.51% figure from the income series, which sits on top of the 3.5% default rent
+growth, which is why the deposit race is a genuine race.
 
 ### The sharpest claim on the site: `lib/where-it-works.ts`
 
