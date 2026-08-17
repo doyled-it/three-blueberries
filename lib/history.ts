@@ -376,6 +376,52 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
   };
 }
 
+/**
+ * The cost of waiting, month by month, and when it pays off.
+ *
+ * Derived ENTIRELY from the scalars `evaluateWaiting` already returns, so the
+ * chart can never disagree with the stat cards or the verdict beside it. This is
+ * the same discipline as the scenario bridge: one source of truth, two
+ * renderings that cannot drift.
+ *
+ * The line has two phases against months-from-now:
+ *   - While you wait (0 to the bottom), you burn rent and buy nothing, so the
+ *     cumulative position falls to exactly −(rent paid while waiting).
+ *   - After you buy at the bottom, the lower payment pays you back at
+ *     `monthlySaving` a month, so the line climbs and crosses zero at exactly
+ *     the bottom plus `breakevenMonths`, the number the verdict quotes.
+ *
+ * When the monthly saving is zero or negative (the rate at the bottom eats the
+ * price discount, which is the whole "price is not payment" point) the line
+ * never recovers, and there is no zero crossing to mark.
+ */
+export interface WaitingPoint {
+  /** Months from today. */
+  month: number;
+  /** Cumulative dollars ahead of buying now. Negative means still behind. */
+  value: number;
+}
+
+export function waitingPath(result: WaitScenarioResult, monthsToBottom: number): WaitingPoint[] {
+  const bottom = Math.max(1, Math.round(monthsToBottom));
+  const rent = result.rentPaidWhileWaiting;
+  const saving = result.monthlySaving;
+
+  // Run long enough to show the crossing, or a fixed window if it never comes.
+  const payoff = result.breakevenMonths ?? 0;
+  const end = result.breakevenMonths !== null ? Math.ceil(bottom + payoff * 1.25) + 2 : bottom + 60;
+
+  const points: WaitingPoint[] = [];
+  for (let m = 0; m <= end; m++) {
+    const value =
+      m <= bottom
+        ? -(rent * m) / bottom // ramp down to −rent at the bottom
+        : -rent + saving * (m - bottom); // then climb by the monthly saving
+    points.push({ month: m, value });
+  }
+  return points;
+}
+
 export interface CrashPreset {
   id: string;
   label: string;

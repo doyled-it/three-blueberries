@@ -21,6 +21,7 @@ import {
   crashPresets,
   currentStatus,
   evaluateWaiting,
+  waitingPath,
   findDrawdowns,
   historicalContext,
 } from "../../lib/history.ts";
@@ -1614,6 +1615,46 @@ function renderWaiting(input: ScenarioInput): void {
         ${money(r.paperLossIfBuyingNow)} underwater on paper.
       </span>
     </div>`;
+
+  // The cost of waiting over time: it falls while you burn rent, then climbs
+  // once the lower payment starts paying you back, crossing zero at exactly the
+  // break-even the card above quotes. Built from the same scalars, so it can't
+  // disagree with the numbers beside it.
+  const path = waitingPath(r, months);
+  const points = path.map((p) => ({ month: String(p.month), value: p.value }));
+  const end = path[path.length - 1]!.month;
+  // Space the year ticks so a 23-year chart is not labelled every 12 months.
+  const stepMonths = end > 180 ? 60 : end > 84 ? 24 : 12;
+  const xTicks: Array<{ index: number; label: string }> = [];
+  for (let m = 0; m <= end; m += stepMonths) xTicks.push({ index: m, label: m === 0 ? "now" : `${m / 12}yr` });
+  const crossing = r.breakevenMonths !== null ? Math.round(months + r.breakevenMonths) : null;
+
+  $("waitingChart").innerHTML = renderMultiLine({
+    series: [{ key: "wait", label: "Cash position vs buying now", color: SERIES_PAYMENT, points }],
+    format: (n) => (Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(0)}k` : `$${Math.round(n)}`),
+    xTicks,
+    markers: [
+      { seriesKey: "wait", month: String(Math.round(months)), label: "you buy at the bottom" },
+      ...(crossing !== null && crossing <= end
+        ? [{ seriesKey: "wait", month: String(crossing), label: "waiting has paid off" }]
+        : []),
+    ],
+    description:
+      `The running cash position of waiting versus buying now, month by month. It drops while you pay rent, then ` +
+      `climbs after you buy at the bottom` +
+      (crossing !== null ? `, breaking even ${crossing} months from now.` : `, but never catches up on these numbers.`),
+    height: 200,
+  });
+
+  const wf = $("waitingChart").querySelector<HTMLElement>("[data-multi]");
+  if (wf) {
+    attachMultiHover(
+      wf,
+      [{ key: "wait", label: "Ahead of buying now", color: SERIES_PAYMENT, points }],
+      money,
+      (m) => `${m} months from now`
+    );
+  }
 
   $("waitingVerdict").textContent = r.verdict;
   $("waitingVerdict").className = `verdict ${better ? "verdict--yes" : "verdict--no"}`;

@@ -7,6 +7,7 @@ import {
   currentStatus,
   defaultCrashPreset,
   evaluateWaiting,
+  waitingPath,
   findDrawdowns,
   historicalContext,
   paymentExtremes,
@@ -496,4 +497,37 @@ test("the caveat says each thing once", () => {
   // It stated the income source twice, once at the top and once in the middle.
   const mentions = (BUYING_POWER_CAVEAT.match(/median household income/g) ?? []).length;
   assert.equal(mentions, 1, `"median household income" appears ${mentions} times`);
+});
+
+test("the waiting chart's zero crossing matches the reported break-even", () => {
+  // The chart is built from the same scalars as the cards, so its recovery
+  // line must cross zero at exactly monthsToBottom + breakevenMonths. If it
+  // did not, the plot would contradict the verdict beside it.
+  const months = 36;
+  const r = evaluateWaiting({ ...waitBase, crashDepthPercent: 25, monthsToBottom: months, rateAtBottom: 0.05 });
+  assert.ok(r.breakevenMonths !== null, "this scenario should break even");
+  const path = waitingPath(r, months);
+
+  // At the bottom, the position is exactly minus the rent burned.
+  const atBottom = path.find((p) => p.month === months)!;
+  assert.ok(Math.abs(atBottom.value + r.rentPaidWhileWaiting) < 1, "position at the bottom is -rent");
+
+  // The zero crossing sits at the bottom plus the break-even.
+  const expectedCross = months + r.breakevenMonths!;
+  const crossIdx = path.findIndex((p, i) => i > 0 && path[i - 1]!.value < 0 && p.value >= 0);
+  assert.ok(crossIdx > 0, "the line must cross zero");
+  assert.ok(Math.abs(crossIdx - expectedCross) <= 1.5, `crossing at ${crossIdx}, expected ~${expectedCross.toFixed(0)}`);
+});
+
+test("when the monthly saving is negative, the waiting chart never recovers", () => {
+  // The 'price is not payment' case: the rate at the bottom eats the discount.
+  const months = 36;
+  const r = evaluateWaiting({ ...waitBase, crashDepthPercent: 10, monthsToBottom: months, rateAtBottom: 0.11 });
+  assert.ok(r.monthlySaving <= 0, "this scenario should not save monthly");
+  const path = waitingPath(r, months);
+  // After the bottom, the line only falls further.
+  const after = path.filter((p) => p.month > months);
+  for (let i = 1; i < after.length; i++) {
+    assert.ok(after[i]!.value <= after[i - 1]!.value + 1, "position must not climb when saving is non-positive");
+  }
 });
