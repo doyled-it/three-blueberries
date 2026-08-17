@@ -130,10 +130,8 @@ export function payTrap(sampleSize = 10): PayTrap {
 }
 
 export const WHERE_IT_WORKS_CAVEAT =
-  `Home values are Zillow's typical single-family value today. Incomes are the Census Bureau's ${COUNTY_INCOME_YEAR} ` +
-  `median household income for each county, which is what the people who already live and work there actually earn, ` +
-  `not a statewide figure. The two are not the same instant: the values are current and the incomes are from ` +
-  `${COUNTY_INCOME_YEAR}, which is the most recent SAIPE year, so every multiple here is slightly HIGH. Both are a ` +
-  `snapshot: this shows where things stand, not which way they are moving, and it ` +
-  `cannot tell you whether jobs are arriving or leaving. It also says nothing about whether you would want to live in ` +
-  `any of these places, which is the question it most obviously invites and the one arithmetic is worst at.`;
+  `Home values are Zillow's typical single-family value today; incomes are each county's own Census median from ` +
+  `${COUNTY_INCOME_YEAR}, the most recent SAIPE year, not a statewide figure. Because the values are current and the ` +
+  `incomes a year or two old, every multiple runs slightly HIGH. It is a snapshot, not a trend: it cannot see jobs ` +
+  `arriving or leaving, and it says nothing about whether you would want to live in any of these places, which is ` +
+  `the question it most obviously invites and the one arithmetic is worst at.`;

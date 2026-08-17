@@ -150,7 +150,7 @@ test("a metro county gets quarterly data and a rural one gets annual", () => {
   assert.equal(metro.stepMonths, 3);
   assert.match(metro.note, /quarterly/);
   assert.ok(metro.spliceMonth, "a metro series is chained, and the note should say so");
-  assert.match(metro.note, /seam/);
+  assert.match(metro.note, /chain-linked|seam/);
 
   const rural = countyScope("Sierra");
   assert.equal(rural.stepMonths, 12);

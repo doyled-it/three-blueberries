@@ -619,8 +619,11 @@ test("the relief shrinks over the life of the loan as interest does", () => {
 });
 
 test("the caveat no longer claims to ignore the deduction", () => {
-  assert.match(RENT_VS_BUY_CAVEAT, /includes the mortgage interest deduction/i);
+  // It once said it IGNORED the deduction, which understated owning. It must
+  // acknowledge crediting it, on the $750k of debt the tax code actually allows.
+  assert.match(RENT_VS_BUY_CAVEAT, /(credits|includes)[^.]*mortgage interest deduction/i);
   assert.match(RENT_VS_BUY_CAVEAT, /750,000/);
+  assert.ok(!/ignores the (mortgage )?interest/i.test(RENT_VS_BUY_CAVEAT));
 });
 
 // --- audit regressions -----------------------------------------------------

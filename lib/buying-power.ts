@@ -261,25 +261,16 @@ export function buyingPowerCaveat(county: CaCounty = DEFAULT_COUNTY): string {
   const startYear = series[0]!.month.slice(0, 4);
   const { spliceMonth } = historyFor(county);
 
+  void spliceMonth;
   return (
     `The income here is STATEWIDE California median household income, so this answers "could a typical Californian ` +
-    `buy here", not "can the people who live here afford it". The panel below answers that one, using each county's ` +
-    `own income. ` +
-    `The price line is the FHFA repeat-sales index for your county, anchored to Zillow's current typical ` +
-    `single-family value so it reads in dollars: one representative house through time, not the median listing of ` +
-    `each year. Only the price line is anchored, so the anchor moves the GAP: every dollar figure here and the ` +
-    `"last month it worked" date scale with Zillow's estimate. The percentage change in buying power does not. ` +
-    `The record starts in ${startYear}` +
-    (startYear === INCOME_STARTS
-      ? `, where the income series starts, because every figure here is a ratio of the two. `
-      : `, where this county's price series starts. The income series begins in ${INCOME_STARTS}, so counties with ` +
-        `a longer price record get a longer panel. `) +
-    (spliceMonth ? `Prices before ${spliceMonth.slice(0, 4)} are chain-linked from a coarser FHFA series. ` : "") +
-    `Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is carried forward flat after that, which OVERSTATES ` +
-    `the gap, since incomes kept rising. ` +
-    `The affordable-price line assumes ${AFFORDABILITY_EFFORT * 100}% of gross income toward principal and interest, ` +
-    `${ASSUMED_DOWN_PAYMENT * 100}% down, 30-year fixed at the prevailing rate, and excludes tax, insurance and ` +
-    `everything else. It is the most generous possible reading of what a household could carry.`
+    `buy here", not "can the people who live here afford it": the panel below answers that, using each county's own ` +
+    `income. The price line is the FHFA index anchored to Zillow's current typical value, so it reads in dollars. ` +
+    `Only that line is anchored, so the anchor moves the GAP and every dollar figure with it; the percentage change ` +
+    `does not. The record starts in ${startYear}. Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is held flat after ` +
+    `that, which OVERSTATES the gap, since incomes kept rising. The affordable line is the most generous possible ` +
+    `reading: ${AFFORDABILITY_EFFORT * 100}% of income, ${ASSUMED_DOWN_PAYMENT * 100}% down, and it excludes tax, ` +
+    `insurance and everything else.`
   );
 }
 

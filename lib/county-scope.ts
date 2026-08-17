@@ -40,26 +40,24 @@ export function countyScope(county: CaCounty): CountyScope {
 
   const resolution =
     stepMonths === 3
-      ? `The price history below is the FHFA index for ${place}, quarterly, from ${from}. ` +
-        `${county} County is part of that metro, so this is your market rather than somebody else's.`
-      : `The price history below is the FHFA index for ${county} County itself, annual, from ${from}. ` +
-        `${county} is not inside a metropolitan area, and FHFA publishes quarterly data only for metros, ` +
-        `so this is the finest resolution that exists for where you are buying.`;
+      ? `The price history below is the FHFA index for ${place}, quarterly, from ${from}. ${county} County sits in ` +
+        `that metro, so this is your market, not somebody else's.`
+      : `The price history below is the FHFA index for ${county} County itself, annual, from ${from}. It is not ` +
+        `inside a metropolitan area, and FHFA publishes quarterly data only for metros, so this is the finest ` +
+        `resolution there is.`;
 
   // A series that stops years ago is presented as current everywhere else on the
   // page. Say it here, where the resolution caveat already lives.
   const lastMonth = rows[rows.length - 1]![0];
   const staleness =
     lastMonth < "2025-06"
-      ? ` It also STOPS in ${YEAR(lastMonth)}: FHFA suppresses a county-year with too few sales to publish, and ` +
-        `${county} County has not had enough since. Everything downstream that says "today" means ${YEAR(lastMonth)} here.`
+      ? ` It also STOPS in ${YEAR(lastMonth)}: FHFA suppresses county-years with too few sales, so everything ` +
+        `downstream that says "today" means ${YEAR(lastMonth)} here.`
       : "";
 
   const seam = spliceMonth
-    ? ` One seam worth knowing about: readings before ${spliceMonth} come from FHFA's longer all-transactions ` +
-      `index, chain-linked on, because the more accurate expanded-data series only starts then. The two ` +
-      `disagree by a couple of points a year, so treat the earliest stretch as the shape of what happened ` +
-      `rather than as a precise measurement.`
+    ? ` Readings before ${spliceMonth} are chain-linked from FHFA's older, coarser index, so treat the earliest ` +
+      `stretch as the shape of what happened rather than a precise measurement.`
     : "";
 
   return { county, place, stepMonths, spliceMonth, note: resolution + staleness + seam };

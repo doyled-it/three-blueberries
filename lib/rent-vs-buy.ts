@@ -1178,13 +1178,8 @@ export function assumptionSet(id: string): AssumptionSet | undefined {
 export const RENT_VS_BUY_DEFAULTS = DEFAULTS;
 
 export const RENT_VS_BUY_CAVEAT =
-  "This is the most assumption-heavy thing on the page, and small changes to appreciation or investment return swing " +
-  "the answer by years. It now includes the mortgage interest deduction, on the first $750,000 of debt at a 40% " +
-  "combined marginal rate, counting only the part that clears the standard deduction, which for a high California " +
-  "earner is most of it. It still ignores tax on investment gains, which helps owning further, though less if your " +
-  "savings sit in retirement accounts, and it models California and federal tax as one blended rate rather than " +
-  "separately. Insurance, tax and upkeep are escalated together at the Prop 13 2% cap for the whole 30 years, which " +
-  "is right for the tax line and optimistic for the other two: California insurance has been moving far faster than " +
-  "that, and every year it does is a year this understates the cost of owning. Rent growth is an assumption too, " +
-  "with no California rent series behind it. " +
-  "It cannot price security of tenure: nobody can raise a fixed payment or decline to renew you.";
+  "The softest number on the page: nudge appreciation, investment return or rent growth and the answer moves by " +
+  "years, so read the sliders, not the verdict. It credits the mortgage interest deduction on the first $750,000 of " +
+  "debt, and escalates insurance and upkeep at Prop 13's 2% cap, which is generous: California insurance is rising " +
+  "far faster, so if anything it understates the cost of owning. And it cannot price security of tenure, which is " +
+  "the thing renting never buys you.";
