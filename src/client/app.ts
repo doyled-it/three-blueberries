@@ -1593,7 +1593,11 @@ function renderWaiting(input: ScenarioInput): void {
       <span class="stat__note">
         ${
           r.breakevenMonths !== null
-            ? `Repays the ${money(r.rentPaidWhileWaiting)} of rent in ${Math.round(r.breakevenMonths)} months.`
+            ? `That ${money(r.rentPaidWhileWaiting)} of rent takes ${
+                r.breakevenMonths >= 24
+                  ? `${(r.breakevenMonths / 12).toFixed(1)} years`
+                  : `${Math.round(r.breakevenMonths)} months`
+              } of the saving to earn back.`
             : `And you'd still have paid ${money(r.rentPaidWhileWaiting)} in rent to get there.`
         }
       </span>

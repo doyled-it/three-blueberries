@@ -343,10 +343,19 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
   if (monthlySaving <= 0) {
     verdict =
       "Waiting loses. The rate you're assuming at the bottom cancels out the price drop, you'd pay the same or more per month for the same house, having paid rent the whole time. This is the trap: prices and rates usually move in opposite directions, because the thing that crashes prices is also the thing that makes the Fed cut rates.";
-  } else if (breakevenMonths !== null && breakevenMonths > 84) {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month, but you'd pay ${Math.round(rentPaid).toLocaleString("en-US")} in rent first, about ${(breakevenMonths / 12).toFixed(1)} years just to break even on it. A long time to be right about timing.`;
   } else {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month and repays the rent you spent waiting in about ${Math.round(breakevenMonths ?? 0)} months. Worth it on these assumptions, if the crash arrives on your schedule and you still have your job when it does.`;
+    // Count from NOW, not from the purchase, so this matches the chart's "waiting
+    // has paid off" marker. That marker sits at the wait plus the rent-repayment,
+    // which is the honest "how long until waiting was worth it" from today.
+    const totalYears = (monthsToBottom + (breakevenMonths ?? 0)) / 12;
+    verdict =
+      totalYears > 10
+        ? `Waiting saves ${money(monthlySaving)}/month, but between the wait and earning back the ${money(rentPaid)} ` +
+          `of rent you burn getting there, you are not actually ahead for about ${totalYears.toFixed(0)} years from ` +
+          `now. A long time to be right about timing.`
+        : `Waiting saves ${money(monthlySaving)}/month and comes out ahead about ${totalYears.toFixed(1)} years from ` +
+          `now. Worth it on these assumptions, if the crash arrives on your schedule and you still have your job ` +
+          `when it does.`;
   }
 
   return {
