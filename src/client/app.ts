@@ -53,6 +53,7 @@ import {
   RATE_SOLVER_CEILING,
   RENT_VS_BUY_CAVEAT,
   breakevenByPrice,
+  buyMinusRentAt,
   buyZone,
   compareRentVsBuy,
   decide,
@@ -716,7 +717,11 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // The heuristic and the model can disagree, and the page used to print both
   // verdicts inches apart without acknowledging it: "renting territory" beside
   // a chart saying buying wins in year six. Say which one to believe.
-  const modelSaysBuy = r.breakevenYear !== null && r.breakevenYear <= Number($<HTMLInputElement>("holdYears").value);
+  //
+  // "Ahead AT the hold year", not "crossed by then": owning can lead in a middle
+  // window and trail at the endpoint, so the first crossing is the wrong test.
+  const readerHoldYears = Number($<HTMLInputElement>("holdYears").value);
+  const modelSaysBuy = buyMinusRentAt(r, readerHoldYears) >= 0;
   const disagrees =
     (ratioVerdict.favours === "rent" && modelSaysBuy) || (ratioVerdict.favours === "buy" && !modelSaysBuy);
 
@@ -731,8 +736,8 @@ function renderRentVsBuy(input: ScenarioInput): void {
           disagrees
             ? `That is a rule of thumb and it disagrees with the full comparison below, which ${
                 modelSaysBuy
-                  ? `has buying ahead by year ${r.breakevenYear}`
-                  : `never has buying catch up inside your horizon`
+                  ? `has buying ahead at year ${readerHoldYears}`
+                  : `has renting ahead at year ${readerHoldYears}`
               }. Believe the itemised one: the ratio ignores your rate, your deposit, mortgage insurance and the tax relief.`
             : `The full comparison below agrees, and it is the one that counts the rate, the deposit and the tax relief.`
         }
@@ -778,9 +783,17 @@ function renderRentVsBuy(input: ScenarioInput): void {
     ],
     format: (n) => (Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`),
     shadeGap: true,
-    markers: r.breakevenYear
-      ? [{ seriesKey: "buy", month: `${2026 + r.breakevenYear}-01`, label: `buying wins, year ${r.breakevenYear}` }]
-      : [],
+    // Mark the START of owning's lead and, when it closes, the year renting
+    // reclaims it. A single "buying wins, year 6" marker hid that owning gives
+    // the lead back at year 14.
+    markers: [
+      ...(r.buyWindow.start
+        ? [{ seriesKey: "buy", month: `${2026 + r.buyWindow.start}-01`, label: `buying pulls ahead, year ${r.buyWindow.start}` }]
+        : []),
+      ...(r.buyWindow.end
+        ? [{ seriesKey: "rent", month: `${2026 + r.buyWindow.end}-01`, label: `renting back ahead, year ${r.buyWindow.end}` }]
+        : []),
+    ],
     description: "Net worth over 30 years if you buy, against renting and investing the difference.",
   });
 
@@ -808,12 +821,11 @@ function renderRentVsBuy(input: ScenarioInput): void {
   }
 
   $("rentBuyVerdict").textContent = r.verdict;
-  // Colour against the reader's OWN horizon, not a hardcoded ten years. Somebody
-  // who told the page they are staying twenty-five was shown a red verdict on a
-  // house that breaks even in year fourteen.
+  // Colour by who is ahead AT the reader's own horizon, not whether owning ever
+  // crossed by then. A house whose lead closes at year 14 is not a win for a
+  // 30-year hold, even though it broke even at year 6.
   const readerHold = Number($<HTMLInputElement>("holdYears").value);
-  $("rentBuyVerdict").className =
-    `verdict ${r.breakevenYear && r.breakevenYear <= readerHold ? "verdict--yes" : "verdict--no"}`;
+  $("rentBuyVerdict").className = `verdict ${buyMinusRentAt(r, readerHold) >= 0 ? "verdict--yes" : "verdict--no"}`;
   $("rentBuyCaveat").textContent = RENT_VS_BUY_CAVEAT;
 
   if ($("assumptionSets").dataset["county"] !== input.county) {
@@ -852,7 +864,11 @@ function renderRentVsBuy(input: ScenarioInput): void {
   // The same comparison the panel above ran. It used to be a second, separately
   // written call, which is exactly how the two drifted apart.
   const thisHouse = r;
-  const worksForYou = thisHouse.breakevenYear !== null && thisHouse.breakevenYear <= holdYears;
+  // Ahead AT the hold year, not "crossed by then". The window can close before
+  // the reader's horizon.
+  const worksForYou = buyMinusRentAt(thisHouse, holdYears) >= 0;
+  const win = thisHouse.buyWindow;
+  const windowLabel = win.start === null ? "never" : win.end === null ? `${win.start}+ yr` : `${win.start}–${win.end - 1} yr`;
 
   $("holdVerdict").innerHTML = `
     <div class="stat ${maxPrice ? "stat--pass" : "stat--fail"}">
@@ -860,19 +876,23 @@ function renderRentVsBuy(input: ScenarioInput): void {
       <span class="stat__value">${maxPrice ? money(maxPrice) : "nothing"}</span>
       <span class="stat__note">${
         maxPrice
-          ? `A price-to-rent of ${(maxPrice / (rent * 12)).toFixed(1)}x. Above that, renting wins over your horizon.`
-          : "At this rent and these assumptions, no price breaks even inside your horizon."
+          ? `A price-to-rent of ${(maxPrice / (rent * 12)).toFixed(1)}x. Above that, renting wins at your horizon.`
+          : "At this rent and these assumptions, no price is ahead at your horizon."
       }</span>
     </div>
     <div class="stat ${worksForYou ? "stat--pass" : "stat--fail"}">
       <span class="stat__label">This house at ${money(input.purchasePrice)}</span>
-      <span class="stat__value">${thisHouse.breakevenYear ? `${thisHouse.breakevenYear} yr` : "never"}</span>
+      <span class="stat__value">${windowLabel}</span>
       <span class="stat__note">${
-        thisHouse.breakevenYear
-          ? worksForYou
-            ? `Breaks even inside your ${holdYears} years. Selling earlier loses money against renting.`
-            : `Breaks even in year ${thisHouse.breakevenYear}, which is longer than you plan to stay.`
-          : "Never catches up within 30 years at this price and rent."
+        win.start === null
+          ? "Never catches up within 30 years at this price and rent."
+          : win.end === null
+            ? worksForYou
+              ? `Owning leads from year ${win.start} on, and you plan to stay ${holdYears}. Selling earlier loses money against renting.`
+              : `Owning does not pull ahead until year ${win.start}, longer than you plan to stay.`
+            : worksForYou
+              ? `Owning leads only between year ${win.start} and year ${win.end - 1}. You are inside that, but sell before year ${win.end} or renting pulls back ahead.`
+              : `Owning leads only between year ${win.start} and year ${win.end - 1}, and your ${holdYears}-year hold is outside that window.`
       }</span>
     </div>
     <div class="stat">

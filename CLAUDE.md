@@ -109,7 +109,7 @@ scripts/
 
 ```
 npm run dev        eleventy serve on :8080 (no /api. The rate fetch falls back)
-npm test           302 tests, no watch mode needed, under a second
+npm test           304 tests, no watch mode needed, under a second
 npm run typecheck  app tsconfig + separate worker tsconfig
 npm run build      bundle client, build site
 node scripts/demo.ts   print full worked scenarios. The fastest sanity check
@@ -283,6 +283,20 @@ The deposit timeline it quotes models RENT RISING: saving capacity evolves as
 whose rent outruns wages closes the gap slower. `LONG_RUN_WAGE_GROWTH` is the
 3.51% figure from the income series, which sits on top of the 3.5% default rent
 growth, which is why the deposit race is a genuine race.
+
+**Buying wins a WINDOW, not a finish line, and the whole decision surface asks
+"ahead AT your hold year" not "did it ever cross".** When the investment return
+you give up (10%) exceeds the appreciation you buy (6.5%), the renter's invested
+capital eventually outcompounds the house: owning pulls ahead in the middle
+years, then renting reclaims the lead. `breakevenYear` is only the FIRST
+crossing, and reading it as the answer said a plain "yes" for a 30-year hold that
+ends $2.5M behind. `compareRentVsBuy` returns `buyWindow: {start, end}`;
+`buyMinusRentAt(result, holdYears)` is the honest test and every consumer routes
+through it (`decide.worthIt`, `maxPriceForHoldPeriod`, `requiredRate`,
+`requiredRentalIncome`, the recommendation's third gate, the chart markers, the
+verdict colour). A consequence worth not un-learning: `maxPriceForHoldPeriod`
+PEAKS around year 10 and then FALLS, because a longer hold lets the renter
+compound further ahead. A test pins that it is not monotonic.
 
 ### The sharpest claim on the site: `lib/where-it-works.ts`
 

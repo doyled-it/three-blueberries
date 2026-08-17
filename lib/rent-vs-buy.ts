@@ -132,6 +132,17 @@ export interface RentVsBuyResult {
   years: YearPoint[];
   /** First year owning is worth more than renting. Null if it never is. */
   breakevenYear: number | null;
+  /**
+   * The window in which owning leads, because owning does not always STAY ahead.
+   * When the investment return you give up is larger than the appreciation you
+   * buy, the renter's invested capital eventually outcompounds the house: owning
+   * pulls ahead in the middle years, then renting reclaims the lead in the long
+   * run. `start` is the first year owning leads (== breakevenYear); `end` is the
+   * first year AFTER that renting is back ahead, or null if owning holds the lead
+   * through the whole series. So a null `start` means owning never leads, and a
+   * non-null `start` with a non-null `end` means owning leads only in between.
+   */
+  buyWindow: { start: number | null; end: number | null };
   /** Year one, where the "rent is throwing money away" claim gets tested. */
   firstYear: {
     interestPaid: number;
@@ -275,6 +286,14 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
   }
 
   const breakeven = points.find((p) => p.buyNetWorth >= p.rentNetWorth);
+  // Where does owning's lead END? The first year, after it pulls ahead, that
+  // renting is back in front. Null means owning never gives the lead back within
+  // the series. This is the whole reason "buying wins at year 6" was misleading:
+  // it wins at year 6 and loses it again at year 14.
+  const reclaim = breakeven
+    ? (points.find((p) => p.year > breakeven.year && p.rentNetWorth > p.buyNetWorth)?.year ?? null)
+    : null;
+  const buyWindow = { start: breakeven ? breakeven.year : null, end: reclaim };
 
   // Year-one detail: the honest test of "rent is throwing money away".
   const firstYearBalance = balanceAfter(input.loanAmount, input.interestRate, input.termYears, 12);
@@ -305,19 +324,29 @@ export function compareRentVsBuy(input: RentVsBuyInput): RentVsBuyResult {
     verdict =
       `On these assumptions owning never catches up within ${years} years. That is what happens when the ` +
       `investment return you are giving up is larger than the appreciation you are buying. Change either number and the answer moves.`;
+  } else if (reclaim) {
+    // Owning wins only a window, then renting reclaims the lead. This is the
+    // case the old copy could not describe: it announced the year owning pulled
+    // ahead and never mentioned that owning gives the lead back.
+    verdict =
+      `Owning is only ahead between year ${breakeven.year} and year ${reclaim - 1}. Sell earlier and you never caught up; ` +
+      `hold past year ${reclaim - 1} and renting is ahead again, because the money you did not sink into the house ` +
+      `compounds faster in the market than the house appreciates. This is a window, not a finish line.`;
   } else if (breakeven.year <= 5) {
     verdict =
-      `Owning pulls ahead in year ${breakeven.year}. That is fast, and it is mostly because rent is assumed to ` +
-      `keep rising while your principal and interest never do.`;
+      `Owning pulls ahead in year ${breakeven.year} and stays ahead. That is fast, and it is mostly because rent is ` +
+      `assumed to keep rising while your principal and interest never do.`;
   } else {
     verdict =
-      `Owning pulls ahead in year ${breakeven.year}. Before then renting leaves you wealthier, because the down payment ` +
-      `is earning more in the market than it is earning in the house. If you might move before year ${breakeven.year}, renting wins.`;
+      `Owning pulls ahead in year ${breakeven.year} and stays ahead through year ${years}. Before then renting leaves ` +
+      `you wealthier, because the down payment is earning more in the market than it is earning in the house. If you ` +
+      `might move before year ${breakeven.year}, renting wins.`;
   }
 
   return {
     years: points,
     breakevenYear: breakeven ? breakeven.year : null,
+    buyWindow,
     firstYear: {
       interestPaid: interest1,
       principalPaid: principal1,
@@ -617,10 +646,12 @@ export function maxPriceForHoldPeriod(
   const low0 = bounds.low ?? 100_000;
   const high0 = bounds.high ?? 5_000_000;
 
-  const worksAt = (price: number): boolean => {
-    const result = atPrice(base, costs, price, downPercent, closingCostRate, Math.max(holdYears, 1));
-    return result.breakevenYear !== null && result.breakevenYear <= holdYears;
-  };
+  // Owning has to be ahead AT the hold year, not merely to have crossed once by
+  // then. A cheaper house sinks less capital, so owning's position at any fixed
+  // year improves monotonically as price falls: a single crossing, safe to
+  // bisect.
+  const worksAt = (price: number): boolean =>
+    buyWinsAtHold(base, costs, price, holdYears, downPercent, closingCostRate);
 
   if (!worksAt(low0)) return null;
   if (worksAt(high0)) return high0;
@@ -640,9 +671,11 @@ export function maxPriceForHoldPeriod(
 // ---------------------------------------------------------------------------
 
 export interface DecisionThresholds {
-  /** Does buying this house, at this rate, over this horizon, beat renting? */
+  /** Is owning ahead AT the hold year? Not "did it ever cross by then". */
   worthIt: boolean;
   breakevenYear: number | null;
+  /** The window owning leads. `end` null means it holds the lead to year 30. */
+  buyWindow: { start: number | null; end: number | null };
   priceToRent: number;
 
   /** The rate at which this price starts to work. Null if no rate rescues it. */
@@ -659,14 +692,14 @@ export interface DecisionThresholds {
   verdict: string;
 }
 
-function breakevenAt(
+function scenarioAtPrice(
   base: SweepBase,
   costs: ScalingCosts,
   price: number,
   downPercent: number,
   closingCostRate: number,
   extra: Partial<RentVsBuyInput> = {}
-) {
+): RentVsBuyResult {
   const down = price * downPercent;
   const loan = (price - down) * (1 + (costs.financedFeeRate ?? 0));
   return compareRentVsBuy({
@@ -680,7 +713,47 @@ function breakevenAt(
     monthlyMaintenance: (price * costs.maintenanceRate) / 12,
     monthlyMortgageInsurance: ((costs.mortgageInsuranceRate ?? 0) * loan) / 12,
     mortgageInsuranceEndsMonth: costs.mortgageInsuranceEndsMonth ?? null,
-  }).breakevenYear;
+  });
+}
+
+function breakevenAt(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  downPercent: number,
+  closingCostRate: number,
+  extra: Partial<RentVsBuyInput> = {}
+) {
+  return scenarioAtPrice(base, costs, price, downPercent, closingCostRate, extra).breakevenYear;
+}
+
+/**
+ * Net worth if you buy vs if you rent, AT a given hold year. Positive means
+ * owning is ahead if you sell then.
+ *
+ * This is the honest decision, and it is NOT the same as "did owning ever pull
+ * ahead by this year". Owning can lead in a middle window and trail at the
+ * endpoint, so a threshold test on the first breakeven called a 30-year hold a
+ * win when the buyer would in fact end $2.5M behind. Always ask about the
+ * endpoint the reader actually names.
+ */
+export function buyMinusRentAt(result: RentVsBuyResult, holdYears: number): number {
+  const point = result.years.find((p) => p.year === holdYears) ?? result.years[result.years.length - 1];
+  return point ? point.buyNetWorth - point.rentNetWorth : 0;
+}
+
+/** Is owning ahead if you sell after exactly `holdYears`? */
+function buyWinsAtHold(
+  base: SweepBase,
+  costs: ScalingCosts,
+  price: number,
+  holdYears: number,
+  downPercent: number,
+  closingCostRate: number,
+  extra: Partial<RentVsBuyInput> = {}
+): boolean {
+  const result = scenarioAtPrice(base, costs, price, downPercent, closingCostRate, extra);
+  return buyMinusRentAt(result, holdYears) >= 0;
 }
 
 /**
@@ -702,10 +775,8 @@ export function requiredRate(
   downPercent: number,
   closingCostRate = 0.025
 ): number | null {
-  const works = (rate: number) => {
-    const year = breakevenAt({ ...base, interestRate: rate }, costs, price, downPercent, closingCostRate);
-    return year !== null && year <= holdYears;
-  };
+  const works = (rate: number) =>
+    buyWinsAtHold({ ...base, interestRate: rate }, costs, price, holdYears, downPercent, closingCostRate);
   // Lower rates are strictly better, so search for the highest rate that works.
   if (!works(0.001)) return null;
   let low = 0.001;
@@ -727,10 +798,8 @@ export function requiredRentalIncome(
   downPercent: number,
   closingCostRate = 0.025
 ): number | null {
-  const works = (income: number) => {
-    const year = breakevenAt(base, costs, price, downPercent, closingCostRate, { monthlyRentalIncome: income });
-    return year !== null && year <= holdYears;
-  };
+  const works = (income: number) =>
+    buyWinsAtHold(base, costs, price, holdYears, downPercent, closingCostRate, { monthlyRentalIncome: income });
   if (works(0)) return 0;
   if (!works(8000)) return null;
   let low = 0;
@@ -773,8 +842,13 @@ export function decide(args: {
   // counted income the user had just said they would never collect.
   const base: SweepBase = excludeRentalIncome ? { ...args.base, monthlyRentalIncome: 0 } : args.base;
 
-  const breakevenYear = breakevenAt(base, costs, price, downPercent, closingCostRate);
-  const worthIt = breakevenYear !== null && breakevenYear <= holdYears;
+  const scenario = scenarioAtPrice(base, costs, price, downPercent, closingCostRate);
+  const breakevenYear = scenario.breakevenYear;
+  const window = scenario.buyWindow;
+  // Worth it means owning is ahead AT the hold year the reader named, not that
+  // it crossed once by then. With a window that closes, holding to year 30
+  // lands the buyer behind even though breakeven was year 6.
+  const worthIt = buyMinusRentAt(scenario, holdYears) >= 0;
   const priceToRent = price / (base.monthlyRent * 12);
 
   const rateNeeded = requiredRate(base, costs, price, holdYears, downPercent, closingCostRate);
@@ -823,14 +897,25 @@ export function decide(args: {
       key: "years",
       label: "Years you stay",
       current: `${holdYears}`,
-      needed: breakevenYear === null ? "never breaks even" : `${breakevenYear}`,
-      reachable: breakevenYear !== null && breakevenYear <= 30,
+      // The "years" lever is a WINDOW, not a threshold, whenever owning's lead
+      // closes. Staying longer helps you into the window and then hurts you back
+      // out of it, so "you need to stay N years" is only true when the lead
+      // never closes.
+      needed:
+        window.start === null
+          ? "never breaks even"
+          : window.end === null
+            ? `${window.start}+`
+            : `${window.start}–${window.end - 1}`,
+      reachable: window.start !== null && window.start <= 30,
       note:
-        breakevenYear === null
+        window.start === null
           ? "Staying longer does not fix it. This runs the full 30 years and buying never catches renting, so the binding constraint is the price against the rent, not how long you are willing to stay."
-          : breakevenYear <= holdYears
+          : worthIt
             ? "Already there."
-            : `${breakevenYear - holdYears} more years than you planned.`,
+            : window.end !== null && holdYears >= window.end
+              ? `Owning only leads between year ${window.start} and year ${window.end - 1}. You plan to stay ${holdYears}, past the point renting pulls back ahead, so staying is the problem, not the fix.`
+              : `${window.start - holdYears} more years than you planned, and only up to year ${window.end === null ? 30 : window.end - 1}.`,
     },
     {
       key: "income",
@@ -856,7 +941,13 @@ export function decide(args: {
 
   let verdict: string;
   if (worthIt) {
-    verdict = `On these assumptions this works. Owning beats renting by year ${breakevenYear}, inside the ${holdYears} years you expect to stay.`;
+    verdict =
+      window.end !== null
+        ? `On these assumptions this works only if you sell on time. Owning is ahead at year ${holdYears}, but its lead ` +
+          `closes at year ${window.end}: hold past then and renting is ahead again, because the money you did not sink ` +
+          `into the house compounds faster than the house appreciates.`
+        : `On these assumptions this works. Owning is ahead at year ${holdYears} and stays ahead, having pulled ` +
+          `level in year ${breakevenYear}.`;
   } else if (closest.length === 0) {
     verdict =
       `Nothing here is close. At ${priceToRent.toFixed(1)}x price to rent, no single change of a plausible size makes ` +
@@ -871,6 +962,7 @@ export function decide(args: {
   return {
     worthIt,
     breakevenYear,
+    buyWindow: window,
     priceToRent,
     rateNeeded,
     priceNeeded,

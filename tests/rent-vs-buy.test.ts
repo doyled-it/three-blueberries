@@ -246,14 +246,17 @@ test("the required holding period lengthens monotonically with price", () => {
   }
 });
 
-test("the max price you should pay rises as your horizon lengthens, then plateaus", () => {
+test("the max price peaks at a middle horizon, then FALLS, because the lead closes", () => {
+  // The honest shape. maxPriceForHoldPeriod asks "the most I can pay and still be
+  // ahead AT year N". A longer hold helps at first (rent compounds against you),
+  // but once the invested down payment outcompounds the house, a longer hold
+  // HURTS: the price you can justify falls. The old test asserted this rose
+  // monotonically, which was the first-crossing bug in test form.
   const short = maxPriceForHoldPeriod(SWEEP, COSTS, 3, 0.2)!;
   const medium = maxPriceForHoldPeriod(SWEEP, COSTS, 10, 0.2)!;
   const long = maxPriceForHoldPeriod(SWEEP, COSTS, 30, 0.2)!;
-  assert.ok(medium > short, "staying longer should let you pay more");
-  assert.ok(long >= medium);
-  // Past roughly 15 years the constraint is price-to-rent, not patience.
-  assert.ok(long < medium * 1.3, "holding period has sharply diminishing returns");
+  assert.ok(medium > short, "reaching the window lets you pay more than a 3-year flip");
+  assert.ok(long < medium, "past the peak a longer hold LOWERS the price you can justify");
 });
 
 test("the interest rate moves the budget more than the horizon does", () => {

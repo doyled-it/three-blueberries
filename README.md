@@ -41,7 +41,7 @@ state, it relocated to where the work is not.
 
 ```
 npm install
-npm test          # 302 tests, under a second, no framework
+npm test          # 304 tests, under a second, no framework
 npm run dev       # eleventy on :8080 (no /api, the rate fetch falls back)
 npm run typecheck
 npm run build

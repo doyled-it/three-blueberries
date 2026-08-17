@@ -161,10 +161,17 @@ export function recommend(
     `The cash is there. ${money(result.cashToClose.total)} to close against ${money(savings.currentSavings)} saved.`
   );
 
-  // --- gate 3: does owning beat renting over YOUR horizon? -----------------
+  // --- gate 3: does owning beat renting AT YOUR horizon? -------------------
   // The genuinely assumption-heavy one, so it is the only gate whose answer is
   // hedged, and the hedge names the assumption rather than gesturing at it.
-  if (decision.breakevenYear === null) {
+  //
+  // "Ahead at your hold year" is the test, not "crossed once by then". Owning
+  // can lead in a middle window and trail at the end, so the window has to be
+  // reasoned about, not just the first crossing.
+  const { start, end } = decision.buyWindow;
+
+  if (start === null) {
+    // Owning never leads.
     because.push(
       `Against renting it never catches up. Over thirty years, on these assumptions, renting and investing the ` +
         `difference stays ahead.`
@@ -185,19 +192,60 @@ export function recommend(
     };
   }
 
-  if (decision.breakevenYear > holdYears) {
+  if (!decision.worthIt) {
+    // Owning leads a window, but the reader's horizon is outside it. Two shapes:
+    // too short to reach the window, or long enough to have passed it.
+    const pastWindow = end !== null && holdYears >= end;
+    if (pastWindow) {
+      because.push(
+        `Against renting it is ahead only between year ${start} and year ${end - 1}. You plan to stay ${holdYears}, ` +
+          `past the point renting pulls back ahead, because the money you did not sink into the house compounds faster ` +
+          `than the house appreciates.`
+      );
+      conditions.push(`Selling between year ${start} and year ${end - 1}, not holding to ${holdYears}.`);
+      return {
+        answer: "conditional",
+        headline:
+          `Only if you sell on time. Owning is ahead between year ${start} and year ${end - 1}, but you plan to stay ` +
+          `${holdYears}, by which point renting is ahead again.`,
+        because,
+        conditions,
+        caveats: caveatsFor(input, result),
+      };
+    }
+    // Too short to reach the window.
     because.push(
-      `Against renting it takes ${decision.breakevenYear} years to come out ahead, and you said you expect to stay ` +
-        `${holdYears}.`
+      `Against renting it does not pull ahead until year ${start}, and you said you expect to stay ${holdYears}.`
     );
-    conditions.push(`Staying ${decision.breakevenYear} years instead of ${holdYears}.`);
+    conditions.push(
+      end === null
+        ? `Staying at least ${start} years instead of ${holdYears}.`
+        : `Staying between year ${start} and year ${end - 1}, instead of ${holdYears}.`
+    );
     if (decision.priceNeeded !== null && decision.priceNeeded < input.purchasePrice) {
-      conditions.push(`Or a price around ${money(decision.priceNeeded)}, which breaks even inside your ${holdYears}.`);
+      conditions.push(`Or a price around ${money(decision.priceNeeded)}, which is ahead by your ${holdYears}.`);
     }
     return {
       answer: "conditional",
+      headline: `Yes, if you stay longer. Owning does not pull ahead until year ${start}, past the ${holdYears} you expect.`,
+      because,
+      conditions,
+      caveats: caveatsFor(input, result),
+    };
+  }
+
+  // worthIt: owning is ahead at the hold year. Clean yes only if the lead holds.
+  if (end !== null) {
+    because.push(
+      `Against renting it is ahead at year ${holdYears}, but only in a window: its lead closes at year ${end}. Sell on ` +
+        `time and you win; hold past then and renting is ahead again.`
+    );
+    conditions.push(`Selling by year ${end - 1}. Past that, renting pulls back ahead.`);
+    return {
+      answer: "yes",
       headline:
-        `Yes, if you stay ${decision.breakevenYear} years. At the ${holdYears} you expect, renting comes out ahead.`,
+        `Yes, if you sell on time. You qualify, the cash is there, and owning is ahead at year ${holdYears}, but its ` +
+        `lead over renting closes at year ${end}.`,
       because,
       conditions,
       caveats: caveatsFor(input, result),
@@ -205,14 +253,13 @@ export function recommend(
   }
 
   because.push(
-    `Against renting it comes out ahead in year ${decision.breakevenYear}, inside the ${holdYears} you expect to stay.`
+    `Against renting it pulls ahead in year ${decision.breakevenYear} and stays ahead through your ${holdYears}.`
   );
 
   return {
     answer: "yes",
     headline:
-      `Yes. You qualify, the cash is there, and it beats renting by year ${decision.breakevenYear} of the ` +
-      `${holdYears} you plan to stay.`,
+      `Yes. You qualify, the cash is there, and owning is ahead of renting at year ${holdYears} and stays there.`,
     because,
     conditions,
     caveats: caveatsFor(input, result),
