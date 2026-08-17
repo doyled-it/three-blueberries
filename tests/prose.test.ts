@@ -445,7 +445,7 @@ test("the browser layer hardcodes nothing that varies by county", () => {
   const ALLOWED: Array<{ phrase: RegExp; because: string }> = [
     {
       phrase: /San Diego scored as of/,
-      because: "the forecaster is trained on Case-Shiller and genuinely produces only a San Diego number",
+      because: "the forecaster is trained on FHFA's metro index and genuinely produces only a San Diego number",
     },
     {
       phrase: /produces a number for San Diego only, so it does not follow the county selector/,

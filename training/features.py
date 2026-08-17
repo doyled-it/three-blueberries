@@ -1,8 +1,13 @@
 """Feature engineering for the housing forecaster.
 
+The panel is QUARTERLY: FHFA's metro house price index is published quarterly,
+so a "12-month" feature is four quarters, a 24-month horizon is eight, and every
+window below counts quarters. The feature and horizon names stay in months
+because that is how a reader thinks about them; the arithmetic is in quarters.
+
 The single most important property of this module is that **no feature may see
 the future**. Every rolling statistic uses an expanding or trailing window ending
-at the observation's own month.
+at the observation's own quarter.
 
 This matters more than it sounds. A full-sample z-score of price would encode
 "2008 was the peak" into 2005's features, and the resulting model would look
@@ -23,13 +28,17 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PANEL_PATH = REPO_ROOT / "data" / "panel.json"
 
+# Horizons are labelled in MONTHS (how a reader thinks) but the data is
+# quarterly, so a horizon of h months is h // 3 quarters ahead.
 HORIZONS = (12, 24, 36)
+Q = 3  # months per quarter, so a shift of n quarters is n = months // Q
 DRAWDOWN_THRESHOLD = -0.10
 
-# Minimum history before a metro contributes rows: the trend feature needs a
-# decade, and the expanding z-scores need enough observations to be meaningful.
-MIN_HISTORY_MONTHS = 120
-TREND_WINDOW = 120
+# Minimum history before a metro contributes rows, and the trend window, both in
+# QUARTERS. A decade of trend is 40 quarters; the expanding z-scores need 20.
+MIN_HISTORY_QUARTERS = 40
+TREND_WINDOW = 40
+Z_MIN_PERIODS = 20
 
 FEATURES: list[tuple[str, str]] = [
     ("mom3", "3-month momentum"),
@@ -65,15 +74,16 @@ def _annuity_factor(rate_percent: pd.Series) -> pd.Series:
 
 
 def _national_frame(national: dict[str, list]) -> pd.DataFrame:
-    """National series joined onto a monthly index, forward-filled.
+    """National series joined onto a QUARTERLY index, forward-filled.
 
-    Forward-fill is the correct choice here and is not lookahead: quarterly
-    delinquency published for Q1 is the most recent *known* value during Q2.
+    The panel already resamples every national series to quarters, so this just
+    aligns them. Forward-fill is not lookahead: a value published for Q1 is the
+    most recent *known* value during Q2.
     """
     series = {}
     for key, rows in national.items():
         s = pd.Series(
-            {pd.Period(month, freq="M"): value for month, value in rows},
+            {pd.Period(month, freq="Q"): value for month, value in rows},
             name=key,
             dtype="float64",
         ).sort_index()
@@ -82,7 +92,7 @@ def _national_frame(national: dict[str, list]) -> pd.DataFrame:
     idx = pd.period_range(
         min(s.index.min() for s in series.values()),
         max(s.index.max() for s in series.values()),
-        freq="M",
+        freq="Q",
     )
     frame = pd.DataFrame(index=idx)
     for key, s in series.items():
@@ -100,7 +110,7 @@ def load_panel(path: Path = PANEL_PATH) -> Panel:
     for metro_id, meta in raw["metros"].items():
         metros[metro_id] = meta["name"]
         rows = meta["series"]
-        idx = pd.PeriodIndex([pd.Period(m, freq="M") for m, _ in rows], freq="M")
+        idx = pd.PeriodIndex([pd.Period(m, freq="Q") for m, _ in rows], freq="Q")
         price = pd.Series([v for _, v in rows], index=idx, dtype="float64").sort_index()
 
         df = pd.DataFrame({"price": price})
@@ -111,31 +121,32 @@ def load_panel(path: Path = PANEL_PATH) -> Panel:
         burden = np.log((df["price"] / df["cpi"]) * _annuity_factor(df["rate"]))
 
         # --- momentum: trailing log returns -------------------------------
-        df["mom3"] = np.log(df["price"] / df["price"].shift(3))
-        df["mom12"] = np.log(df["price"] / df["price"].shift(12))
-        df["mom24"] = np.log(df["price"] / df["price"].shift(24))
+        df["mom3"] = np.log(df["price"] / df["price"].shift(1))  # 1 quarter
+        df["mom12"] = np.log(df["price"] / df["price"].shift(4))  # 4 quarters
+        df["mom24"] = np.log(df["price"] / df["price"].shift(8))  # 8 quarters
 
         # --- EXPANDING statistics: strictly data up to and including t -----
-        real_mean = log_real.expanding(min_periods=60).mean()
-        real_std = log_real.expanding(min_periods=60).std()
+        real_mean = log_real.expanding(min_periods=Z_MIN_PERIODS).mean()
+        real_std = log_real.expanding(min_periods=Z_MIN_PERIODS).std()
         df["real_price_z"] = (log_real - real_mean) / real_std.replace(0, np.nan)
 
-        burden_mean = burden.expanding(min_periods=60).mean()
-        burden_std = burden.expanding(min_periods=60).std()
+        burden_mean = burden.expanding(min_periods=Z_MIN_PERIODS).mean()
+        burden_std = burden.expanding(min_periods=Z_MIN_PERIODS).std()
         df["burden_z"] = (burden - burden_mean) / burden_std.replace(0, np.nan)
 
         # --- trailing trend ------------------------------------------------
-        df["dev_from_trend"] = log_real - log_real.rolling(TREND_WINDOW, min_periods=60).mean()
+        df["dev_from_trend"] = log_real - log_real.rolling(TREND_WINDOW, min_periods=Z_MIN_PERIODS).mean()
 
         # --- national levels and changes ------------------------------------
-        df["rate_chg12"] = df["rate"] - df["rate"].shift(12)
-        df["unemp_chg12"] = df["unemployment"] - df["unemployment"].shift(12)
+        df["rate_chg12"] = df["rate"] - df["rate"].shift(4)
+        df["unemp_chg12"] = df["unemployment"] - df["unemployment"].shift(4)
 
         # --- targets ---------------------------------------------------------
         for h in HORIZONS:
-            df[f"fwd_ret_{h}"] = np.log(df["price"].shift(-h) / df["price"])
+            hq = h // Q  # horizon in quarters
+            df[f"fwd_ret_{h}"] = np.log(df["price"].shift(-hq) / df["price"])
             # Worst point reached at any time inside the horizon, not just the end.
-            forward_min = df["price"].shift(-1).rolling(h, min_periods=h).min().shift(-(h - 1))
+            forward_min = df["price"].shift(-1).rolling(hq, min_periods=hq).min().shift(-(hq - 1))
             df[f"drawdown_{h}"] = ((forward_min / df["price"] - 1.0) <= DRAWDOWN_THRESHOLD).astype("float64")
             df.loc[forward_min.isna(), f"drawdown_{h}"] = np.nan
 
@@ -143,7 +154,7 @@ def load_panel(path: Path = PANEL_PATH) -> Panel:
         df["metro_name"] = meta["name"]
         df["month"] = df.index.astype(str)
         df["order"] = np.arange(len(df))
-        df = df.iloc[MIN_HISTORY_MONTHS:]
+        df = df.iloc[MIN_HISTORY_QUARTERS:]
         blocks.append(df)
 
     frame = pd.concat(blocks).reset_index(names="period")

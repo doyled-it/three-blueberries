@@ -35,8 +35,9 @@ from training.validation import walk_forward
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = REPO_ROOT / "lib" / "data" / "model.ts"
 
-TARGET_METRO = "SDXRSA"
-PRE_CRASH = ("2004-01", "2006-06")
+TARGET_METRO = "SanDiego"
+# Quarter labels, because the panel is quarterly and `month` holds "2004Q1".
+PRE_CRASH = ("2004Q1", "2006Q2")
 
 
 def build_regressors() -> dict[str, object]:
@@ -250,7 +251,7 @@ def fit_final(frame: pd.DataFrame, metro_row: pd.Series) -> dict:
 
 def main() -> None:
     panel = load_panel()
-    print(f"Panel: {len(panel.frame):,} metro-months across {len(panel.metros)} metros (retrieved {panel.retrieved})")
+    print(f"Panel: {len(panel.frame):,} metro-quarters across {len(panel.metros)} metros (retrieved {panel.retrieved})")
 
     sd_row = latest_features(panel, TARGET_METRO)
     print(f"Scoring {panel.metros[TARGET_METRO]} as of {sd_row['month']}")
@@ -280,10 +281,10 @@ def emit(payload: dict, panel, sd_row: pd.Series) -> None:
     body = f"""// GENERATED FILE. Do not edit by hand.
 // Regenerate with: npm run data:panel && npm run train
 //
-// Trained by training/train.py (scikit-learn) on a panel of {len(panel.metros)} Case-Shiller
-// metros, {len(panel.frame):,} metro-months. Validated with purged walk-forward folds:
-// training rows whose target resolves inside the test window are dropped, so no
-// fold can see its own answer.
+// Trained by training/train.py (scikit-learn) on a panel of {len(panel.metros)} metros from
+// FHFA's all-transactions house price index, {len(panel.frame):,} metro-quarters. Validated
+// with purged walk-forward folds: training rows whose target resolves inside the
+// test window are dropped, so no fold can see its own answer.
 //
 // Scored for {panel.metros[TARGET_METRO]} as of {sd_row["month"]}.
 // Trained: {pd.Timestamp.today().date()}

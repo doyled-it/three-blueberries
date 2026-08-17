@@ -6,8 +6,9 @@
  * is a negative one, and a negative result is worth shipping properly.
  *
  * A model was trained: ridge, gradient boosting and random forest, on a panel of
- * 20 Case-Shiller metros, at 12/24/36-month horizons, validated with purged
- * walk-forward folds. It produces a current number for San Diego. That number is
+ * 20 metros from FHFA's all-transactions house price index (quarterly), at
+ * 12/24/36-month horizons, validated with purged walk-forward folds. It produces
+ * a current number for San Diego. That number is
  * NOT a forecast anyone should act on, and this module's job is to make it
  * impossible to display it as one.
  *

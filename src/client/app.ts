@@ -1465,7 +1465,7 @@ function renderForecast(): void {
     <p class="verdict ${v.trustworthy ? "verdict--yes" : "verdict--no"}">${v.headline}</p>
     <ul class="warnings">${v.failures.map((f) => `<li>${f}</li>`).join("")}</ul>
     <p class="field-note">
-      Trained ${MODEL_META.trained} on ${MODEL_META.observations.toLocaleString("en-US")} metro-months across
+      Trained ${MODEL_META.trained} on ${MODEL_META.observations.toLocaleString("en-US")} metro-quarters across
       ${MODEL_META.metros} metros; San Diego scored as of ${MODEL_META.scoredMonth}. Checks were fixed before
       looking at results: ${v.criteria.join("; ")}.
     </p>`;
@@ -1480,7 +1480,7 @@ function renderForecast(): void {
           Crash probability ${(r.current.crashProbabilityGbm * 100).toFixed(0)}%.
           Same model, judged on 2004-2006, said ${(r.classifier.preCrashProbability * 100).toFixed(0)}% right before
           ${(r.classifier.preCrashActual * 100).toFixed(0)}% of those windows went on to fall 10% or more.
-          Case-Shiller San Diego, not your county.
+          FHFA San Diego metro, not your county.
         </span>
       </div>`
     )

@@ -473,7 +473,7 @@ Python, managed with **uv**. `pyproject.toml` + `.python-version` are committed;
 never use system Python or pip-install into it.
 
 ```
-npm run data:panel   # 20 Case-Shiller metros + national controls -> data/panel.json
+npm run data:panel   # 20 FHFA metros (quarterly) + national controls -> data/panel.json
 npm run train        # uv run python -m training.train -> lib/data/model.ts
 npm run train:test   # uv run pytest  (the leakage suite)
 ```
@@ -482,6 +482,14 @@ npm run train:test   # uv run pytest  (the leakage suite)
 (ridge / gradient boosting / random forest, plus logistic + GBM classifiers for
 "prices fall 10%+ within the horizon"). Training is offline; the browser receives
 only coefficients and metrics, so there is no Python at runtime.
+
+**The panel is QUARTERLY.** FHFA publishes its metro index quarterly, so every
+window in `training/` counts quarters: a "12-month" feature is four quarters, a
+24-month horizon is eight. Horizons stay labelled in months because that is how a
+reader thinks; the arithmetic converts with `horizon // 3`. This is the one thing
+to hold onto when editing `features.py`, `features_v2.py` or `validation.py`, a
+shift or window left in months would silently be four times too long. The earlier
+pipeline was monthly (Case-Shiller); the swap to FHFA is why.
 
 ### THE BUG THAT MUST NEVER COME BACK
 
@@ -492,22 +500,29 @@ classifier AUC of 0.96. All of it was leakage. The correct pipeline scores
 **below zero** on both.
 
 `training/tests/test_leakage.py` pins this: every fold asserts
-`(train_period + horizon) < test_start`, and a separate test asserts the purge
-actually removes rows, because a purge that drops nothing is not a purge. Run it
-before trusting any number the model produces.
+`(train_period + horizon // 3) < test_start` (periods are quarterly, the horizon
+is in months), and a separate test asserts the purge actually removes rows,
+because a purge that drops nothing is not a purge. Run it before trusting any
+number the model produces.
 
 ### What the honest model says
 
 It does not work, and `lib/forecast.ts` is built so it cannot be displayed as if
-it does. `verdict()` checks four criteria fixed in advance and currently fails
-all four: it loses to "assume the trend continues," its direction calls are worse
-than always saying "up" (76.7% base rate), the crash classifier scores AUC below
-0.5, and going into 2008 it predicted growth with a 0% chance of a decline.
+it does. `verdict()` checks four criteria fixed in advance: beat the momentum
+baseline, beat "always say up" on direction, a crash classifier better than a coin
+(AUC > 0.5), and elevated risk before the 2008 decline. On FHFA it fails at least
+one at every horizon and is trustworthy at none: the default 24-month horizon
+fails two (it cannot beat "assume the trend continues," and it assigned a
+near-zero crash probability going into 2008), and the 36-month horizon fails all
+four. `verdict()` derives which, so **do not write "fails all four" into copy**,
+it was true on the monthly Case-Shiller panel and is not the whole story now.
+`trustworthy: false` at every horizon is what holds, and the UI reads it live.
 
-The model's _current_ San Diego output is bearish (roughly −20% at 24 months, 74%
-crash probability). **Do not promote that number.** It is rendered underneath its
-own track record on purpose. If a future model earns `trustworthy: true` against
-the pre-registered criteria, that changes. Nothing else does.
+The model's _current_ San Diego output is mildly bearish, and the exact number
+drifts with every retrain. **Do not promote or hardcode it.** It is rendered
+underneath its own track record on purpose. If a future model earns
+`trustworthy: true` against the pre-registered criteria, that changes. Nothing
+else does.
 
 ## 7. Planned, not built
 
@@ -531,13 +546,15 @@ almost nobody distributes a web app: they run it on a server and hand you HTML, 
 GPL says nothing about. AGPL section 13 is the clause that reaches a modified version running
 as a website.
 
-**The AGPL covers the code, not the data.** `lib/data/history.ts` and `data/panel.json`
-contain S&P CoreLogic Case-Shiller index values, and S&P prohibits reproduction without prior
-written permission; FRED states explicitly that API access is not that permission. Permission
-has NOT been requested. If it needs solving, the FHFA House Price Index covers the same metros
-as a US government work with no such restriction, and `scripts/fetch-history.mjs` is the only
-file that would change. Everything else in `lib/data/` is a government work or published
-public statistics. The README carries the table.
+**The AGPL covers the code, not the data, and every data file is now freely
+redistributable.** This used to carry a caveat: both `lib/data/history.ts` and the
+forecaster's `data/panel.json` held S&P CoreLogic Case-Shiller index values, which
+S&P prohibits reproducing without prior written permission (and FRED is explicit
+that API access is not that permission). Both have since moved to the FHFA House
+Price Index, a US government work with no such restriction: the price history in
+2026, the forecaster panel after it. Nothing in `lib/data/` or `data/` now depends
+on anyone's permission; it is all government works or published public statistics.
+The README carries the table.
 
 ---
 

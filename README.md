@@ -125,15 +125,11 @@ data files, which come from other people and carry their own terms:
 | County incomes | Census SAIPE | US government work, public domain |
 | FHA county limits | HUD CHUMS | US government work, public domain |
 | Fraunces, IBM Plex Mono | Undercase Type, IBM | SIL Open Font License 1.1 |
-| **Forecaster panel** | **S&P Case-Shiller via FRED** | **see below** |
+| Forecaster panel | FHFA all-transactions HPI via FRED | US government work, public domain |
 
-`data/panel.json` contains S&P CoreLogic Case-Shiller index values for 20 metros.
-It is the offline training input for the forecaster and is not displayed. S&P's
-terms state that reproduction in any form is prohibited without their prior
-written permission, and FRED is explicit that making a series available through
-their API is not that permission. Permission has not been requested.
-
-The site itself no longer touches it. Everything shown to a reader comes from
-FHFA, Zillow and the Census, none of which need anyone's permission. The same
-move would work for the panel: FHFA covers those metros too, and the forecaster's
-conclusion is that it does not work, which a coarser input would not change.
+`data/panel.json` is the offline training input for the forecaster and is never
+displayed. It holds FHFA's quarterly all-transactions house price index for 20
+metros, joined to national controls. FHFA's index is a US government work, so the
+whole panel can live in a public repo with no one's permission, the same as
+everything the reader actually sees. An earlier version trained on S&P Case-Shiller,
+which S&P prohibits redistributing; that dependency is gone.

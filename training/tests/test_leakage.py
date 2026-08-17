@@ -33,7 +33,9 @@ def frame24(panel):
 
 
 def test_panel_is_non_trivial(panel):
-    assert len(panel.frame) > 5000
+    # Quarterly FHFA data has roughly a quarter of the rows the monthly
+    # Case-Shiller panel did: ~20 metros x ~160 usable quarters.
+    assert len(panel.frame) > 2000
     assert len(panel.metros) >= 15
 
 
@@ -49,12 +51,12 @@ def test_expanding_zscore_never_uses_the_future(panel):
     confirm it matches. If someone swaps `.expanding()` for a full-sample
     transform, this fails.
     """
-    metro = panel.frame[panel.frame["metro"] == "SDXRSA"].sort_values("period").reset_index(drop=True)
+    metro = panel.frame[panel.frame["metro"] == "SanDiego"].sort_values("period").reset_index(drop=True)
 
     # Rebuild log real price from the same inputs the feature used.
     log_real = np.log(metro["price"] / metro["cpi"])
 
-    for position in (150, 250, 350):
+    for position in (60, 100, 140):
         if position >= len(metro):
             continue
         history = log_real.iloc[: position + 1]
@@ -75,7 +77,7 @@ def test_full_sample_zscore_would_be_detectably_different(panel):
     If a full-sample z-score happened to equal the expanding one, the previous
     test would be vacuous. It does not.
     """
-    metro = panel.frame[panel.frame["metro"] == "SDXRSA"].sort_values("period").reset_index(drop=True)
+    metro = panel.frame[panel.frame["metro"] == "SanDiego"].sort_values("period").reset_index(drop=True)
     log_real = np.log(metro["price"] / metro["cpi"])
     full_sample = (log_real - log_real.mean()) / log_real.std()
     expanding = metro["real_price_z"]
@@ -84,11 +86,12 @@ def test_full_sample_zscore_would_be_detectably_different(panel):
 
 
 def test_momentum_uses_only_past_prices(panel):
-    metro = panel.frame[panel.frame["metro"] == "LXXRSA"].sort_values("period").reset_index(drop=True)
-    for position in (200, 300):
+    metro = panel.frame[panel.frame["metro"] == "LosAngeles"].sort_values("period").reset_index(drop=True)
+    for position in (60, 100):
         if position >= len(metro):
             continue
-        expected = np.log(metro["price"].iloc[position] / metro["price"].iloc[position - 12])
+        # mom12 is a year of momentum, which on quarterly data is four quarters.
+        expected = np.log(metro["price"].iloc[position] / metro["price"].iloc[position - 4])
         assert metro["mom12"].iloc[position] == pytest.approx(expected, rel=1e-9)
 
 
@@ -101,7 +104,8 @@ def test_no_training_target_resolves_inside_the_test_window(panel, horizon):
 
     for fold in folds:
         train_periods = frame.loc[fold.train_index, "period"]
-        resolves = train_periods + horizon
+        # Periods are quarterly; a horizon of h months resolves h // 3 quarters on.
+        resolves = train_periods + horizon // 3
         assert (resolves < fold.test_start).all(), (
             f"{int((resolves >= fold.test_start).sum())} training rows in the fold starting "
             f"{fold.test_start} have targets resolving at or after the test start"
@@ -150,19 +154,20 @@ def test_inner_split_is_also_purged(panel):
     fit_index, val_index = purged_inner_split(frame, fold.train_index, 24)
     if len(fit_index) == 0:
         pytest.skip("training window too short to split")
-    resolves = frame.loc[fit_index, "period"] + 24
+    resolves = frame.loc[fit_index, "period"] + 24 // 3
     assert (resolves < frame.loc[val_index, "period"].min()).all()
 
 
 def test_drawdown_label_looks_forward_not_backward(panel):
     """The label must describe the future, and only within the horizon."""
-    metro = panel.frame[panel.frame["metro"] == "SDXRSA"].sort_values("period").reset_index(drop=True)
-    row = metro.index[metro["month"] == "2006-06"]
+    metro = panel.frame[panel.frame["metro"] == "SanDiego"].sort_values("period").reset_index(drop=True)
+    row = metro.index[metro["month"] == "2006Q2"]
     if len(row) == 0:
-        pytest.skip("2006-06 not present")
+        pytest.skip("2006Q2 not present")
     i = int(row[0])
     price_now = metro["price"].iloc[i]
-    future = metro["price"].iloc[i + 1 : i + 25]
+    # 24 months is eight quarters on quarterly data.
+    future = metro["price"].iloc[i + 1 : i + 9]
     expected = float((future.min() / price_now - 1) <= -0.10)
     assert metro["drawdown_24"].iloc[i] == expected
     # San Diego from mid-2006 unambiguously fell more than 10% within two years.

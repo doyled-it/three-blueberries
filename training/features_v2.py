@@ -25,9 +25,20 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from training.features import HORIZONS, DRAWDOWN_THRESHOLD, MIN_HISTORY_MONTHS, _annuity_factor, _national_frame
+from training.features import (
+    HORIZONS,
+    DRAWDOWN_THRESHOLD,
+    MIN_HISTORY_QUARTERS,
+    Q,
+    TREND_WINDOW,
+    Z_MIN_PERIODS,
+    _annuity_factor,
+    _national_frame,
+)
 
-TREND_WINDOW = 120
+# The panel is QUARTERLY (FHFA). Every window below counts quarters: a "12-month"
+# feature is four quarters, a 36-month horizon is twelve. Names stay in months
+# because that is how a reader thinks; the arithmetic is in quarters.
 
 FEATURES_V2: list[tuple[str, str]] = [
     # --- momentum and its derivatives -------------------------------------
@@ -77,7 +88,7 @@ def build_panel_v2(raw: dict, horizons=HORIZONS) -> pd.DataFrame:
 
     for metro_id, meta in raw["metros"].items():
         rows = meta["series"]
-        idx = pd.PeriodIndex([pd.Period(m, freq="M") for m, _ in rows], freq="M")
+        idx = pd.PeriodIndex([pd.Period(m, freq="Q") for m, _ in rows], freq="Q")
         price = pd.Series([v for _, v in rows], index=idx, dtype="float64").sort_index()
 
         df = pd.DataFrame({"price": price}).join(national, how="left")
@@ -86,53 +97,56 @@ def build_panel_v2(raw: dict, horizons=HORIZONS) -> pd.DataFrame:
         log_price = np.log(df["price"])
         log_real = np.log(df["price"] / df["cpi"])
         burden = np.log((df["price"] / df["cpi"]) * _annuity_factor(df["rate"]))
-        monthly_ret = log_price.diff()
+        quarterly_ret = log_price.diff()
 
-        df["mom3"] = log_price - log_price.shift(3)
-        df["mom12"] = log_price - log_price.shift(12)
-        df["mom24"] = log_price - log_price.shift(24)
-        df["mom36"] = log_price - log_price.shift(36)
-        df["accel12"] = df["mom12"] - df["mom12"].shift(12)
+        df["mom3"] = log_price - log_price.shift(1)  # 1 quarter
+        df["mom12"] = log_price - log_price.shift(4)  # 4 quarters
+        df["mom24"] = log_price - log_price.shift(8)  # 8 quarters
+        df["mom36"] = log_price - log_price.shift(12)  # 12 quarters
+        df["accel12"] = df["mom12"] - df["mom12"].shift(4)
         df["mom_slowdown"] = df["mom3"] * 4 - df["mom12"]
 
-        real_mean = log_real.expanding(min_periods=60).mean()
-        real_std = log_real.expanding(min_periods=60).std().replace(0, np.nan)
+        real_mean = log_real.expanding(min_periods=Z_MIN_PERIODS).mean()
+        real_std = log_real.expanding(min_periods=Z_MIN_PERIODS).std().replace(0, np.nan)
         df["real_price_z"] = (log_real - real_mean) / real_std
-        df["dev_from_trend"] = log_real - log_real.rolling(TREND_WINDOW, min_periods=60).mean()
+        df["dev_from_trend"] = log_real - log_real.rolling(TREND_WINDOW, min_periods=Z_MIN_PERIODS).mean()
 
-        burden_mean = burden.expanding(min_periods=60).mean()
-        burden_std = burden.expanding(min_periods=60).std().replace(0, np.nan)
+        burden_mean = burden.expanding(min_periods=Z_MIN_PERIODS).mean()
+        burden_std = burden.expanding(min_periods=Z_MIN_PERIODS).std().replace(0, np.nan)
         df["burden_z"] = (burden - burden_mean) / burden_std
-        df["burden_chg12"] = df["burden_z"] - df["burden_z"].shift(12)
+        df["burden_chg12"] = df["burden_z"] - df["burden_z"].shift(4)
 
-        df["vol12"] = monthly_ret.rolling(12, min_periods=12).std()
-        df["vol36"] = monthly_ret.rolling(36, min_periods=24).std()
+        df["vol12"] = quarterly_ret.rolling(4, min_periods=4).std()
+        df["vol36"] = quarterly_ret.rolling(12, min_periods=8).std()
 
         running_peak = df["price"].expanding().max()
         df["drawdown_from_peak"] = df["price"] / running_peak - 1.0
-        peak_month = (
+        peak_quarter = (
             pd.Series(np.arange(len(df)), index=df.index)
             .where(df["price"] >= running_peak)
             .ffill()
         )
-        df["months_since_peak"] = np.arange(len(df)) - peak_month
+        # Feature key stays "months_since_peak"; the unit is quarters, consistent
+        # between training and prediction, which is all the model needs.
+        df["months_since_peak"] = np.arange(len(df)) - peak_quarter
 
-        df["rate_spread"] = df["rate"] - df["rate"].rolling(120, min_periods=60).mean()
-        df["rate_chg12"] = df["rate"] - df["rate"].shift(12)
-        df["supply_chg12"] = df["supply"] - df["supply"].shift(12)
-        df["delinquency_chg12"] = df["delinquency"] - df["delinquency"].shift(12)
-        df["unemp_chg12"] = df["unemployment"] - df["unemployment"].shift(12)
+        df["rate_spread"] = df["rate"] - df["rate"].rolling(TREND_WINDOW, min_periods=Z_MIN_PERIODS).mean()
+        df["rate_chg12"] = df["rate"] - df["rate"].shift(4)
+        df["supply_chg12"] = df["supply"] - df["supply"].shift(4)
+        df["delinquency_chg12"] = df["delinquency"] - df["delinquency"].shift(4)
+        df["unemp_chg12"] = df["unemployment"] - df["unemployment"].shift(4)
 
         for h in horizons:
-            df[f"fwd_ret_{h}"] = np.log(df["price"].shift(-h) / df["price"])
-            forward_min = df["price"].shift(-1).rolling(h, min_periods=h).min().shift(-(h - 1))
+            hq = h // Q  # horizon in quarters
+            df[f"fwd_ret_{h}"] = np.log(df["price"].shift(-hq) / df["price"])
+            forward_min = df["price"].shift(-1).rolling(hq, min_periods=hq).min().shift(-(hq - 1))
             df[f"drawdown_{h}"] = ((forward_min / df["price"] - 1.0) <= DRAWDOWN_THRESHOLD).astype("float64")
             df.loc[forward_min.isna(), f"drawdown_{h}"] = np.nan
 
         df["metro"] = metro_id
         df["metro_name"] = meta["name"]
         df["month"] = df.index.astype(str)
-        blocks.append(df.iloc[MIN_HISTORY_MONTHS:])
+        blocks.append(df.iloc[MIN_HISTORY_QUARTERS:])
 
     frame = pd.concat(blocks).reset_index(names="period")
 
@@ -161,7 +175,7 @@ def horizon_frame_v2(frame: pd.DataFrame, horizon: int) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
-def add_lags(frame: pd.DataFrame, keys: list[str], lags=(6, 12, 24)) -> tuple[pd.DataFrame, list[str]]:
+def add_lags(frame: pd.DataFrame, keys: list[str], lags=(2, 4, 8)) -> tuple[pd.DataFrame, list[str]]:
     """Lagged copies of selected features. A tabular stand-in for a sequence model.
 
     Gradient boosting over a lagged window can represent most of what a small
