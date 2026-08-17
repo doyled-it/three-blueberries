@@ -1504,3 +1504,79 @@ input[type="range"] {
   font-size: 0.8rem;
   padding: 2px 0;
 }
+
+/* ---------- the methodology page (/how-its-calculated) ---------- */
+/* The deep detail lives here so the tool stays scannable. Formulas are native
+   MathML: no third-party request, and readable text if a browser lacks it. */
+.hero--sub {
+  padding-top: 56px;
+}
+.hero--sub .hero__kicker a {
+  border: 0;
+  color: var(--ink-3);
+}
+.hero--sub .hero__kicker a:hover {
+  color: var(--berry-bright);
+}
+.method-page .formula-block {
+  padding: 26px 0;
+  border-top: 1px solid var(--rule);
+  max-width: var(--measure);
+}
+.method-page .formula-block h2 {
+  margin: 0 0 12px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 1.3rem;
+}
+.method-page p {
+  color: var(--ink-2);
+  font-size: 0.96rem;
+  line-height: 1.6;
+}
+.method-page .source {
+  color: var(--ink-3);
+  font-size: 0.86rem;
+}
+.method-page code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--berry-bright);
+}
+/* Formula display: a recessed slab, monospace-adjacent, centered. */
+.method-page math[display="block"] {
+  display: block;
+  margin: 18px 0;
+  padding: 16px 20px;
+  background: var(--panel);
+  border-left: 2px solid var(--berry-deep);
+  border-radius: 0 4px 4px 0;
+  overflow-x: auto;
+  font-size: 1.15rem;
+  color: var(--ink);
+  /* MathML inherits the page serif otherwise, which reads oddly for algebra. */
+  font-family: "IBM Plex Mono", var(--mono);
+}
+.method-page math {
+  color: var(--ink);
+}
+/* The symbol key under each formula. */
+.method-page .symbols {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 18px;
+  margin: 14px 0;
+  font-size: 0.9rem;
+}
+.method-page .symbols dt {
+  font-family: var(--mono);
+  color: var(--berry-bright);
+  white-space: nowrap;
+}
+.method-page .symbols dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+.method-page__back {
+  margin-top: 8px;
+}

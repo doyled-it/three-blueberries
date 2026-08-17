@@ -1645,6 +1645,11 @@ function attachMoneyFormatting(el: HTMLInputElement): void {
 }
 
 function init(): void {
+  // This script ships on every page but only the calculator has a form to wire.
+  // On a static page (the methodology page) there is nothing to do, and reaching
+  // for #county would throw. Bail before that.
+  if (!document.getElementById("scenario")) return;
+
   // Built from the page's own headings, so it cannot drift when sections move.
   const toc = buildToc();
   document.body.insertAdjacentHTML("afterbegin", renderToc(toc));

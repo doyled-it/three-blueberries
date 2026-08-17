@@ -1,0 +1,337 @@
+---
+layout: base.njk
+permalink: /how-its-calculated/
+title: "How every number is calculated | Three Blueberries"
+description: "The formulas behind the calculator, in full: the mortgage payment, PMI termination, FHA MIP, VA residual income, Prop 13 tax, rent-versus-buy net worth, and the affordability search. Each with its source."
+---
+
+{#
+  The deep detail lives here, so the tool itself can stay scannable. Formulas are
+  MathML: native in every modern browser, no third-party request, and the page
+  degrades to readable text if a browser lacks it. Every formula matches the
+  code it links to; if you change one, change the other.
+#}
+
+<article class="panel method-page">
+  <header class="hero hero--sub">
+    <p class="hero__kicker">
+      <a href="/">← Three Blueberries</a>
+    </p>
+    <h1>How every number is calculated</h1>
+    <p class="hero__sub">
+      The whole point of this project is that you can check the arithmetic. Here it is, formula by formula, each
+      with its source and a link to the code that runs it. Nothing here is a secret sauce; it is all either an
+      agency's published rule or a line of algebra.
+    </p>
+  </header>
+
+  <!-- 1. The two totals -->
+  <section class="formula-block">
+    <h2>The two totals</h2>
+    <p>
+      Every other calculator shows you one number. This shows two, and the gap between them is the reason the
+      project exists. The <strong>lender total</strong> is what underwriting counts; the <strong>true total</strong>
+      adds the one thing a lender does not, the maintenance you will actually spend.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>C</mi><mtext>lender</mtext></msub><mo>=</mo>
+        <mi>P&amp;I</mi><mo>+</mo><mi>T</mi><mo>+</mo><mi>I</mi><mo>+</mo><mi>MI</mi><mo>+</mo>
+        <mi>HOA</mi><mo>+</mo><mi>M</mi>
+      </mrow>
+    </math>
+    <math display="block">
+      <mrow>
+        <msub><mi>C</mi><mtext>true</mtext></msub><mo>=</mo>
+        <msub><mi>C</mi><mtext>lender</mtext></msub><mo>+</mo><mi>R</mi>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>P&amp;I</dt><dd>principal and interest (below)</dd>
+      <dt>T, I</dt><dd>property tax, homeowners insurance</dd>
+      <dt>MI</dt><dd>mortgage insurance (PMI, FHA MIP, or none)</dd>
+      <dt>HOA, M</dt><dd>HOA dues, Mello-Roos / special assessments</dd>
+      <dt>R</dt><dd>maintenance reserve, 1% of value a year by default</dd>
+    </dl>
+    <p class="source">
+      A lender never counts maintenance, so it must never inflate a debt-to-income ratio.
+      <a href="{{ site.repo.url }}/blob/main/lib/mortgage.ts">mortgage.ts</a>
+    </p>
+  </section>
+
+  <!-- 2. Monthly payment -->
+  <section class="formula-block">
+    <h2>The mortgage payment</h2>
+    <p>The standard amortized-loan formula: the fixed monthly payment that retires a loan of <math><mi>P</mi></math> over <math><mi>n</mi></math> months at monthly rate <math><mi>r</mi></math>.</p>
+    <math display="block">
+      <mrow>
+        <mi>M</mi><mo>=</mo>
+        <mi>P</mi><mo>·</mo>
+        <mfrac>
+          <mrow><mi>r</mi><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>n</mi></msup></mrow>
+          <mrow><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>n</mi></msup><mo>−</mo><mn>1</mn></mrow>
+        </mfrac>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>P</dt><dd>the loan amount, including any financed FHA upfront premium or VA funding fee</dd>
+      <dt>r</dt><dd>the annual rate divided by 12</dd>
+      <dt>n</dt><dd>the term in months, so 360 for a 30-year loan</dd>
+    </dl>
+    <p class="source">
+      <a href="{{ site.repo.url }}/blob/main/lib/amortization.ts">amortization.ts</a>
+    </p>
+  </section>
+
+  <!-- 3. Balance and LTV over time -->
+  <section class="formula-block">
+    <h2>The balance, and when mortgage insurance ends</h2>
+    <p>
+      After <math><mi>k</mi></math> payments the remaining balance is the loan grown at the rate, less the payments
+      made, also grown. Loan-to-value is that balance over the original purchase price.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>B</mi><mi>k</mi></msub><mo>=</mo>
+        <mi>P</mi><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>k</mi></msup>
+        <mo>−</mo>
+        <mi>M</mi><mo>·</mo>
+        <mfrac>
+          <mrow><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>k</mi></msup><mo>−</mo><mn>1</mn></mrow>
+          <mi>r</mi>
+        </mfrac>
+      </mrow>
+    </math>
+    <p>
+      Conventional PMI has two automatic end points under the Homeowners Protection Act, and whichever comes first
+      governs: the month LTV reaches 78% <em>on the original schedule</em> (appreciation does not count), or the
+      midpoint of the loan term. FHA is different: put less than 10% down and its premium runs for the
+      <strong>life of the loan</strong>, with no equity exit at all.
+    </p>
+    <p class="source">
+      Homeowners Protection Act of 1998; HUD Mortgagee Letter 2023-05 for FHA.
+      <a href="{{ site.repo.url }}/blob/main/lib/mortgage.ts">mortgage.ts</a>
+    </p>
+  </section>
+
+  <!-- 4. Property tax -->
+  <section class="formula-block">
+    <h2>Property tax, under Proposition 13</h2>
+    <p>
+      Buying resets the assessed value to your purchase price. The tax is that value, less the homeowners'
+      exemption if you file for it, times the county rate.
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>T</mi><mo>=</mo>
+        <mo>(</mo><mi>V</mi><mo>−</mo><mi>E</mi><mo>)</mo>
+        <mo>·</mo><mi>t</mi>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>V</dt><dd>the purchase price (Prop 13 reassesses to it)</dd>
+      <dt>E</dt><dd>the $7,000 homeowners' exemption, if claimed</dd>
+      <dt>t</dt><dd>the county rate: the 1% statutory base plus voter-approved bonds</dd>
+    </dl>
+    <p>
+      Mello-Roos is modeled as its own line, never folded into <math><mi>t</mi></math>, because doing so would
+      double-count and hide the single most invisible cost in California new construction.
+    </p>
+    <p class="source">
+      California Constitution Article XIII A. County rates are hand-verified where we have them, and flagged as a
+      statewide fallback where we do not.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/ca-property.ts">ca-property.ts</a>
+    </p>
+  </section>
+
+  <!-- 5. VA residual income -->
+  <section class="formula-block">
+    <h2>VA residual income</h2>
+    <p>
+      VA does not underwrite on debt-to-income; it underwrites on what is left over each month after everything.
+      That residual has to clear a regional minimum, and California is in the West region, which has the highest
+      minimums in the country.
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>Residual</mi><mo>=</mo>
+        <msub><mi>Y</mi><mtext>mo</mtext></msub>
+        <mo>−</mo><mi>Tax</mi>
+        <mo>−</mo><mi>Housing</mi>
+        <mo>−</mo><mi>Debts</mi>
+        <mo>−</mo><mn>0.14</mn><mo>·</mo><mi>ft²</mi>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>Y<sub>mo</sub></dt><dd>gross monthly income across all earners</dd>
+      <dt>Tax</dt><dd>estimated income-tax withholding</dd>
+      <dt>0.14 · ft²</dt><dd>VA's fixed utility allowance, 14¢ per square foot per month</dd>
+    </dl>
+    <p>
+      This is why a VA borrower can be approved at a debt-to-income ratio that would sink a conventional loan, and
+      why the 41% figure you may have heard is a guideline, not a cap.
+      <a href="{{ site.repo.url }}/blob/main/lib/mortgage.ts">mortgage.ts</a>,
+      VA Lender's Handbook M26-7 ch. 4.
+    </p>
+  </section>
+
+  <!-- 6. Rent versus buy -->
+  <section class="formula-block">
+    <h2>Rent versus buy: two net-worth paths</h2>
+    <p>
+      The honest version of "rent is throwing money away". Each year, the <strong>buyer's</strong> net worth is
+      what the house would fetch after selling costs, less the loan balance:
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>W</mi><mtext>buy</mtext></msub><mo>=</mo>
+        <mi>V</mi><mo>(</mo><mn>1</mn><mo>−</mo><mi>s</mi><mo>)</mo>
+        <mo>−</mo><mi>B</mi>
+      </mrow>
+    </math>
+    <p>
+      The <strong>renter</strong> invests the money the buyer sank into the house, and every month adds or
+      withdraws the difference in the two paths' cash costs, compounding at the investment return:
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>W</mi><mtext>rent</mtext></msub><mo>←</mo>
+        <msub><mi>W</mi><mtext>rent</mtext></msub><mo>(</mo><mn>1</mn><mo>+</mo><msub><mi>r</mi><mtext>inv</mtext></msub><mo>)</mo>
+        <mo>+</mo><mo>(</mo><msub><mi>c</mi><mtext>own</mtext></msub><mo>−</mo><msub><mi>c</mi><mtext>rent</mtext></msub><mo>)</mo>
+      </mrow>
+    </math>
+    <p>
+      Owning does not always <em>stay</em> ahead. When the investment return you give up is larger than the
+      appreciation you buy, the renter's invested capital eventually out-compounds the house: owning leads in a
+      middle window, then renting reclaims the lead. So the panel reports whether owning is ahead
+      <em>at your hold year</em>, not merely whether it ever crossed.
+    </p>
+    <dl class="symbols">
+      <dt>V, B</dt><dd>the home value and loan balance that year</dd>
+      <dt>s</dt><dd>selling costs, 6% by default</dd>
+      <dt>c<sub>own</sub>, c<sub>rent</sub></dt><dd>the monthly cost of owning (net of the tax deduction) and of renting</dd>
+    </dl>
+    <p class="source">
+      Every cost that enters this comes from one <code>bridgeScenario()</code> call, so the itemised comparison and
+      every price sweep cannot drift apart.
+      <a href="{{ site.repo.url }}/blob/main/lib/rent-vs-buy.ts">rent-vs-buy.ts</a>,
+      <a href="{{ site.repo.url }}/blob/main/lib/scenario-bridge.ts">scenario-bridge.ts</a>
+    </p>
+  </section>
+
+  <!-- 7. The mortgage interest deduction -->
+  <section class="formula-block">
+    <h2>The mortgage interest deduction</h2>
+    <p>
+      Only the interest above the standard deduction is worth anything, and only on the first $750,000 of debt.
+      The relief in a year is:
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>Relief</mi><mo>=</mo>
+        <mi>τ</mi><mo>·</mo>
+        <mi>max</mi><mo>(</mo><mn>0</mn><mo>,</mo>
+        <mi>min</mi><mo>(</mo><msub><mi>i</mi><mtext>ded</mtext></msub><mo>,</mo>
+        <msub><mi>i</mi><mtext>ded</mtext></msub><mo>+</mo><mi>O</mi><mo>−</mo><mi>S</mi><mo>)</mo><mo>)</mo>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>τ</dt><dd>combined marginal tax rate</dd>
+      <dt>i<sub>ded</sub></dt><dd>deductible interest, capped at the share of the loan under $750,000</dd>
+      <dt>O</dt><dd>other itemized deductions</dd>
+      <dt>S</dt><dd>the standard deduction for your filing status</dd>
+    </dl>
+    <p class="source">
+      Internal Revenue Code §163(h); the 2026 standard deduction and SALT cap.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/federal-tax.ts">federal-tax.ts</a>
+    </p>
+  </section>
+
+  <!-- 8. Affordability -->
+  <section class="formula-block">
+    <h2>What can you actually afford?</h2>
+    <p>
+      Run backwards, this is not a formula but a search. Price feeds back into property tax, insurance, the PMI
+      band, and the jumbo and FHA limits, so there is no closed form. The engine binary-searches for the highest
+      price that still clears every gate: the debt-to-income ceiling, VA residual income, and the FHA county limit,
+      which is a hard stop that is not the conforming limit.
+    </p>
+    <p class="source">
+      An answer above the conforming limit is quoted at the conforming rate, so it is an upper bound, and the page
+      says so on the number.
+      <a href="{{ site.repo.url }}/blob/main/lib/affordability.ts">affordability.ts</a>
+    </p>
+  </section>
+
+  <!-- 9. Buying power -->
+  <section class="formula-block">
+    <h2>Buying power: the payment formula, inverted</h2>
+    <p>
+      To ask "what could a median income buy", invert the payment. Given a monthly budget of 30% of income at that
+      year's rate, the affordable price is:
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>Price</mi><mo>=</mo>
+        <mfrac>
+          <mn>1</mn>
+          <mrow><mn>1</mn><mo>−</mo><mi>d</mi></mrow>
+        </mfrac>
+        <mo>·</mo>
+        <mi>M</mi><mo>·</mo>
+        <mfrac>
+          <mrow><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>n</mi></msup><mo>−</mo><mn>1</mn></mrow>
+          <mrow><mi>r</mi><mo>(</mo><mn>1</mn><mo>+</mo><mi>r</mi><msup><mo>)</mo><mi>n</mi></msup></mrow>
+        </mfrac>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>M</dt><dd>the monthly budget: 30% of gross income, divided by 12</dd>
+      <dt>d</dt><dd>the assumed down payment, 20%</dd>
+    </dl>
+    <p>
+      Holding the <em>effort</em> constant at 30% and letting the price float is what isolates buying power from
+      everything else that moved.
+      <a href="{{ site.repo.url }}/blob/main/lib/buying-power.ts">buying-power.ts</a>
+    </p>
+  </section>
+
+  <!-- 10. The deposit race -->
+  <section class="formula-block">
+    <h2>Saving the deposit, with rent rising</h2>
+    <p>
+      A renter's saving capacity is not fixed: rising rent eats into it. If non-rent spending tracks wages, next
+      year's monthly saving is:
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>s</mi><mtext>next</mtext></msub><mo>=</mo>
+        <mi>s</mi><mo>(</mo><mn>1</mn><mo>+</mo><mi>g</mi><mo>)</mo>
+        <mo>+</mo>
+        <mi>rent</mi><mo>·</mo><mo>(</mo><mi>g</mi><mo>−</mo><msub><mi>g</mi><mtext>rent</mtext></msub><mo>)</mo>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>g</dt><dd>nominal wage growth, 3.51% from the California income series</dd>
+      <dt>g<sub>rent</sub></dt><dd>rent growth, which you set</dd>
+    </dl>
+    <p>
+      When rent grows faster than wages the second term is negative and the saving rate falls, which is why a
+      renter whose rent outruns wages closes the gap more slowly. The house price, meanwhile, compounds at its
+      own appreciation rate, so the deposit is a genuine race.
+      <a href="{{ site.repo.url }}/blob/main/lib/rent-vs-buy.ts">rent-vs-buy.ts</a>
+    </p>
+  </section>
+
+  <section class="formula-block">
+    <h2>Everything else</h2>
+    <p>
+      The FHA MIP schedule, the VA funding fee, the PMI rate bands, the FAIR Plan wildfire figures, the AB 1482
+      rent caps, the county price histories and the affordability search all follow the same discipline: a
+      published rule where one exists, an honest estimate flagged as one where it does not, and a citation on
+      every number. The whole engine is a few thousand lines of TypeScript with no dependencies, and it is
+      <a href="{{ site.repo.url }}">open source</a> so you can read all of it.
+    </p>
+    <p class="method-page__back"><a href="/">← Back to the calculator</a></p>
+  </section>
+</article>
