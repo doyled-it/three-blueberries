@@ -481,10 +481,9 @@ export function savingsRace(input: SavingsRaceInput): SavingsRaceResult {
     // savingsGrowBy is monthlySavings * 12 plus the return, so saving more IS the
     // lever, and the number below says exactly how much more.
     verdict =
-      `The target is moving away from you. The cash you need grows by about ${money(targetGrowsBy)} a year at this ` +
-      `appreciation rate, while your savings grow by about ${money(savingsGrowBy)}. You would have to put away another ` +
-      `${money((targetGrowsBy - savingsGrowBy) / 12)} a month just to stop losing ground, before saving anything toward ` +
-      `the deposit itself. That is the treadmill: the price of standing still.`;
+      `The target is moving away from you. You would have to put away another ` +
+      `${money((targetGrowsBy - savingsGrowBy) / 12)} a month just to stop losing ground, before saving anything ` +
+      `toward the deposit itself. That is the treadmill: the price of standing still.`;
   } else if (yearsToAfford === null) {
     verdict = `You are gaining ground, but not fast enough to reach the target inside ${maxYears} years.`;
   } else {
@@ -953,10 +952,9 @@ export function decide(args: {
       `Nothing here is close. At ${priceToRent.toFixed(1)}x price to rent, no single change of a plausible size makes ` +
       `this house beat renting over ${holdYears} years. That is not a reason to feel bad, it is a reason to keep renting and keep investing.`;
   } else {
-    const names = closest.map((l) => l.label.toLowerCase()).join(", or ");
     verdict =
-      `Not yet, but it is not hopeless. The reachable levers are ${names}. ` +
-      `Everything else would have to move further than is realistic.`;
+      `Not yet, but it is not hopeless. Some of the levers below are reachable; the rest would have to move ` +
+      `further than is realistic.`;
   }
 
   return {

@@ -898,7 +898,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     <div class="stat">
       <span class="stat__label">Rate is the biggest lever</span>
       <span class="stat__value">${money(maxPriceForHoldPeriod({ ...sweepBase, interestRate: 0.045 }, scaling, holdYears, downPercent, closingCostRate) ?? 0)}</span>
-      <span class="stat__note">What you could pay at 4.5% instead of ${pct(input.interestRate)}, same horizon. Rates move your budget more than anything else here.</span>
+      <span class="stat__note">What you could pay at 4.5% instead of ${pct(input.interestRate)}, same horizon.</span>
     </div>`;
 
   const prices: number[] = [];
@@ -1105,12 +1105,14 @@ function renderRentVsBuy(input: ScenarioInput): void {
     `Where the blue line sits below the orange one, buying wins over your horizon. California caps annual rent ` +
     `increases at ${pct(statutoryRentCap(input.county), 1)} in ${input.county} County under AB 1482 ` +
     `(5% plus the CPI for ${capRegion.label}, never above 10%), but that is a ceiling, not a forecast: most ` +
-    // Both conditions matter and both were dropped. A single-family home is only
-    // exempt if it is NOT corporate-owned AND the lease gave the required
-    // notice; without them the sentence exempts most of the rental stock.
-    `sitting tenants see far less. The exemptions are broad but conditional: a single-family home or condo is exempt ` +
-    `only if it is not owned by a corporation or REIT AND the lease carries the statutory exemption notice. New ` +
-    `construction is exempt for its first 15 years, which is a rolling window, not a fixed build date.`;
+    `sitting tenants see far less.`;
+  // Both conditions matter and both were once dropped: a single-family home is
+  // only exempt if it is NOT corporate-owned AND the lease gave the required
+  // notice. Load-bearing, so it is demoted behind the expandable, not cut.
+  $("rentCapExemptions").textContent =
+    `The exemptions are broad but conditional. A single-family home or condo is exempt only if it is not owned by ` +
+    `a corporation or REIT AND the lease carries the statutory exemption notice. New construction is exempt for ` +
+    `its first 15 years, a rolling window, not a fixed build date.`;
 
   // --- the savings treadmill ---
   const race = savingsRace({
