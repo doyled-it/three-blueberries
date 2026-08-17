@@ -69,22 +69,21 @@ export function fairPlanRisk(county: CaCounty): FairPlanRisk {
 
   const high =
     row.highRiskPremium !== null && row.highRiskPremium > row.averagePremium
-      ? ` In its high-wildfire-risk ZIP codes the average is ${money(row.highRiskPremium)}.`
+      ? ` In its high-wildfire-risk ZIPs, ${money(row.highRiskPremium)}.`
       : "";
 
   const warning =
     level === "severe"
-      ? `${pct(row.share)} of detached homes in ${county} County are already on the FAIR Plan, the state's insurer of ` +
-        `last resort: fire cover only, averaging ${money(row.averagePremium)}/year, before the separate policy you ` +
-        `need for everything else.${high} The figure above assumes you get a normal policy, and ` +
-        `${oneIn(row.share)} homes in your county did not.`
+      ? `${pct(row.share)} of detached homes in ${county} County are on the FAIR Plan, the state's insurer of last ` +
+        `resort: fire cover only, ${money(row.averagePremium)}/year, before the separate policy for everything ` +
+        `else.${high} The figure above assumes a normal policy, and ${oneIn(row.share)} homes here could not get one.`
       : level === "elevated"
-        ? `${pct(row.share)} of detached homes in ${county} County are on the FAIR Plan, the insurer of last resort, ` +
-          `averaging ${money(row.averagePremium)}/year for fire cover alone.${high} Whether you land there is decided ` +
-          `by your ZIP code and your brush clearance, not by the county average.`
-        : `${pct(row.share)} of detached homes in ${county} County are on the FAIR Plan, so the admitted market is ` +
-          `mostly still writing here. That is a county figure and it hides its own worst ZIP codes: the FAIR Plan ` +
-          `average in ${county} is ${money(row.averagePremium)}/year for fire cover alone.${high}`;
+        ? `${pct(row.share)} of detached homes in ${county} County are on the FAIR Plan, the insurer of last resort: ` +
+          `fire cover only, ${money(row.averagePremium)}/year.${high} Whether you land there is your ZIP and your brush ` +
+          `clearance, not the county average.`
+        : `Only ${pct(row.share)} of detached homes in ${county} County are on the FAIR Plan, so the admitted market ` +
+          `mostly still writes here. That county figure hides its worst ZIPs: the FAIR Plan average is ` +
+          `${money(row.averagePremium)}/year for fire cover alone.${high}`;
 
   return {
     county,

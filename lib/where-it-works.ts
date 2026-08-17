@@ -121,11 +121,10 @@ export function payTrap(sampleSize = 10): PayTrap {
     pricedOut: standings.filter((s) => s.yearsOfIncome >= PRICED_OUT_MULTIPLE),
     workable: standings.filter((s) => s.yearsOfIncome < WORKABLE_MULTIPLE),
     headline:
-      `The ten best-paying counties in California pay a median of ${money(bestPaying.medianIncome)}, and a house ` +
-      `there costs ${bestPaying.medianMultiple.toFixed(1)} years of it. The ten worst-paying pay ` +
-      `${money(worstPaying.medianIncome)}, and a house costs ${worstPaying.medianMultiple.toFixed(1)} years. ` +
-      `Across all 58 counties, the better the pay, the worse the multiple. Earning more does not get you in; ` +
-      `it gets bid away.`,
+      `California's ten best-paying counties pay a median ${money(bestPaying.medianIncome)}, where a house costs ` +
+      `${bestPaying.medianMultiple.toFixed(1)} years of it; the ten worst-paying pay ${money(worstPaying.medianIncome)}, ` +
+      `where it costs ${worstPaying.medianMultiple.toFixed(1)}. Across all 58, the better the pay, the worse the ` +
+      `multiple. Earning more does not get you in; it gets bid away.`,
   };
 }
 

@@ -344,9 +344,9 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
     verdict =
       "Waiting loses. The rate you're assuming at the bottom cancels out the price drop, you'd pay the same or more per month for the same house, having paid rent the whole time. This is the trap: prices and rates usually move in opposite directions, because the thing that crashes prices is also the thing that makes the Fed cut rates.";
   } else if (breakevenMonths !== null && breakevenMonths > 84) {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month, but you'd pay ${Math.round(rentPaid).toLocaleString("en-US")} in rent to get there, about ${(breakevenMonths / 12).toFixed(1)} years just to break even on that rent. That's a long time to be right about timing.`;
+    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month, but you'd pay ${Math.round(rentPaid).toLocaleString("en-US")} in rent first, about ${(breakevenMonths / 12).toFixed(1)} years just to break even on it. A long time to be right about timing.`;
   } else {
-    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month and repays the rent you spent waiting in about ${Math.round(breakevenMonths ?? 0)} months. On these assumptions it's worth it, provided the crash actually arrives on your schedule, and you still have your job when it does.`;
+    verdict = `Waiting saves ${Math.round(monthlySaving).toLocaleString("en-US")}/month and repays the rent you spent waiting in about ${Math.round(breakevenMonths ?? 0)} months. Worth it on these assumptions, if the crash arrives on your schedule and you still have your job when it does.`;
   }
 
   return {
@@ -475,7 +475,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: 18,
       rateAtBottom: 0.055,
       basis:
-        "Prices flat, rates drifting back toward 5.5%. This is the consensus 2026 forecast and by far the most common historical outcome, California housing spends the overwhelming majority of its years not crashing.",
+        "Prices flat, rates easing toward 5.5%. The consensus 2026 forecast, and the most common outcome by far: California housing spends most years not crashing.",
     },
     {
       id: "stagflation",
@@ -484,7 +484,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: 36,
       rateAtBottom: 0.095,
       basis:
-        "The scenario that breaks the 'just wait' thesis: a real price decline with no rate relief. Rare, but it is what the early 1980s looked like, and it turns a 20% discount into almost nothing.",
+        "The scenario that breaks the 'just wait' thesis: a real decline with no rate relief. Rare, but it is what the early 1980s looked like, and it turns a 20% discount into almost nothing.",
     },
     {
       id: "recession",
@@ -493,7 +493,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: 30,
       rateAtBottom: 0.05,
       basis:
-        "Moody's Analytics has repeatedly framed the recession case for 'significantly overvalued' metros as a 15-20% peak-to-trough decline, with rates falling as the Fed responds. Coastal California screens as overvalued on price-to-income, so this is the mainstream bear case rather than a fringe one.",
+        "Moody's has framed the recession case for 'significantly overvalued' metros as a decline of 15-20% with rates falling. Coastal California screens as overvalued on price-to-income, so this is the mainstream bear case, not a fringe one.",
     },
     {
       id: "worse-than-2008",
@@ -501,7 +501,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       depthPercent: tailDepth,
       monthsToBottom: 48,
       rateAtBottom: 0.04,
-      basis: `Beyond anything in ${place}'s record, whose worst was ${worstDepth.toFixed(1)}% from the ${severe.peakMonth.slice(0, 4)} peak. Included because you asked for the tail, not because anything in the data points here. It would require a shock larger than the subprime collapse, and mortgage delinquency is nowhere near where it sat going into that one.`,
+      basis: `Beyond anything in ${place}'s record, whose worst was ${worstDepth.toFixed(1)}% from the ${severe.peakMonth.slice(0, 4)} peak. Here because you asked for the tail, not because the data points here: it needs a shock bigger than the subprime collapse, and delinquency is nowhere near where it sat going into that.`,
     },
     {
       id: "japan",
@@ -510,7 +510,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
       monthsToBottom: Math.min(120, longest.monthsPeakToTrough),
       rateAtBottom: 0.045,
       basis:
-        `Not a crash, a grind. Prices drift down modestly while rates ease. Japan after 1991 and California through the 1990s both looked more like this than like 2008: ` +
+        `Not a crash, a grind: prices drift down while rates ease, the way Japan after 1991 and California through the 1990s did. ` +
         (n > 1
           ? `${place}'s ${longest.peakMonth.slice(0, 4)} decline took ${longest.monthsPeakToTrough} months to bottom, ${stretchFactor.toFixed(1)}x as long as its ${shortest.peakMonth.slice(0, 4)} one.`
           : `${place}'s ${longest.peakMonth.slice(0, 4)} decline took ${longest.monthsPeakToTrough} months to bottom.`),
@@ -546,16 +546,15 @@ export function historicalContext(county: CaCounty = DEFAULT_COUNTY) {
   const priceNotPayment =
     dearestPrice.month === dearestPayment.month
       ? `Price is not payment. The rate decides as much as the sticker does, and a decline that arrives with rate cuts is worth far less than the same decline at today's rate.`
-      : `Price is not payment. ${place}'s most expensive month to BUY was ${dearestPrice.month.slice(0, 4)} at ` +
-        `${money(dearestPrice.price)}, but its most expensive month to OWN was ${dearestPayment.month.slice(0, 4)}, ` +
-        `when the same house cost ${money(dearestPayment.price)} at ${(dearestPayment.rate * 100).toFixed(2)}% ` +
-        `instead of ${(dearestPrice.rate * 100).toFixed(2)}%. And if a recession cracks prices, rate cuts are what ` +
-        `stop the cracking.`;
+      : `Price is not payment. ${place}'s dearest month to BUY was ${dearestPrice.month.slice(0, 4)} at ` +
+        `${money(dearestPrice.price)}, but its dearest month to OWN was ${dearestPayment.month.slice(0, 4)}: the same ` +
+        `house at ${money(dearestPayment.price)} and ${(dearestPayment.rate * 100).toFixed(2)}%, not ` +
+        `${(dearestPrice.rate * 100).toFixed(2)}%. And if a recession cracks prices, rate cuts are what stop the crack.`;
 
   const declineCaveat =
     drops.length === 1
-      ? `One decline over 10% in ${yearsOfData(rows.length, stepMonths)} years is an anecdote, not a sample. Anyone who says they know what happens next is selling something.`
-      : `${drops.length} declines over 10% in ${yearsOfData(rows.length, stepMonths)} years isn't a sample you can forecast from. Anyone who says they know what happens next is selling something.`;
+      ? `One decline over 10% in ${yearsOfData(rows.length, stepMonths)} years is an anecdote, not a sample. Anyone who claims to know what happens next is selling something.`
+      : `${drops.length} declines over 10% in ${yearsOfData(rows.length, stepMonths)} years is not a sample you can forecast from. Anyone who claims to know what happens next is selling something.`;
 
   return {
     place,
@@ -569,9 +568,9 @@ export function historicalContext(county: CaCounty = DEFAULT_COUNTY) {
     caveats: [
       declineCaveat,
       priceNotPayment,
-      "You have to still have a job at the bottom. California unemployment roughly doubled last time; the people who bought the dip were the ones whose income survived.",
+      "You have to still have a job at the bottom. California unemployment roughly doubled last time; the people who bought the dip were the ones whose income held.",
       "Credit tightens exactly when prices fall. In 2009 private lenders went back to 20% down; FHA at 3.5% and VA at zero stayed open.",
-      "In California, buying lower is permanent. Prop 13 locks your assessed value to your price and caps growth at 2%/year, so a cheaper entry keeps paying you back for as long as you own it.",
+      "In California, buying lower is permanent: Prop 13 locks your assessed value to your price and caps growth at 2%/year, so a cheaper entry keeps paying you back for as long as you own.",
     ],
   };
 }

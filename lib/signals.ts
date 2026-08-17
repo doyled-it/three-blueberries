@@ -164,11 +164,10 @@ export function worstTimeToBuy(county: CaCounty = DEFAULT_COUNTY, anchorPrice?: 
   const answer =
     rank === 1
       ? `Yes. At ${pct(latest.paymentToIncome)} of median household income, this is the most expensive it has been in the ${series.length} readings on record.`
-      : `No, but it is close. Buying today costs ${pct(latest.paymentToIncome)} of median household income, worse ` +
-        `than ${(((series.length - rank) / series.length) * 100).toFixed(0)}% of the record since ` +
-        `${series[0]!.month.slice(0, 4)}. The worst was ${longMonth(worstEver.month)} at ` +
-        `${pct(worstEver.paymentToIncome)}, when rates hit ${pct(worstEver.rate)}. The typical reading here is ` +
-        `${pct(median)}.`;
+      : `No, but close. Today costs ${pct(latest.paymentToIncome)} of median household income, worse than ` +
+        `${(((series.length - rank) / series.length) * 100).toFixed(0)}% of the record since ${series[0]!.month.slice(0, 4)}. ` +
+        `The worst was ${longMonth(worstEver.month)} at ${pct(worstEver.paymentToIncome)}, at ${pct(worstEver.rate)} rates. ` +
+        `Typical is ${pct(median)}.`;
 
   return {
     latest,
@@ -397,8 +396,8 @@ export function crashSignals(
           (peak !== null && delinqNow !== null && peak < delinqNow
             ? `, though the ${peakYear} peak itself read lower still at ${peak.toFixed(2)}%. `
             : `. `) +
-          `Still the strongest argument that this isn't 2008: a crash needs forced sellers, and borrowers locked into ` +
-          `cheap fixed rates aren't defaulting, so the distressed supply that drove the last collapse doesn't exist.`
+          `Still the strongest argument that this isn't 2008: a crash needs forced sellers, and borrowers on cheap ` +
+          `fixed rates aren't defaulting, so the distressed supply that drove the last collapse isn't there.`
         );
       })(),
     },
@@ -425,9 +424,8 @@ export function crashSignals(
               : `At ${unempNow.toFixed(1)}%, at or below the ${peak.toFixed(1)}% California carried into the ${peakYear} peak. `;
         return (
           head +
-          `Job losses turn a slowdown into a cascade: people sell because they must. It also decides whether you could ` +
-          `buy a dip, because you have to still be employed at the bottom. This series is STATEWIDE California, not ` +
-          `${county} County.`
+          `Job losses turn a slowdown into a cascade, and decide whether you could buy a dip at all: you have to still ` +
+          `be employed at the bottom. STATEWIDE California, not ${county} County.`
         );
       })(),
     },
@@ -435,8 +433,8 @@ export function crashSignals(
 
   const summary =
     `Valuation says stretched; credit says stable. ${declinePhrase[0]!.toUpperCase()}${declinePhrase.slice(1)} needed ` +
-    `stretched valuations AND a trigger: a recession in 1990, a credit collapse in 2008. Today the valuation is here ` +
-    `and the trigger isn't, which argues for a grind rather than a break. A recession would supply the missing trigger.`;
+    `both a stretched valuation AND a trigger: a recession in 1990, a credit collapse in 2008. The valuation is here ` +
+    `and the trigger isn't, which argues for a grind, not a break. A recession would supply it.`;
 
   return {
     readings,
@@ -453,10 +451,10 @@ export function crashSignals(
           ? `Forward correlations use overlapping 24-month windows, inflating the apparent sample size. Treat the reported n of ${c.observations} as closer to ${c.effectiveObservations} real observations.`
           : "Forward correlations use overlapping windows, which inflates the apparent sample size.";
       })(),
-      "Supply and delinquency are national, and unemployment is STATEWIDE California, not your county. Income is statewide California too, annual, ending " +
+      "Supply and delinquency are national; unemployment and income are STATEWIDE California, not your county. Income is annual, ending " +
         SIGNALS_INCOME_LAST_YEAR +
         ", carried forward after that, which OVERSTATES the burden since incomes kept rising.",
-      "Every indicator here is backward-looking. Markets turn on things that have not happened yet.",
+      "Every indicator here is backward-looking. Markets turn on what has not happened yet.",
     ],
   };
 }

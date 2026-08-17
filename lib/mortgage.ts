@@ -224,7 +224,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     monthly: taxAnnual / 12,
     annual: taxAnnual,
     basis:
-      `Prop 13 reassesses to your purchase price when you buy, so the assessed value is ${money(input.purchasePrice)}` +
+      `Prop 13 resets the assessed value to your purchase price: ${money(input.purchasePrice)}` +
       (exemption ? ` less the ${money(exemption)} homeowners' exemption` : "") +
       `, taxed at ${pct(rate)}. ` +
       // A user-entered rate under 1% used to print a NEGATIVE bond component,
@@ -264,7 +264,7 @@ function buildLines(input: ScenarioInput, loan: LoanFacts, mi: MortgageInsurance
     monthly: insuranceAnnual / 12,
     annual: insuranceAnnual,
     basis: insuranceEstimated
-      ? `Placeholder for a standard HO-3 policy in a non-wildfire California ZIP, scaled to a ${money(input.purchasePrice)} home. It is not specific to ${input.county} County, because no agency publishes a county average for the normal market. What is published, and is below, is what the insurer of last resort charges there.`
+      ? `A placeholder for a standard HO-3 policy in a non-wildfire California ZIP, scaled to a ${money(input.purchasePrice)} home. Not specific to ${input.county} County: no agency publishes a county average for the normal market. What is published, below, is what the insurer of last resort charges.`
       : `Your quoted annual premium of ${money(insuranceAnnual)}.`,
     confidence: insuranceEstimated ? "estimated" : "user",
     sourceIds: insuranceEstimated
@@ -618,9 +618,9 @@ function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qua
   }
 
   warnings.push(
-    "Expect a supplemental property tax bill a few months after closing. When the county reassesses to your purchase price, it bills you " +
-      "the difference from the seller's old assessment, prorated for the rest of the fiscal year. Your impound account does not cover it, " +
-      "it arrives as a separate bill you pay out of pocket, and on a long-held California home it can be thousands."
+    "Expect a supplemental property tax bill a few months after closing: the county reassesses to your purchase price " +
+      "and bills you the difference from the seller's old assessment. Your impound account does not cover it, and on a " +
+      "long-held California home it can be thousands."
   );
 
   if (!hasCountySpecificTaxRate(input.county) && input.propertyTaxRate === undefined) {

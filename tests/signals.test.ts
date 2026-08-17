@@ -148,7 +148,7 @@ test("extreme scenarios exist and are ordered sensibly", () => {
 test("the beyond-historical scenario admits it is beyond historical", () => {
   const worst = crashPresets().find((p) => p.id === "worse-than-2008")!;
   assert.match(worst.basis, /Beyond anything in .+'s record/i);
-  assert.match(worst.basis, /because you asked for the tail, not because anything in the data points here/i);
+  assert.match(worst.basis, /because you asked for the tail, not because .*data points here/i);
 });
 
 // A flat 50% used to be the tail preset for every county. Merced's own record is

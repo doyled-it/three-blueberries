@@ -1131,8 +1131,8 @@ export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet
       investmentReturn: 0.1,
       rentGrowth: 0.035,
       basis:
-        `${county} County housing since ${startYear} ran ${pct(longRun)} a year, against the long-run nominal ` +
-        `total return on US equities of roughly 10%. Both measured over decades.`,
+        `${county} County housing since ${startYear} ran ${pct(longRun)} a year, against roughly 10% long-run on US ` +
+        `equities. Both over decades.`,
     },
     {
       id: "last-decade",
@@ -1150,7 +1150,7 @@ export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet
           : decade >= 0.07
             ? `A strong decade for housing was a far stronger one for stocks.`
             : decade > 0
-              ? `Housing barely moved here while stocks ran. That gap is the whole argument for renting and investing the difference.`
+              ? `Housing barely moved here while stocks ran, which is the whole argument for renting and investing the difference.`
               : `Housing went backwards here while stocks ran.`),
     },
     {
@@ -1160,10 +1160,9 @@ export function assumptionSets(county: CaCounty = DEFAULT_COUNTY): AssumptionSet
       investmentReturn: 0.07,
       rentGrowth: 0.023,
       basis:
-        `${county}'s last twenty years, which include a full crash, at ${pct(twenty)}, against a deliberately ` +
-        `conservative 7% on equities. The 2.3% rent growth is an ASSUMPTION, not a measurement: there is no ` +
-        `county-level California rent series in this project, so all three sets pick a rate rather than derive one. ` +
-        `Override it with what your own rent has actually done.`,
+        `${county}'s last twenty years, a full crash included, at ${pct(twenty)}, against a deliberately conservative 7% ` +
+        `on equities. The 2.3% rent growth is an ASSUMPTION, not a measurement: there is no county rent series here, ` +
+        `so override it with what your own rent has done.`,
     },
   ];
 }
