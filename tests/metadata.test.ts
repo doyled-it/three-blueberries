@@ -313,3 +313,45 @@ test("every formula on the method page cites a source file that exists", () => {
     assert.ok(fs.existsSync(f), `method page cites ${f}, which does not exist`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Shareable permalinks: every field must exist, and keys must be unique
+// ---------------------------------------------------------------------------
+
+test("every permalink field points at a real form control, with a unique key", async () => {
+  const { PERMALINK_FIELDS } = await import("../src/client/permalink.ts");
+  const html = fs.readFileSync("_site/index.html", "utf8");
+
+  const keys = PERMALINK_FIELDS.map((f) => f.key);
+  assert.equal(new Set(keys).size, keys.length, "permalink keys must be unique or links collide");
+
+  for (const { id } of PERMALINK_FIELDS) {
+    assert.ok(
+      new RegExp(`id="${id}"`).test(html),
+      `permalink references #${id}, which is not on the page (a shared link would silently drop it)`
+    );
+  }
+});
+
+test("every 'see the formula' link resolves to a section on the methodology page", () => {
+  const method = fs.readFileSync("_site/how-its-calculated/index.html", "utf8");
+  const sectionIds = new Set([...method.matchAll(/id="([a-z0-9-]+)"/g)].map((m) => m[1]!));
+
+  // The anchors the breakdown links to, mirrored from app.ts FORMULA_ANCHOR
+  // plus the two mortgage-insurance branches. If app.ts adds one, add it here.
+  const anchors = [
+    "the-mortgage-payment",
+    "property-tax-under-proposition-13",
+    "the-rest-and-the-discipline-behind-it",
+    "the-two-totals",
+    "fha-mortgage-insurance",
+    "conventional-pmi",
+  ];
+  for (const a of anchors) {
+    assert.ok(sectionIds.has(a), `a payment line links to #${a}, which is not a section on the method page`);
+  }
+
+  // And the app really references those anchors, so this test cannot rot silently.
+  const app = fs.readFileSync("src/client/app.ts", "utf8");
+  assert.ok(/how-its-calculated\/#\$\{anchor\}/.test(app), "the breakdown must link lines to the method page");
+});

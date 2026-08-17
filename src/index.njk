@@ -145,6 +145,11 @@ description: "The real monthly cost of buying a house in California: property ta
       </fieldset>
     </div>
   </details>
+
+  <p class="form-share">
+    <button type="button" id="copyLink" class="link-btn">Copy a link to this scenario</button>
+    <span class="hint">the whole thing lives in the URL, nothing is sent anywhere</span>
+  </p>
 </form>
 
 <section class="panel">
@@ -177,7 +182,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <ul id="notes" class="notes"></ul>
 </section>
 
-<section class="panel">
+<section class="panel panel--buy">
   <h2>Should you buy it?</h2>
 
   {#
@@ -267,7 +272,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <p id="savingsVerdict" class="verdict"></p>
 </section>
 
-<section class="panel">
+<section class="panel panel--explore">
   <h2>What if you wait?</h2>
   <p class="panel__sub">
     Decades of prices in your county, and the rate that went with them. Price on top, monthly payment below:
@@ -346,7 +351,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <ul id="waitingCaveats" class="warnings"></ul>
 </section>
 
-<section class="panel">
+<section class="panel panel--explore">
   <h2>Why does everyone else seem to manage?</h2>
   <p class="panel__sub">
     Almost never because they out-earn you. Here's what the person already living in this house pays.
@@ -364,7 +369,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <ul id="cohortNotes" class="notes"></ul>
 </section>
 
-<section class="panel panel--thesis">
+<section class="panel panel--thesis panel--explore">
   <h2>Why this is so hard</h2>
   <p class="panel__sub">
     The three blueberries, finally. A price on its own proves nothing: everything else rose too. What matters is

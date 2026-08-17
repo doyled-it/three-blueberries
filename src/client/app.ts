@@ -78,6 +78,7 @@ import {
   type StackColumn,
 } from "./chart.ts";
 import { attachToc, buildToc, renderToc } from "./toc.ts";
+import { applyScenarioFromUrl, writeScenarioToUrl } from "./permalink.ts";
 import type { CaCounty } from "../../lib/data/ca-loan-limits.ts";
 import type { Confidence, LineItem, LoanType, ScenarioInput } from "../../lib/types.ts";
 
@@ -177,6 +178,23 @@ function readInput(): ScenarioInput {
 // Rendering
 // ---------------------------------------------------------------------------
 
+// Which formula on the methodology page explains each line, so the reader can
+// go from a number straight to the algebra behind it.
+const FORMULA_ANCHOR: Record<string, string> = {
+  principalAndInterest: "the-mortgage-payment",
+  propertyTax: "property-tax-under-proposition-13",
+  melloRoos: "property-tax-under-proposition-13",
+  homeownersInsurance: "the-rest-and-the-discipline-behind-it",
+  maintenance: "the-two-totals",
+};
+
+function formulaAnchorFor(line: LineItem): string | null {
+  if (line.key === "mortgageInsurance") {
+    return /FHA/i.test(line.label) ? "fha-mortgage-insurance" : "conventional-pmi";
+  }
+  return FORMULA_ANCHOR[line.key] ?? null;
+}
+
 function renderLine(line: LineItem, isTrueCostOnly: boolean): string {
   const sources = line.sourceIds
     .map((id) => {
@@ -184,6 +202,7 @@ function renderLine(line: LineItem, isTrueCostOnly: boolean): string {
       return `<a href="${s.url}" target="_blank" rel="noopener">${s.publisher}</a>`;
     })
     .join(", ");
+  const anchor = formulaAnchorFor(line);
 
   return `
     <details class="line${isTrueCostOnly ? " line--extra" : ""}">
@@ -197,6 +216,7 @@ function renderLine(line: LineItem, isTrueCostOnly: boolean): string {
         <p class="line__meta">
           <span class="badge badge--${line.confidence}">${CONFIDENCE_LABEL[line.confidence]}</span>
           ${sources ? `<span class="line__sources">${sources}</span>` : ""}
+          ${anchor ? `<a class="line__formula" href="/how-its-calculated/#${anchor}">see the formula →</a>` : ""}
           <span class="line__annual">${money(line.annual)}/year</span>
         </p>
       </div>
@@ -1748,14 +1768,43 @@ function init(): void {
     });
   }
 
+  // A shared URL fills the form before the first render. If it set the rate,
+  // mark it touched so the live feed does not overwrite the shared value.
+  const fromLink = applyScenarioFromUrl();
+  if (fromLink && new URLSearchParams(location.search).has("rate")) {
+    $<HTMLInputElement>("interestRate").dataset["touched"] = "1";
+  }
+
   const form = $<HTMLFormElement>("scenario");
+  let urlTimer = 0;
   form.addEventListener("input", (e) => {
     if ((e.target as HTMLElement).id === "interestRate") {
       $<HTMLInputElement>("interestRate").dataset["touched"] = "1";
     }
     render();
+    // Reflect the scenario into the URL, debounced so typing does not thrash it.
+    clearTimeout(urlTimer);
+    urlTimer = window.setTimeout(writeScenarioToUrl, 250);
   });
   form.addEventListener("submit", (e) => e.preventDefault());
+
+  // Copy the current scenario's link. The URL is already live, so this just
+  // writes it fresh and hands it to the clipboard.
+  const copyBtn = document.getElementById("copyLink");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      writeScenarioToUrl();
+      try {
+        await navigator.clipboard.writeText(location.href);
+        const original = copyBtn.textContent;
+        copyBtn.textContent = "Copied";
+        window.setTimeout(() => (copyBtn.textContent = original), 1600);
+      } catch {
+        // Clipboard denied (rare): select the address bar as the fallback.
+        copyBtn.textContent = "Copy the URL from your address bar";
+      }
+    });
+  }
 
   render();
   void loadRate();

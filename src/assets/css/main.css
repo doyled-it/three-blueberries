@@ -1664,3 +1664,120 @@ input[type="range"] {
     columns: 1;
   }
 }
+
+/* "Copy a link to this scenario" — the permalink affordance under the form. */
+.form-share {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 26px 0 0;
+}
+.link-btn {
+  padding: 8px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--berry-bright);
+  font: 500 0.86rem var(--sans);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.link-btn:hover {
+  border-color: var(--berry);
+  background: color-mix(in oklab, var(--berry) 12%, var(--panel-2));
+}
+
+/* ---------- print: a clean one-sheet cost summary ---------- */
+/* Cmd-P should hand a lender or a folder the numbers, not a screenshot of a
+   dark interactive page. Invert to ink-on-white, keep the scenario, the
+   breakdown, the qualification and the warnings, and drop the exploratory
+   panels, every chart, and the interactive chrome. */
+@media print {
+  :root {
+    --bg: #fff;
+    --panel: #fff;
+    --panel-2: #fff;
+    --rule: #c9c4d2;
+    --rule-soft: #e4e1ea;
+    --ink: #14101c;
+    --ink-2: #2c2637;
+    --ink-3: #4a4358;
+    --ink-4: #6b6479;
+    --berry: #5a3fb0;
+    --berry-bright: #4a2f9e;
+  }
+  body {
+    background: #fff;
+    color: #14101c;
+    font-size: 11pt;
+  }
+  body::before {
+    display: none; /* the paper-grain texture */
+  }
+  .wrap {
+    max-width: none;
+    padding: 0;
+  }
+  /* Chrome and exploration that make no sense on paper. */
+  .toc,
+  .tocbar,
+  .form-share,
+  .site-footer__links,
+  .panel--explore,
+  .overrides,
+  [id$="Chart"],
+  #history,
+  .presets,
+  .instruments,
+  input[type="range"],
+  .slider-label,
+  .method {
+    display: none !important;
+  }
+  /* Keep sections from splitting awkwardly across pages. */
+  .panel,
+  .stat,
+  .breakdown {
+    break-inside: avoid;
+    border-color: var(--rule);
+  }
+  .hero {
+    padding: 0 0 12px;
+  }
+  .hero h1 {
+    font-size: 20pt;
+  }
+  a {
+    color: var(--ink-2);
+    border: 0;
+  }
+  /* The form documents the scenario, but as read-only text, not live controls. */
+  input,
+  select {
+    border: 0;
+    color: var(--ink);
+    padding: 2px 0;
+  }
+  .verdict,
+  .recommendation {
+    background: #fff;
+    border-left-width: 3px;
+  }
+  /* In "Should you buy it?", print only the answer, not the whole rent-vs-buy
+     exploration. */
+  .panel--buy > *:not(h2):not(.recommendation) {
+    display: none !important;
+  }
+}
+
+/* "see the formula →" — links a payment line to its section on /how-its-calculated. */
+.line__formula {
+  border: 0;
+  color: var(--berry);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.line__formula:hover {
+  color: var(--berry-bright);
+}
