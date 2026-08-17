@@ -283,3 +283,33 @@ test("the fonts the stylesheet asks for are actually shipped", () => {
     assert.ok(referenced.includes(m[1]!), `preloaded ${m[1]} is not used by the stylesheet`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// The methodology page's table of contents must stay in sync with its sections
+// ---------------------------------------------------------------------------
+
+test("every method-page ToC link points at a real section, and every section is in the ToC", () => {
+  const html = fs.readFileSync("_site/how-its-calculated/index.html", "utf8");
+
+  const tocTargets = [...html.matchAll(/<a href="#([a-z0-9-]+)">/g)].map((m) => m[1]!);
+  const sectionIds = [...html.matchAll(/<section class="formula-block" id="([a-z0-9-]+)"/g)].map((m) => m[1]!);
+
+  assert.ok(sectionIds.length >= 20, `expected the full set of formula sections, found ${sectionIds.length}`);
+
+  for (const target of tocTargets) {
+    assert.ok(sectionIds.includes(target), `ToC links to #${target}, which is not a section on the page`);
+  }
+  for (const id of sectionIds) {
+    assert.ok(tocTargets.includes(id), `section #${id} has no ToC entry`);
+  }
+});
+
+test("every formula on the method page cites a source file that exists", () => {
+  const html = fs.readFileSync("_site/how-its-calculated/index.html", "utf8");
+  // Each source link ends in a real lib file; a typo'd path would 404.
+  const files = [...html.matchAll(/blob\/main\/(lib\/[a-z0-9/_-]+\.ts)/g)].map((m) => m[1]!);
+  assert.ok(files.length >= 10, `expected many source citations, found ${files.length}`);
+  for (const f of new Set(files)) {
+    assert.ok(fs.existsSync(f), `method page cites ${f}, which does not exist`);
+  }
+});

@@ -25,8 +25,40 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     </p>
   </header>
 
+  <nav class="method-toc" aria-label="Contents">
+    <p class="method-toc__title">On this page</p>
+    <ol>
+      <li><a href="#the-two-totals">The two totals</a></li>
+      <li><a href="#the-mortgage-payment">The mortgage payment</a></li>
+      <li><a href="#the-balance-and-when-mortgage-insurance-">The balance, and when mortgage insurance ends</a></li>
+      <li><a href="#fha-mortgage-insurance">FHA mortgage insurance</a></li>
+      <li><a href="#conventional-pmi">Conventional PMI</a></li>
+      <li><a href="#the-va-funding-fee">The VA funding fee</a></li>
+      <li><a href="#loan-limits-conforming-and-fha-are-diffe">Loan limits: conforming and FHA are different</a></li>
+      <li><a href="#property-tax-under-proposition-13">Property tax, under Proposition 13</a></li>
+      <li><a href="#cash-to-close">Cash to close</a></li>
+      <li><a href="#debt-to-income-and-the-income-a-house-ne">Debt-to-income, and the income a house needs</a></li>
+      <li><a href="#va-residual-income">VA residual income</a></li>
+      <li><a href="#rent-versus-buy-two-net-worth-paths">Rent versus buy: two net-worth paths</a></li>
+      <li><a href="#the-mortgage-interest-deduction">The mortgage interest deduction</a></li>
+      <li><a href="#what-can-you-actually-afford">What can you actually afford?</a></li>
+      <li><a href="#buying-power-the-payment-formula-inverte">Buying power: the payment formula, inverted</a></li>
+      <li><a href="#saving-the-deposit-with-rent-rising">Saving the deposit, with rent rising</a></li>
+      <li><a href="#the-price-history-in-dollars">The price history, in dollars</a></li>
+      <li><a href="#crash-detection-drawdowns">Crash detection: drawdowns</a></li>
+      <li><a href="#should-you-wait-for-a-crash">Should you wait for a crash?</a></li>
+      <li><a href="#why-an-earlier-buyer-pays-less-decompose">Why an earlier buyer pays less, decomposed</a></li>
+      <li><a href="#do-the-signals-actually-lead-the-market">Do the signals actually lead the market?</a></li>
+      <li><a href="#the-pay-trap-where-the-arithmetic-still-">The pay trap: where the arithmetic still works</a></li>
+      <li><a href="#the-ab-1482-rent-cap">The AB 1482 rent cap</a></li>
+      <li><a href="#old-dollars-in-today-s-money">Old dollars in today's money</a></li>
+      <li><a href="#the-rest-and-the-discipline-behind-it">The rest, and the discipline behind it</a></li>
+    </ol>
+  </nav>
+
+
   <!-- 1. The two totals -->
-  <section class="formula-block">
+  <section class="formula-block" id="the-two-totals">
     <h2>The two totals</h2>
     <p>
       Every other calculator shows you one number. This shows two, and the gap between them is the reason the
@@ -60,7 +92,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 2. Monthly payment -->
-  <section class="formula-block">
+  <section class="formula-block" id="the-mortgage-payment">
     <h2>The mortgage payment</h2>
     <p>The standard amortized-loan formula: the fixed monthly payment that retires a loan of <math><mi>P</mi></math> over <math><mi>n</mi></math> months at monthly rate <math><mi>r</mi></math>.</p>
     <math display="block">
@@ -84,7 +116,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 3. Balance and LTV over time -->
-  <section class="formula-block">
+  <section class="formula-block" id="the-balance-and-when-mortgage-insurance-">
     <h2>The balance, and when mortgage insurance ends</h2>
     <p>
       After <math><mi>k</mi></math> payments the remaining balance is the loan grown at the rate, less the payments
@@ -114,8 +146,105 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     </p>
   </section>
 
+  <!-- FHA MIP -->
+  <section class="formula-block" id="fha-mortgage-insurance">
+    <h2>FHA mortgage insurance</h2>
+    <p>
+      FHA charges an <strong>upfront</strong> premium of 1.75% of the loan, financed into the balance, plus an
+      <strong>annual</strong> premium paid monthly. The annual rate depends on the term and loan-to-value; for a
+      standard 30-year loan it is 0.55% above 95% LTV and 0.50% below.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>MIP</mi><mtext>mo</mtext></msub><mo>=</mo>
+        <mfrac><mrow><mi>rate</mi><mo>·</mo><mi>P</mi></mrow><mn>12</mn></mfrac>
+      </mrow>
+    </math>
+    <p>
+      The part that hurts is the <strong>duration</strong>, and it turns on the down payment, not on equity: put
+      down less than 10% and the premium runs for the <em>entire life of the loan</em>, with no equity level that
+      removes it. The only exit is refinancing off FHA. 10% or more down buys an exit at 11 years.
+    </p>
+    <p class="source">
+      HUD Mortgagee Letter 2023-05.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/programs.ts">programs.ts</a>
+    </p>
+  </section>
+
+  <!-- Conventional PMI -->
+  <section class="formula-block" id="conventional-pmi">
+    <h2>Conventional PMI</h2>
+    <p>
+      Below 20% down, a conventional loan carries private mortgage insurance, priced off the lender's rate card by
+      loan-to-value and credit score. It is a monthly percentage of the loan, and the range is wider than most
+      quotes admit: from 0.19% for a 760+ borrower a hair under 20% down, to 1.85% at 97% LTV with a sub-640 score.
+      That is 8.5x the rate for the same house.
+    </p>
+    <p>
+      It terminates automatically at 78% LTV on the original amortization schedule (appreciation does not count),
+      or at the midpoint of the term, whichever comes first. These are estimates, flagged as such: insurers do not
+      publish their cards.
+    </p>
+    <p class="source">
+      Homeowners Protection Act of 1998; rate bands cross-checked against the Urban Institute.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/programs.ts">programs.ts</a>
+    </p>
+  </section>
+
+  <!-- VA funding fee -->
+  <section class="formula-block" id="the-va-funding-fee">
+    <h2>The VA funding fee</h2>
+    <p>
+      VA loans carry no mortgage insurance but a one-time funding fee, a percentage of the loan that scales with
+      the down payment and whether you have used a VA loan before. A service-connected disability rating at any
+      level waives it entirely.
+    </p>
+    <table class="method-table">
+      <thead><tr><th>Down payment</th><th>First use</th><th>Subsequent use</th></tr></thead>
+      <tbody>
+        <tr><td>0%</td><td>2.15%</td><td>3.30%</td></tr>
+        <tr><td>5–10%</td><td>1.50%</td><td>1.50%</td></tr>
+        <tr><td>10%+</td><td>1.25%</td><td>1.25%</td></tr>
+      </tbody>
+    </table>
+    <p class="source">
+      va.gov. The fee is measured on the base loan before it is financed in, so rolling it in does not push you
+      into a worse mortgage-insurance band.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/programs.ts">programs.ts</a>
+    </p>
+  </section>
+
+  <!-- Loan limits -->
+  <section class="formula-block" id="loan-limits-conforming-and-fha-are-diffe">
+    <h2>Loan limits: conforming and FHA are different</h2>
+    <p>
+      Both the conforming limit (FHFA) and the FHA limit are set at 115% of the county's area median sale price,
+      capped at 150% of the national baseline. The difference is the floor:
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>limit</mi><mo>=</mo>
+        <mi>clamp</mi><mo>(</mo>
+        <mn>1.15</mn><mo>·</mo><msub><mi>median</mi><mtext>county</mtext></msub><mo>,</mo>
+        <mspace width="0.3em"/><mtext>floor</mtext><mo>,</mo>
+        <mspace width="0.3em"/><mn>1.5</mn><mo>·</mo><mtext>baseline</mtext>
+        <mo>)</mo>
+      </mrow>
+    </math>
+    <p>
+      FHFA floors at the full baseline; FHA floors at 65% of it. So below the ceiling the two diverge hard:
+      <strong>Stanislaus is $832,750 conforming and $545,100 FHA.</strong> Over its limit an FHA loan is not a
+      jumbo, it is simply not an FHA loan, and the engine carries both limits on every scenario so it can never
+      reach for the wrong one.
+    </p>
+    <p class="source">
+      FHFA county file; HUD CHUMS master file.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/ca-fha-limits.ts">ca-fha-limits.ts</a>
+    </p>
+  </section>
+
   <!-- 4. Property tax -->
-  <section class="formula-block">
+  <section class="formula-block" id="property-tax-under-proposition-13">
     <h2>Property tax, under Proposition 13</h2>
     <p>
       Buying resets the assessed value to your purchase price. The tax is that value, less the homeowners'
@@ -144,8 +273,68 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     </p>
   </section>
 
+  <!-- Cash to close -->
+  <section class="formula-block" id="cash-to-close">
+    <h2>Cash to close</h2>
+    <p>What you actually need on hand at signing: the down payment, closing costs, and the escrow account seeded up front.</p>
+    <math display="block">
+      <mrow>
+        <mi>Cash</mi><mo>=</mo>
+        <mi>D</mi><mo>+</mo>
+        <mn>0.025</mn><mo>·</mo><mi>V</mi><mo>+</mo>
+        <mo>(</mo><mn>6</mn><mi>T</mi><mo>+</mo><mn>3</mn><mi>I</mi><mo>)</mo>
+      </mrow>
+    </math>
+    <dl class="symbols">
+      <dt>D</dt><dd>the down payment; plus any upfront fee you pay in cash rather than finance</dd>
+      <dt>0.025 · V</dt><dd>closing costs, estimated at 2.5% of price: lender fees, appraisal, title, escrow</dd>
+      <dt>6T + 3I</dt><dd>six months of property tax and three of insurance, collected to open the impound account</dd>
+    </dl>
+    <p class="source">
+      Closing costs and impound months are estimates, flagged as such.
+      <a href="{{ site.repo.url }}/blob/main/lib/mortgage.ts">mortgage.ts</a>
+    </p>
+  </section>
+
+  <!-- DTI -->
+  <section class="formula-block" id="debt-to-income-and-the-income-a-house-ne">
+    <h2>Debt-to-income, and the income a house needs</h2>
+    <p>
+      Underwriting counts two ratios: the front end is housing against income, the back end adds every other
+      monthly debt. The back end is the one that binds.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>DTI</mi><mtext>back</mtext></msub><mo>=</mo>
+        <mfrac>
+          <mrow><mi>Housing</mi><mo>+</mo><mi>Debts</mi></mrow>
+          <msub><mi>Y</mi><mtext>mo</mtext></msub>
+        </mfrac>
+      </mrow>
+    </math>
+    <p>Inverting it gives the income a given house needs, against the program's ceiling:</p>
+    <math display="block">
+      <mrow>
+        <msub><mi>Y</mi><mtext>req</mtext></msub><mo>=</mo>
+        <mfrac>
+          <mrow><mn>12</mn><mo>(</mo><mi>Housing</mi><mo>+</mo><mi>Debts</mi><mo>)</mo></mrow>
+          <mi>ceiling</mi>
+        </mfrac>
+      </mrow>
+    </math>
+    <p>
+      Ceilings run about 45% conventional, 43–57% FHA. VA is the exception: it has no hard ceiling, and its 41%
+      figure is a guideline, so for a VA loan the binding test is residual income, below, and the income figure is
+      solved from that instead.
+    </p>
+    <p class="source">
+      Fannie Mae Selling Guide B3-6-02; HUD Handbook 4000.1.
+      <a href="{{ site.repo.url }}/blob/main/lib/mortgage.ts">mortgage.ts</a>
+    </p>
+  </section>
+
   <!-- 5. VA residual income -->
-  <section class="formula-block">
+  <section class="formula-block" id="va-residual-income">
     <h2>VA residual income</h2>
     <p>
       VA does not underwrite on debt-to-income; it underwrites on what is left over each month after everything.
@@ -176,7 +365,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 6. Rent versus buy -->
-  <section class="formula-block">
+  <section class="formula-block" id="rent-versus-buy-two-net-worth-paths">
     <h2>Rent versus buy: two net-worth paths</h2>
     <p>
       The honest version of "rent is throwing money away". Each year, the <strong>buyer's</strong> net worth is
@@ -220,7 +409,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 7. The mortgage interest deduction -->
-  <section class="formula-block">
+  <section class="formula-block" id="the-mortgage-interest-deduction">
     <h2>The mortgage interest deduction</h2>
     <p>
       Only the interest above the standard deduction is worth anything, and only on the first $750,000 of debt.
@@ -248,7 +437,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 8. Affordability -->
-  <section class="formula-block">
+  <section class="formula-block" id="what-can-you-actually-afford">
     <h2>What can you actually afford?</h2>
     <p>
       Run backwards, this is not a formula but a search. Price feeds back into property tax, insurance, the PMI
@@ -264,7 +453,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 9. Buying power -->
-  <section class="formula-block">
+  <section class="formula-block" id="buying-power-the-payment-formula-inverte">
     <h2>Buying power: the payment formula, inverted</h2>
     <p>
       To ask "what could a median income buy", invert the payment. Given a monthly budget of 30% of income at that
@@ -297,7 +486,7 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   </section>
 
   <!-- 10. The deposit race -->
-  <section class="formula-block">
+  <section class="formula-block" id="saving-the-deposit-with-rent-rising">
     <h2>Saving the deposit, with rent rising</h2>
     <p>
       A renter's saving capacity is not fixed: rising rent eats into it. If non-rent spending tracks wages, next
@@ -323,14 +512,201 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     </p>
   </section>
 
-  <section class="formula-block">
-    <h2>Everything else</h2>
+  <!-- The price index in dollars -->
+  <section class="formula-block" id="the-price-history-in-dollars">
+    <h2>The price history, in dollars</h2>
     <p>
-      The FHA MIP schedule, the VA funding fee, the PMI rate bands, the FAIR Plan wildfire figures, the AB 1482
-      rent caps, the county price histories and the affordability search all follow the same discipline: a
-      published rule where one exists, an honest estimate flagged as one where it does not, and a citation on
-      every number. The whole engine is a few thousand lines of TypeScript with no dependencies, and it is
-      <a href="{{ site.repo.url }}">open source</a> so you can read all of it.
+      The FHFA repeat-sales index tracks what the <em>same</em> houses resold for, but it has no units. To read it
+      in dollars, anchor it to Zillow's current typical single-family value for the county and scale every past
+      reading against the latest:
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>price</mi><mi>t</mi></msub><mo>=</mo>
+        <mi>anchor</mi><mo>·</mo>
+        <mfrac>
+          <msub><mi>index</mi><mi>t</mi></msub>
+          <msub><mi>index</mi><mtext>latest</mtext></msub>
+        </mfrac>
+      </mrow>
+    </math>
+    <p>
+      So the dollar figures describe one representative house through time, not the median listing of each year.
+      Every ratio the panels report divides the anchor out, so only the dollar axis depends on it. Metro counties
+      get a quarterly series; the 21 rural counties get their own annual one.
+      <a href="{{ site.repo.url }}/blob/main/lib/history.ts">history.ts</a>
+    </p>
+  </section>
+
+  <!-- Drawdowns -->
+  <section class="formula-block" id="crash-detection-drawdowns">
+    <h2>Crash detection: drawdowns</h2>
+    <p>
+      A "crash" is a peak-to-trough decline of at least 10% on that index. Running-peak logic collapses
+      overlapping dips into the single real drawdown rather than double-counting them: track the highest reading
+      seen, and when a new high arrives, close off any decline of
+      <math><mrow><mo>(</mo><msub><mi>trough</mi></msub><mo>−</mo><msub><mi>peak</mi></msub><mo>)</mo><mo>/</mo><mi>peak</mi><mo>≤</mo><mo>−</mo><mn>10</mn><mi>%</mi></mrow></math>
+      that came before it.
+    </p>
+    <p>
+      This is what makes the crash presets each county's own: "the shallowest of the 3 declines on record" is
+      derived, never written down, because 17 counties have one decline and 16 have three.
+      <a href="{{ site.repo.url }}/blob/main/lib/history.ts">history.ts</a>
+    </p>
+  </section>
+
+  <!-- Should you wait -->
+  <section class="formula-block" id="should-you-wait-for-a-crash">
+    <h2>Should you wait for a crash?</h2>
+    <p>
+      Waiting has a cost the "just wait" crowd never counts: the rent you pay and the principal you do not pay
+      down while you wait. It also has a benefit nobody counts: a permanently lower Prop 13 basis. The break-even
+      is how long the monthly saving takes to repay the rent burned getting there.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>months</mi><mtext>break-even</mtext></msub><mo>=</mo>
+        <mfrac>
+          <msub><mi>rent</mi><mtext>waiting</mtext></msub>
+          <msub><mi>saving</mi><mtext>monthly</mtext></msub>
+        </mfrac>
+      </mrow>
+    </math>
+    <p>
+      The surprising result, pinned by a test: because the lower assessed value follows you for as long as you
+      own, Prop 13 raises the crash size at which waiting finally beats buying now. Price is not payment, and a
+      decline that arrives with rate relief is worth far less than the same decline at today's rate.
+      <a href="{{ site.repo.url }}/blob/main/lib/history.ts">history.ts</a>
+    </p>
+  </section>
+
+  <!-- Cohort -->
+  <section class="formula-block" id="why-an-earlier-buyer-pays-less-decompose">
+    <h2>Why an earlier buyer pays less, decomposed</h2>
+    <p>
+      The panel prices the same house at an earlier date via the repeat-sales index, then splits the monthly gap
+      into its three causes, which sum exactly to the total:
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>Δ</mi><mo>=</mo>
+        <munder><munder><mrow><mo>(</mo><msub><mi>PI</mi><mtext>you</mtext></msub><mo>−</mo><msub><mi>PI</mi><mtext>their rate</mtext></msub><mo>)</mo></mrow><mo>⏟</mo></munder><mtext>rate</mtext></munder>
+        <mo>+</mo>
+        <munder><munder><mrow><mo>(</mo><msub><mi>PI</mi><mtext>their rate</mtext></msub><mo>−</mo><msub><mi>PI</mi><mtext>them</mtext></msub><mo>)</mo></mrow><mo>⏟</mo></munder><mtext>price</mtext></munder>
+        <mo>+</mo>
+        <munder><munder><mrow><mo>(</mo><msub><mi>tax</mi><mtext>you</mtext></msub><mo>−</mo><msub><mi>tax</mi><mtext>them</mtext></msub><mo>)</mo></mrow><mo>⏟</mo></munder><mtext>Prop 13</mtext></munder>
+      </mrow>
+    </math>
+    <p>
+      The decomposition is asserted to sum to the total in the tests, so the three bars can never quietly stop
+      adding up. It also credits the earlier buyer with any refinance into the 2020–21 cheap-money window, if they
+      already owned when it opened.
+      <a href="{{ site.repo.url }}/blob/main/lib/cohort.ts">cohort.ts</a>
+    </p>
+  </section>
+
+  <!-- Correlations -->
+  <section class="formula-block" id="do-the-signals-actually-lead-the-market">
+    <h2>Do the signals actually lead the market?</h2>
+    <p>
+      Each indicator is correlated against the next 24 months of price change with a plain Pearson coefficient. The
+      honest part is the sample size: overlapping windows inflate it, so the effective count deflates the raw one
+      by the window length.
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>r</mi><mo>=</mo>
+        <mfrac>
+          <mrow><mo>∑</mo><mo>(</mo><mi>x</mi><mo>−</mo><mover><mi>x</mi><mo>‾</mo></mover><mo>)</mo><mo>(</mo><mi>y</mi><mo>−</mo><mover><mi>y</mi><mo>‾</mo></mover><mo>)</mo></mrow>
+          <msqrt><mrow><mo>∑</mo><mo>(</mo><mi>x</mi><mo>−</mo><mover><mi>x</mi><mo>‾</mo></mover><msup><mo>)</mo><mn>2</mn></msup><mo>∑</mo><mo>(</mo><mi>y</mi><mo>−</mo><mover><mi>y</mi><mo>‾</mo></mover><msup><mo>)</mo><mn>2</mn></msup></mrow></msqrt>
+        </mfrac>
+        <mo>,</mo>
+        <mspace width="0.6em"/>
+        <msub><mi>n</mi><mtext>eff</mtext></msub><mo>=</mo>
+        <mfrac><mi>n</mi><mtext>window</mtext></mfrac>
+      </mrow>
+    </math>
+    <p>
+      A handful of declines is not enough to fit anything to, and the effective <math><mi>n</mi></math> is printed
+      precisely so nobody quotes the inflated one. The forecaster built on this data is shipped
+      <em>failing its own pre-registered tests</em>, on purpose.
+      <a href="{{ site.repo.url }}/blob/main/lib/signals.ts">signals.ts</a>
+    </p>
+  </section>
+
+  <!-- Pay trap -->
+  <section class="formula-block" id="the-pay-trap-where-the-arithmetic-still-">
+    <h2>The pay trap: where the arithmetic still works</h2>
+    <p>
+      Measured against each county's <em>own</em> Census income, not the statewide figure, the correlation between
+      what a county pays and how many years of that pay a house costs is
+      <math><mrow><mi>r</mi><mo>=</mo><mo>+</mo><mn>0.71</mn></mrow></math>; between pay and price outright it is
+      <math><mrow><mi>r</mi><mo>=</mo><mo>+</mo><mn>0.91</mn></mrow></math>. The better a county pays, the worse its
+      housing multiple: the raise does not get you in, it gets bid away. Both are the same Pearson coefficient as
+      above, computed at render time and pinned by tests.
+      <a href="{{ site.repo.url }}/blob/main/lib/where-it-works.ts">where-it-works.ts</a>
+    </p>
+  </section>
+
+  <!-- Rent cap -->
+  <section class="formula-block" id="the-ab-1482-rent-cap">
+    <h2>The AB 1482 rent cap</h2>
+    <p>
+      California caps annual rent increases at 5% plus regional inflation, never above 10%. The inflation figure is
+      not one number for the state; it is the CPI for the region the property sits in.
+    </p>
+    <math display="block">
+      <mrow>
+        <mi>cap</mi><mo>=</mo>
+        <mi>min</mi><mo>(</mo><mn>5</mn><mi>%</mi><mo>+</mo><msub><mi>CPI</mi><mtext>region</mtext></msub><mo>,</mo>
+        <mspace width="0.3em"/><mn>10</mn><mi>%</mi><mo>)</mo>
+      </mrow>
+    </math>
+    <p>
+      It is a ceiling, not a forecast: most sitting tenants see far less, and the exemptions are broad. But it is
+      the honest upper bound on how fast a landlord can raise a rent you are already in.
+      <a href="{{ site.repo.url }}/blob/main/lib/data/ca-rent-cap.ts">ca-rent-cap.ts</a>
+    </p>
+  </section>
+
+  <!-- Inflation -->
+  <section class="formula-block" id="old-dollars-in-today-s-money">
+    <h2>Old dollars in today's money</h2>
+    <p>
+      Where a chart can be shown inflation-adjusted, past dollars are restated with the CPI. This changes the shape
+      of the chart, never a ratio: both lines carry the same factor, so the headline findings do not move.
+    </p>
+    <math display="block">
+      <mrow>
+        <msub><mi>V</mi><mtext>today</mtext></msub><mo>=</mo>
+        <msub><mi>V</mi><mi>t</mi></msub><mo>·</mo>
+        <mfrac>
+          <msub><mi>CPI</mi><mtext>latest</mtext></msub>
+          <msub><mi>CPI</mi><mi>t</mi></msub>
+        </mfrac>
+      </mrow>
+    </math>
+    <p class="source">
+      <a href="{{ site.repo.url }}/blob/main/lib/buying-power.ts">buying-power.ts</a>
+    </p>
+  </section>
+
+  <!-- Everything else -->
+  <section class="formula-block" id="the-rest-and-the-discipline-behind-it">
+    <h2>The rest, and the discipline behind it</h2>
+    <p>
+      A few things are data rather than formulas, and follow the same rule: the FAIR Plan wildfire figures
+      (parsed from the insurer's own quarterly ZIP reports, refusing to write unless they reconcile to the printed
+      totals), the county tax rates (real where we have them, a flagged statewide fallback where we do not), and
+      the insurance premium itself (a statewide estimate, because no agency publishes a county average for the
+      normal market). The supplemental tax bill is warned about but never modeled numerically, because that needs
+      the seller's old assessed value, which we do not have, and a faked number is exactly what this project
+      exists to avoid.
+    </p>
+    <p>
+      Every constant traces to a source with a real date and an honest label. The whole engine is a few thousand
+      lines of TypeScript with no dependencies, and it is <a href="{{ site.repo.url }}">open source</a>, so you can
+      read all of it and check any of it.
     </p>
     <p class="method-page__back"><a href="/">← Back to the calculator</a></p>
   </section>

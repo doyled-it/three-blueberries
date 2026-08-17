@@ -1580,3 +1580,87 @@ input[type="range"] {
 .method-page__back {
   margin-top: 8px;
 }
+
+/* Small rate tables on the methodology page (FHA MIP, VA fee, PMI shape). */
+.method-page .method-table {
+  width: 100%;
+  max-width: 34rem;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.88rem;
+}
+.method-page .method-table th,
+.method-page .method-table td {
+  text-align: left;
+  padding: 7px 14px 7px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.method-page .method-table th {
+  color: var(--ink-4);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.method-page .method-table td:first-child {
+  font-family: var(--mono);
+  color: var(--berry-bright);
+  white-space: nowrap;
+}
+
+/* The methodology page's table of contents: a plain numbered index, since the
+   page is static and its sections do not move at runtime. */
+.method-toc {
+  margin: 8px 0 12px;
+  padding: 18px 22px;
+  background: var(--panel);
+  border-radius: 4px;
+  max-width: var(--measure);
+}
+.method-toc__title {
+  margin: 0 0 10px;
+  color: var(--ink-4);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.method-toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 2;
+  column-gap: 32px;
+}
+.method-toc li {
+  break-inside: avoid;
+  margin: 4px 0;
+  counter-increment: toc;
+}
+.method-toc a {
+  border: 0;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.method-toc a::before {
+  content: counter(toc, decimal-leading-zero) "  ";
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-4);
+}
+.method-toc a:hover {
+  color: var(--berry-bright);
+}
+.method-toc ol {
+  counter-reset: toc;
+}
+/* Anchor targets clear the fixed nothing here, but give a little breathing room
+   when jumped to. */
+.method-page .formula-block {
+  scroll-margin-top: 20px;
+}
+@media (max-width: 640px) {
+  .method-toc ol {
+    columns: 1;
+  }
+}
