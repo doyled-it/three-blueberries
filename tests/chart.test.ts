@@ -238,3 +238,49 @@ test("REGRESSION: the old whole-thousands formatter WOULD have collapsed labels"
   assert.equal(bad(500), bad(1000), "the old formatter really did collapse $500 and $1,000");
   assert.notEqual(moneyAxis(500), moneyAxis(1000), "the new one must not");
 });
+
+test("close markers do not stack their labels on top of each other", () => {
+  // A narrow buy-window puts "buying pulls ahead, year N" and "renting back
+  // ahead, year M" at nearly the same x. Their labels must not collide.
+  const buy = [];
+  const rent = [];
+  for (let i = 0; i <= 30; i++) {
+    buy.push({ month: String(2026 + i), value: 100_000 + i * i * 3000 });
+    rent.push({ month: String(2026 + i), value: 120_000 + i * i * 2900 });
+  }
+  const svg = renderMultiLine({
+    series: [
+      { key: "buy", label: "buy", color: "#3987e5", points: buy },
+      { key: "rent", label: "rent", color: "#d95926", points: rent },
+    ],
+    format: (n) => `$${n}`,
+    markers: [
+      { seriesKey: "buy", month: "2030", label: "buying pulls ahead, year 4" },
+      { seriesKey: "rent", month: "2032", label: "renting back ahead, year 6" },
+    ],
+    description: "test",
+  });
+  const labels = [...svg.matchAll(/<text class="c-marker-label" x="([\d.]+)" y="([\d.]+)"/g)].map((m) => ({
+    x: Number(m[1]),
+    y: Number(m[2]),
+  }));
+  assert.equal(labels.length, 2);
+  // Close in x means they must be separated in y by at least a line's height.
+  const dx = Math.abs(labels[0]!.x - labels[1]!.x);
+  const dy = Math.abs(labels[0]!.y - labels[1]!.y);
+  assert.ok(dx < 150, "the test's markers should be horizontally close");
+  assert.ok(dy >= 13, `labels only ${dy.toFixed(0)}px apart vertically: they collide`);
+});
+
+test("a marker label never rides off the top of the chart", () => {
+  const pts = Array.from({ length: 12 }, (_, i) => ({ month: String(2026 + i), value: 1_000_000 }));
+  const svg = renderMultiLine({
+    series: [{ key: "a", label: "a", color: "#3987e5", points: pts }],
+    format: (n) => `$${n}`,
+    // A marker on the highest point, whose label would want to sit above the top.
+    markers: [{ seriesKey: "a", month: "2026", label: "peak" }],
+    description: "test",
+  });
+  const y = Number(/<text class="c-marker-label" x="[\d.]+" y="([\d.]+)"/.exec(svg)![1]);
+  assert.ok(y >= 20, `label at y=${y} is above the top edge`);
+});

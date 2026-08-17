@@ -233,6 +233,19 @@ export function renderMultiLine(opts: {
     )
     .join("");
 
+  // Resolve label positions first so close markers do not collide. Two markers
+  // near the same x (a narrow buy-window: "buying pulls ahead, year 6" beside
+  // "renting back ahead, year 10") would otherwise print their labels on top of
+  // each other. Give each a vertical lane: the first sits above its point, and
+  // any later marker whose label would overlap one already placed drops below,
+  // or steps further out, until it clears.
+  const placedLabels: Array<{ left: number; right: number; y: number }> = [];
+  // Stack upward by preference: the crossover markers sit low on the net-worth
+  // chart, so a "below" lane would clip into the axis. Only drop below as a last
+  // resort, and never above the top edge.
+  const LANES = [-12, -27, -42, 18];
+  const TOP_EDGE = PAD.top + 10;
+
   const markerEls = markers
     .map((mk) => {
       const s = series.find((ss) => ss.key === mk.seriesKey);
@@ -242,9 +255,31 @@ export function renderMultiLine(opts: {
       const px = x(i);
       const py = y(s.points[i]!.value);
       const anchor = px > W * 0.72 ? "end" : px < W * 0.18 ? "start" : "middle";
+
+      // Estimate the label's horizontal extent from its length and anchor, so we
+      // can tell whether two labels would overlap.
+      const halfWidth = mk.label.length * 3.4;
+      const left = anchor === "end" ? px - halfWidth * 2 : anchor === "start" ? px : px - halfWidth;
+      const right = anchor === "end" ? px : anchor === "start" ? px + halfWidth * 2 : px + halfWidth;
+
+      // Try lanes in order until one does not overlap an already-placed label,
+      // and never let a label ride off the top edge.
+      let labelY = py + LANES[0]!;
+      for (const lane of LANES) {
+        const candidateY = Math.max(py + lane, TOP_EDGE);
+        const clash = placedLabels.some(
+          (p) => Math.abs(p.y - candidateY) < 13 && left < p.right + 6 && right > p.left - 6
+        );
+        if (!clash) {
+          labelY = candidateY;
+          break;
+        }
+      }
+      placedLabels.push({ left, right, y: labelY });
+
       return (
         `<circle class="c-marker" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4.5" style="stroke:${s.color}"/>` +
-        `<text class="c-marker-label" x="${px.toFixed(1)}" y="${(py - 12).toFixed(1)}" text-anchor="${anchor}">${mk.label}</text>`
+        `<text class="c-marker-label" x="${px.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="${anchor}">${mk.label}</text>`
       );
     })
     .join("");
