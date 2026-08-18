@@ -185,7 +185,7 @@ const FORMULA_ANCHOR: Record<string, string> = {
   propertyTax: "property-tax-under-proposition-13",
   melloRoos: "property-tax-under-proposition-13",
   homeownersInsurance: "the-rest-and-the-discipline-behind-it",
-  maintenance: "the-two-totals",
+  maintenanceReserve: "the-two-totals",
 };
 
 function formulaAnchorFor(line: LineItem): string | null {

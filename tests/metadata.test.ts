@@ -355,3 +355,42 @@ test("every 'see the formula' link resolves to a section on the methodology page
   const app = fs.readFileSync("src/client/app.ts", "utf8");
   assert.ok(/how-its-calculated\/#\$\{anchor\}/.test(app), "the breakdown must link lines to the method page");
 });
+
+test("every FORMULA_ANCHOR key is a line the engine actually emits", async () => {
+  // The bug this pins: FORMULA_ANCHOR mapped `maintenance`, but the engine emits
+  // `maintenanceReserve`, so that line silently got no formula link. The old test
+  // only checked the anchor TARGETS existed, never that the KEYS were real, which
+  // is the same "assert the wording against itself" trap the prose lint exists to
+  // stop. So check the keys against the data: run the engine and read the keys off
+  // the actual line items, across a conventional and an FHA loan so mortgage
+  // insurance shows up too.
+  const { evaluateScenario } = await import("../lib/mortgage.ts");
+  const base = {
+    purchasePrice: 900_000,
+    downPayment: { kind: "percent" as const, value: 0.2 },
+    loanType: "conventional" as const,
+    termYears: 30,
+    interestRate: 0.0666,
+    creditScore: 760,
+    county: "San Diego" as const,
+    claimHomeownersExemption: true,
+    hoaMonthly: 0,
+    melloRoosAnnual: 200,
+    household: { grossAnnualIncomes: [220_000], monthlyDebts: 500, size: 2 },
+  };
+  const conv = evaluateScenario(base);
+  const fha = evaluateScenario({ ...base, loanType: "fha", downPayment: { kind: "percent", value: 0.035 } });
+  const emittedKeys = new Set([...conv.lines, ...fha.lines].map((l) => l.key));
+
+  // Parse the FORMULA_ANCHOR object keys straight out of app.ts, plus the
+  // mortgageInsurance branch handled separately in formulaAnchorFor.
+  const app = fs.readFileSync("src/client/app.ts", "utf8");
+  const block = app.match(/const FORMULA_ANCHOR[^=]*=\s*\{([^}]*)\}/s);
+  assert.ok(block, "could not find FORMULA_ANCHOR in app.ts");
+  const mappedKeys = [...block[1]!.matchAll(/^\s*([a-zA-Z]+)\s*:/gm)].map((m) => m[1]!);
+  mappedKeys.push("mortgageInsurance");
+
+  for (const key of mappedKeys) {
+    assert.ok(emittedKeys.has(key), `FORMULA_ANCHOR maps "${key}", which no line item emits; the link never renders`);
+  }
+});
