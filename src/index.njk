@@ -20,6 +20,10 @@ description: "The real monthly cost of buying a house in California: property ta
   </p>
 </header>
 
+<!-- Populated by the client and shown only in print: the scenario recap that
+     stands in for the live form on paper. -->
+<section id="printReport" class="print-report" aria-hidden="true"></section>
+
 <form id="scenario" class="panel" data-toc-label="The calculator">
   <div class="grid">
     <fieldset>
@@ -148,13 +152,17 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <p class="form-share">
     <button type="button" id="copyLink" class="link-btn">Copy a link to this scenario</button>
-    <span class="hint">the whole thing lives in the URL, nothing is sent anywhere</span>
+    <button type="button" id="savePdf" class="link-btn">Save as PDF</button>
+  </p>
+  <p class="form-share-hint">
+    The link carries the whole scenario in the URL; nothing is sent anywhere. The PDF is a clean cost
+    report, not this page: for the tidiest result, turn off &ldquo;Headers and footers&rdquo; in the print dialog.
   </p>
 </form>
 
 <section class="panel">
   <h2>What will it actually cost?</h2>
-  <p class="panel__sub">Open a line to see how it was calculated.</p>
+  <p class="panel__sub no-print">Open a line to see how it was calculated.</p>
   <div id="breakdown" class="breakdown"></div>
 </section>
 

@@ -80,7 +80,7 @@ import {
 import { attachToc, buildToc, renderToc } from "./toc.ts";
 import { applyScenarioFromUrl, writeScenarioToUrl } from "./permalink.ts";
 import type { CaCounty } from "../../lib/data/ca-loan-limits.ts";
-import type { Confidence, LineItem, LoanType, ScenarioInput } from "../../lib/types.ts";
+import type { Confidence, LineItem, LoanType, ScenarioInput, ScenarioResult } from "../../lib/types.ts";
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 const pct = (n: number, places = 2) => (n * 100).toFixed(places) + "%";
@@ -223,6 +223,51 @@ function renderLine(line: LineItem, isTrueCostOnly: boolean): string {
     </details>`;
 }
 
+const LOAN_LABEL: Record<string, string> = { conventional: "Conventional", fha: "FHA", va: "VA" };
+
+/**
+ * The scenario, recapped for print. On paper the live form is noise: read-only
+ * inputs, placeholder warnings, empty fields. A report wants the facts it was run
+ * on, stated once and compactly. This is hidden on screen and shown only in the
+ * print stylesheet, and it is rebuilt on every render so it can never disagree
+ * with the numbers below it.
+ */
+function renderPrintReport(input: ScenarioInput, result: ScenarioResult): void {
+  const el = document.getElementById("printReport");
+  if (!el) return;
+
+  const price = input.purchasePrice;
+  const downAmount = input.downPayment.kind === "amount" ? input.downPayment.value : input.downPayment.value * price;
+  const downPct = price > 0 ? downAmount / price : 0;
+  const income = input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0);
+  const loan = LOAN_LABEL[input.loanType] ?? input.loanType;
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  const facts: [string, string][] = [
+    ["Purchase price", money(price)],
+    ["Down payment", `${money(downAmount)} · ${pct(downPct, 1)}`],
+    ["Loan", `${loan} · ${input.termYears} years · ${pct(input.interestRate, 2)}`],
+    ["County", `${input.county}`],
+    ["Household income", `${money(income)}/yr`],
+  ];
+  if (input.hoaMonthly > 0) facts.push(["HOA dues", `${money(input.hoaMonthly)}/mo`]);
+  if (input.melloRoosAnnual > 0) facts.push(["Mello-Roos", `${money(input.melloRoosAnnual)}/yr`]);
+
+  el.innerHTML = `
+    <div class="print-report__head">
+      <p class="print-report__kicker">Three Blueberries · cost report</p>
+      <h2 class="print-report__title">What this house actually costs</h2>
+      <p class="print-report__meta">${money(price)} home in ${input.county} County · generated ${today}</p>
+    </div>
+    <dl class="print-report__facts">
+      ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}
+    </dl>
+    <div class="print-report__totals">
+      <div><span>Lender total</span><strong>${money(result.lenderMonthlyTotal)}/mo</strong><small>what a mortgage calculator shows you</small></div>
+      <div class="print-report__true"><span>True monthly cost</span><strong>${money(result.trueMonthlyTotal)}/mo</strong><small>what actually leaves your account</small></div>
+    </div>`;
+}
+
 function render(): void {
   const input = readInput();
 
@@ -339,6 +384,7 @@ function render(): void {
     ...affordOnly.map((w) => `<li><strong>On the ${money(afford.maxPurchasePrice)} answer above:</strong> ${w}</li>`),
   ].join("");
 
+  renderPrintReport(input, result);
   renderRentVsBuy(input);
   // The thesis panel is a claim about the median San Diego home, so it must use
   // the project's own anchor. Passing the form's price made it a market-level
@@ -1805,6 +1851,32 @@ function init(): void {
       }
     });
   }
+
+  const pdfBtn = document.getElementById("savePdf");
+  if (pdfBtn) {
+    // The report layout lives in the print stylesheet; the browser's own
+    // print-to-PDF renders it. Nothing is generated server-side or fetched.
+    pdfBtn.addEventListener("click", () => window.print());
+  }
+
+  // The caveats under the recommendation are load-bearing, so they must print.
+  // A closed <details> cannot be forced open by CSS, so open them for print and
+  // restore the reader's state afterward.
+  const printDetails = () => document.querySelectorAll<HTMLDetailsElement>(".recommendation__caveats");
+  let reopen: HTMLDetailsElement[] = [];
+  window.addEventListener("beforeprint", () => {
+    reopen = [];
+    printDetails().forEach((d) => {
+      if (!d.open) {
+        d.open = true;
+        reopen.push(d);
+      }
+    });
+  });
+  window.addEventListener("afterprint", () => {
+    reopen.forEach((d) => (d.open = false));
+    reopen = [];
+  });
 
   render();
   void loadRate();

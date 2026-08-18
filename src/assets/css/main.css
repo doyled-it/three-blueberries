@@ -1673,6 +1673,13 @@ input[type="range"] {
   flex-wrap: wrap;
   margin: 26px 0 0;
 }
+.form-share-hint {
+  margin: 10px 0 0;
+  max-width: var(--measure-tight);
+  color: var(--ink-4);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
 .link-btn {
   padding: 8px 14px;
   background: var(--panel-2);
@@ -1693,6 +1700,18 @@ input[type="range"] {
    dark interactive page. Invert to ink-on-white, keep the scenario, the
    breakdown, the qualification and the warnings, and drop the exploratory
    panels, every chart, and the interactive chrome. */
+/* On screen the print report is invisible; the print stylesheet turns it on. */
+.print-report {
+  display: none;
+}
+
+/*
+ * PRINT: a purpose-built cost report, not the live page with bits hidden. The
+ * form, the charts, and every exploratory panel are dropped. What remains is a
+ * document: a header, the scenario it was run on, the two totals, the itemised
+ * cost, whether you can buy it, and whether you should. Iterated by rendering
+ * the PDF and looking at it.
+ */
 @media print {
   :root {
     --bg: #fff;
@@ -1707,19 +1726,30 @@ input[type="range"] {
     --berry: #5a3fb0;
     --berry-bright: #4a2f9e;
   }
+  /* Vertical margin only. Chrome lays the page out at full width and then offsets
+     it by the @page left/right margin, so a horizontal @page margin makes
+     right-aligned content hang off the printable edge and clip. The horizontal
+     inset goes on .wrap padding instead, which repeats on every page. */
+  @page {
+    margin: 13mm 0;
+  }
   body {
     background: #fff;
     color: #14101c;
-    font-size: 11pt;
+    font-size: 10.5pt;
   }
   body::before {
     display: none; /* the paper-grain texture */
   }
   .wrap {
     max-width: none;
-    padding: 0;
+    padding: 0 14mm;
   }
-  /* Chrome and exploration that make no sense on paper. */
+
+  /* Screen chrome, live controls, and exploration: none of it belongs on paper.
+     The whole form goes, replaced by the scenario recap in .print-report. */
+  .hero,
+  #scenario,
   .toc,
   .tocbar,
   .form-share,
@@ -1732,39 +1762,159 @@ input[type="range"] {
   .instruments,
   input[type="range"],
   .slider-label,
-  .method {
+  .method,
+  .line__formula {
     display: none !important;
   }
-  /* Keep sections from splitting awkwardly across pages. */
-  .panel,
+
+  /* --- the report header + scenario recap ------------------------------- */
+  .print-report {
+    display: block;
+    margin: 0 0 20px;
+  }
+  .print-report__kicker {
+    font: 500 8.5pt/1 var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin: 0;
+  }
+  .print-report__title {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 23pt;
+    line-height: 1.05;
+    margin: 5px 0 4px;
+  }
+  .print-report__meta {
+    color: var(--ink-3);
+    margin: 0;
+  }
+  .print-report__facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    margin: 14px 0;
+    padding: 10px 0;
+    border-top: 1.5px solid var(--ink);
+    border-bottom: 1.5px solid var(--ink);
+  }
+  .print-report__facts div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 3px 0;
+  }
+  .print-report__facts dt {
+    color: var(--ink-3);
+  }
+  .print-report__facts dd {
+    margin: 0;
+    font-family: var(--mono);
+    text-align: right;
+  }
+  .print-report__totals {
+    display: flex;
+    gap: 16px;
+  }
+  .print-report__totals > div {
+    flex: 1;
+    border: 1px solid var(--rule);
+    padding: 10px 14px;
+  }
+  .print-report__totals span {
+    display: block;
+    font-size: 9.5pt;
+    color: var(--ink-3);
+  }
+  .print-report__totals strong {
+    display: block;
+    font-family: var(--mono);
+    font-size: 16pt;
+    margin: 2px 0;
+  }
+  .print-report__true {
+    border-color: var(--berry) !important;
+  }
+  .print-report__true strong {
+    color: var(--berry);
+  }
+  .print-report__totals small {
+    color: var(--ink-4);
+    font-size: 8.5pt;
+  }
+
+  /* --- panels flow; only small units are kept whole ---------------------- */
+  .panel {
+    break-inside: auto;
+    border: 0;
+    padding: 0;
+    margin: 0 0 16px;
+    box-shadow: none;
+  }
+  .panel h2 {
+    break-after: avoid;
+    font-size: 15pt;
+    margin-bottom: 6px;
+  }
+  .panel__sub {
+    break-after: avoid;
+  }
   .stat,
-  .breakdown {
+  .breakdown .line,
+  .subtotal,
+  .total,
+  .recommendation {
     break-inside: avoid;
-    border-color: var(--rule);
   }
-  .hero {
-    padding: 0 0 12px;
+
+  /* --- the cost breakdown: no interactive marker, amounts never clip ------ */
+  .line summary {
+    padding: 7px 0;
   }
-  .hero h1 {
-    font-size: 20pt;
+  .line summary::before {
+    display: none;
   }
+  .line__amount {
+    font-size: 10.5pt;
+    white-space: nowrap;
+  }
+  .subtotal strong,
+  .total strong {
+    font-size: 12.5pt;
+    white-space: nowrap;
+  }
+
+  /* The caveats under the recommendation are load-bearing. A closed <details>
+     cannot be revealed by CSS, so the client opens them on beforeprint; this
+     just makes the open disclosure read as a heading, not a control. */
+  .recommendation__caveats > summary {
+    list-style: none;
+    font-weight: 600;
+  }
+
+  /* Screen-only helper text that has no meaning on paper. */
+  .no-print {
+    display: none !important;
+  }
+
+  /* The qualification grid leaves an empty track when the VA row is absent; its
+     panel tint should not print as a grey block. */
+  .stats {
+    background: transparent !important;
+  }
+
   a {
     color: var(--ink-2);
     border: 0;
-  }
-  /* The form documents the scenario, but as read-only text, not live controls. */
-  input,
-  select {
-    border: 0;
-    color: var(--ink);
-    padding: 2px 0;
   }
   .verdict,
   .recommendation {
     background: #fff;
     border-left-width: 3px;
   }
-  /* In "Should you buy it?", print only the answer, not the whole rent-vs-buy
+  /* In "Should you buy it?", print only the answer, not the rent-vs-buy
      exploration. */
   .panel--buy > *:not(h2):not(.recommendation) {
     display: none !important;

@@ -394,3 +394,21 @@ test("every FORMULA_ANCHOR key is a line the engine actually emits", async () =>
     assert.ok(emittedKeys.has(key), `FORMULA_ANCHOR maps "${key}", which no line item emits; the link never renders`);
   }
 });
+
+test("the print report is wired: container, button, and a print-only stylesheet", () => {
+  const html = fs.readFileSync("_site/index.html", "utf8");
+  assert.ok(/id="printReport"/.test(html), "the print report container must exist for the client to fill");
+  assert.ok(/id="savePdf"/.test(html), "the Save as PDF button must exist");
+
+  const css = fs.readFileSync("src/assets/css/main.css", "utf8");
+  // Invisible on screen, turned on only in print.
+  assert.ok(/\.print-report\s*\{[^}]*display:\s*none/.test(css), ".print-report must be hidden on screen");
+  assert.ok(/@media print/.test(css), "a print stylesheet must exist");
+  // The live form is replaced by the recap on paper; if the form stops being
+  // hidden the PDF prints read-only inputs again.
+  assert.ok(/#scenario,/.test(css), "the form (#scenario) must be hidden in the print block");
+
+  const app = fs.readFileSync("src/client/app.ts", "utf8");
+  assert.ok(/window\.print\(\)/.test(app), "Save as PDF must call window.print()");
+  assert.ok(/renderPrintReport/.test(app), "the report summary must be rebuilt on render");
+});
