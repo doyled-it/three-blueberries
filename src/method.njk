@@ -19,9 +19,8 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     </p>
     <h1>How every number is calculated</h1>
     <p class="hero__sub">
-      The whole point of this project is that you can check the arithmetic. Here it is, formula by formula, each
-      with its source and a link to the code that runs it. Nothing here is a secret sauce; it is all either an
-      agency's published rule or a line of algebra.
+      The whole point is that you can check the arithmetic. Here it is, formula by formula, each with its source
+      and the code that runs it. No secret sauce: every line is an agency's published rule or plain algebra.
     </p>
   </header>
 
@@ -61,9 +60,9 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   <section class="formula-block" id="the-two-totals">
     <h2>The two totals</h2>
     <p>
-      Every other calculator shows you one number. This shows two, and the gap between them is the reason the
-      project exists. The <strong>lender total</strong> is what underwriting counts; the <strong>true total</strong>
-      adds the one thing a lender does not, the maintenance you will actually spend.
+      Every other calculator shows one number. This shows two, and the gap is the reason the project exists. The
+      <strong>lender total</strong> is what underwriting counts; the <strong>true total</strong> adds the one thing
+      it doesn't, the maintenance you'll actually spend.
     </p>
     <math display="block">
       <mrow>
@@ -135,10 +134,10 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
       </mrow>
     </math>
     <p>
-      Conventional PMI has two automatic end points under the Homeowners Protection Act, and whichever comes first
-      governs: the month LTV reaches 78% <em>on the original schedule</em> (appreciation does not count), or the
-      midpoint of the loan term. FHA is different: put less than 10% down and its premium runs for the
-      <strong>life of the loan</strong>, with no equity exit at all.
+      Conventional PMI ends at two automatic points under the Homeowners Protection Act, whichever comes first: the
+      month LTV reaches 78% <em>on the original schedule</em> (appreciation does not count), or the midpoint of the
+      term. FHA is different: under 10% down, its premium runs for the <strong>life of the loan</strong>, no equity
+      exit at all.
     </p>
     <p class="source">
       Homeowners Protection Act of 1998; HUD Mortgagee Letter 2023-05 for FHA.
@@ -161,9 +160,9 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
       </mrow>
     </math>
     <p>
-      The part that hurts is the <strong>duration</strong>, and it turns on the down payment, not on equity: put
-      down less than 10% and the premium runs for the <em>entire life of the loan</em>, with no equity level that
-      removes it. The only exit is refinancing off FHA. 10% or more down buys an exit at 11 years.
+      The part that hurts is the <strong>duration</strong>, and it turns on the down payment, not equity: under 10%
+      down, the premium runs for the <em>life of the loan</em>, no equity level removes it, and the only exit is
+      refinancing off FHA. 10% or more down buys an exit at 11 years.
     </p>
     <p class="source">
       HUD Mortgagee Letter 2023-05.
@@ -176,14 +175,12 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
     <h2>Conventional PMI</h2>
     <p>
       Below 20% down, a conventional loan carries private mortgage insurance, priced off the lender's rate card by
-      loan-to-value and credit score. It is a monthly percentage of the loan, and the range is wider than most
-      quotes admit: from 0.19% for a 760+ borrower a hair under 20% down, to 1.85% at 97% LTV with a sub-640 score.
-      That is 8.5x the rate for the same house.
+      loan-to-value and credit score. The range is wider than most quotes admit: 0.19% for a 760+ borrower just
+      under 20% down, up to 1.85% at 97% LTV with a sub-640 score, 8.5x the rate for the same house.
     </p>
     <p>
-      It terminates automatically at 78% LTV on the original amortization schedule (appreciation does not count),
-      or at the midpoint of the term, whichever comes first. These are estimates, flagged as such: insurers do not
-      publish their cards.
+      It terminates at 78% LTV on the original schedule (appreciation does not count), or at the midpoint of the
+      term, whichever comes first. These are estimates, flagged as such: insurers don't publish their cards.
     </p>
     <p class="source">
       Homeowners Protection Act of 1998; rate bands cross-checked against the Urban Institute.
@@ -232,10 +229,10 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
       </mrow>
     </math>
     <p>
-      FHFA floors at the full baseline; FHA floors at 65% of it. So below the ceiling the two diverge hard:
+      FHFA floors at the full baseline; FHA floors at 65% of it. Below the ceiling the two diverge hard:
       <strong>Stanislaus is $832,750 conforming and $545,100 FHA.</strong> Over its limit an FHA loan is not a
       jumbo, it is simply not an FHA loan, and the engine carries both limits on every scenario so it can never
-      reach for the wrong one.
+      grab the wrong one.
     </p>
     <p class="source">
       FHFA county file; HUD CHUMS master file.
@@ -390,10 +387,10 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
       </mrow>
     </math>
     <p>
-      Owning does not always <em>stay</em> ahead. When the investment return you give up is larger than the
-      appreciation you buy, the renter's invested capital eventually out-compounds the house: owning leads in a
-      middle window, then renting reclaims the lead. So the panel reports whether owning is ahead
-      <em>at your hold year</em>, not merely whether it ever crossed.
+      Owning does not always <em>stay</em> ahead. When the investment return you give up beats the appreciation
+      you buy, the renter's invested capital eventually out-compounds the house: owning leads in a middle window,
+      then renting reclaims the lead. So the panel reports whether owning is ahead <em>at your hold year</em>, not
+      merely whether it ever crossed.
     </p>
     <dl class="symbols">
       <dt>V, B</dt><dd>the home value and loan balance that year</dd>
@@ -440,10 +437,10 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   <section class="formula-block" id="what-can-you-actually-afford">
     <h2>What can you actually afford?</h2>
     <p>
-      Run backwards, this is not a formula but a search. Price feeds back into property tax, insurance, the PMI
-      band, and the jumbo and FHA limits, so there is no closed form. The engine binary-searches for the highest
-      price that still clears every gate: the debt-to-income ceiling, VA residual income, and the FHA county limit,
-      which is a hard stop that is not the conforming limit.
+      Run backwards, this is a search, not a formula. Price feeds back into tax, insurance, the PMI band, and the
+      jumbo and FHA limits, so there is no closed form. The engine binary-searches for the highest price that still
+      clears every gate: the debt-to-income ceiling, VA residual income, and the FHA county limit, a hard stop that
+      is not the conforming limit.
     </p>
     <p class="source">
       An answer above the conforming limit is quoted at the conforming rate, so it is an upper bound, and the page
@@ -505,9 +502,9 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
       <dt>g<sub>rent</sub></dt><dd>rent growth, which you set</dd>
     </dl>
     <p>
-      When rent grows faster than wages the second term is negative and the saving rate falls, which is why a
-      renter whose rent outruns wages closes the gap more slowly. The house price, meanwhile, compounds at its
-      own appreciation rate, so the deposit is a genuine race.
+      When rent grows faster than wages the second term goes negative and the saving rate falls, so a renter whose
+      rent outruns wages closes the gap more slowly. The house price, meanwhile, compounds at its own appreciation
+      rate, so the deposit is a genuine race.
       <a href="{{ site.repo.url }}/blob/main/lib/rent-vs-buy.ts">rent-vs-buy.ts</a>
     </p>
   </section>
@@ -559,9 +556,9 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   <section class="formula-block" id="should-you-wait-for-a-crash">
     <h2>Should you wait for a crash?</h2>
     <p>
-      Waiting has a cost the "just wait" crowd never counts: the rent you pay and the principal you do not pay
-      down while you wait. It also has a benefit nobody counts: a permanently lower Prop 13 basis. The break-even
-      is how long the monthly saving takes to repay the rent burned getting there.
+      Waiting has a cost the "just wait" crowd never counts: the rent you pay and the principal you don't pay down
+      while you wait. It also has a benefit nobody counts: a permanently lower Prop 13 basis. The break-even is how
+      long the monthly saving takes to repay the rent burned getting there.
     </p>
     <math display="block">
       <mrow>
@@ -695,13 +692,12 @@ description: "The formulas behind the calculator, in full: the mortgage payment,
   <section class="formula-block" id="the-rest-and-the-discipline-behind-it">
     <h2>The rest, and the discipline behind it</h2>
     <p>
-      A few things are data rather than formulas, and follow the same rule: the FAIR Plan wildfire figures
-      (parsed from the insurer's own quarterly ZIP reports, refusing to write unless they reconcile to the printed
-      totals), the county tax rates (real where we have them, a flagged statewide fallback where we do not), and
-      the insurance premium itself (a statewide estimate, because no agency publishes a county average for the
-      normal market). The supplemental tax bill is warned about but never modeled numerically, because that needs
-      the seller's old assessed value, which we do not have, and a faked number is exactly what this project
-      exists to avoid.
+      A few things are data, not formulas, under the same rule: the FAIR Plan wildfire figures (parsed from the
+      insurer's own quarterly ZIP reports, refusing to write unless they reconcile to the printed totals), the
+      county tax rates (real where we have them, a flagged statewide fallback where we don't), and the insurance
+      premium (a statewide estimate, because no agency publishes a county average for the normal market). The
+      supplemental tax bill is warned about but never modeled: that needs the seller's old assessed value, which we
+      don't have, and a faked number is what this project exists to avoid.
     </p>
     <p>
       Every constant traces to a source with a real date and an honest label. The whole engine is a few thousand

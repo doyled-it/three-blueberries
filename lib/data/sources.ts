@@ -134,7 +134,7 @@ export const SOURCES = {
     asOf: "2026-01-01",
     kind: "estimate",
     caveat:
-      "Jumbo loans are non-agency: Fannie Mae does not buy them and publishes no ratio for them, so citing the Selling Guide here was citing a document that says nothing about these loans. Each lender sets its own ceiling. 43% is common because it is the Qualified Mortgage threshold in Regulation Z, and 6-12 months of reserves is typical, but there is no single published number and this one is an estimate.",
+      "Jumbo loans are non-agency: Fannie Mae does not buy them and publishes no ratio for them. Each lender sets its own ceiling. 43% is common because it is the Qualified Mortgage threshold in Regulation Z, and 6-12 months of reserves is typical, but there is no single published number and this one is an estimate.",
   },
 
   "prop-13": {
@@ -310,7 +310,7 @@ export const SOURCES = {
     asOf: "quarterly",
     kind: "published",
     caveat:
-      "A repeat-sales index, not a median: it tracks what the SAME houses resold for, which is the right way to measure price change and the wrong way to read a level. Covers 28 California metros quarterly and all 58 counties annually, which is why the history follows your county rather than showing everyone San Diego. A US government work, so it can be redistributed freely, unlike Case-Shiller which this replaced. Each metro series splices FHFA's longer all-transactions index onto the more accurate expanded-data one at 1991; the two disagree by a couple of points a year, so the earliest stretch is the shape of what happened rather than a precise measurement.",
+      "A repeat-sales index, not a median: it tracks what the SAME houses resold for, the right way to measure price change and the wrong way to read a level. Covers 28 California metros quarterly and all 58 counties annually, which is why the history follows your county rather than showing everyone San Diego. A US government work, redistributable freely, unlike Case-Shiller which this replaced. Each metro series splices FHFA's longer all-transactions index onto the more accurate expanded-data one at 1991; the two disagree by a couple of points a year, so the earliest stretch is the shape of what happened, not a precise measurement.",
   },
 
   "census-saipe": {

@@ -15,8 +15,8 @@ description: "The real monthly cost of buying a house in California: property ta
     Named for the meme where boomers bought a house with a firm handshake and three blueberries.
   </p>
   <p class="hero__sub hero__sub--quiet">
-    Every other mortgage calculator is built by someone selling you a loan, and every one of them omits something.
-    This shows the whole bill and cites where each number came from.
+    Every other mortgage calculator is built to sell you a loan, and leaves things out. This shows the whole
+    bill, and cites every number.
   </p>
 </header>
 
@@ -155,8 +155,8 @@ description: "The real monthly cost of buying a house in California: property ta
     <button type="button" id="savePdf" class="link-btn">Save as PDF</button>
   </p>
   <p class="form-share-hint">
-    The link carries the whole scenario in the URL; nothing is sent anywhere. The PDF is a clean cost
-    report, not this page: for the tidiest result, turn off &ldquo;Headers and footers&rdquo; in the print dialog.
+    The link carries the whole scenario; nothing is sent anywhere. For the cleanest PDF, turn off
+    &ldquo;Headers and footers&rdquo; in the print dialog.
   </p>
 </form>
 
@@ -204,16 +204,15 @@ description: "The real monthly cost of buying a house in California: property ta
   <div id="recommendation" class="recommendation"></div>
 
   <p class="panel__sub">
-    "Rent is throwing money away" is the argument everyone makes, and it is mostly wrong. The honest version: net
-    worth under both paths, with the renter investing what the buyer sank into the house.
+    "Rent is throwing money away" is mostly wrong. The honest version: net worth under both paths, with the
+    renter investing what the buyer sank into the house.
   </p>
 
   <div id="rentRatio" class="stats"></div>
 
   <h3 class="sub-head">What would have to change</h3>
   <p class="panel__sub">
-    Each lever below is the number it would have to reach to flip the answer. Usually one is much closer than
-    the rest.
+    Each lever is the number that would flip the answer. Usually one is much closer than the rest.
   </p>
   <h4 class="chart-title">What the interest rate actually decides</h4>
   <div id="buyZoneChart"></div>
@@ -231,8 +230,8 @@ description: "The real monthly cost of buying a house in California: property ta
   <p id="rentBuyVerdict" class="verdict"></p>
 
   <p class="panel__sub">
-    Appreciation and investment return have to come from the same period, or the comparison is rigged without
-    anyone meaning to rig it. These set both together.
+    Appreciation and investment return have to come from the same period, or the comparison is quietly rigged.
+    These set both together.
   </p>
   <div id="assumptionSets" class="presets"></div>
   <p id="assumptionBasis" class="field-note"></p>
@@ -283,8 +282,8 @@ description: "The real monthly cost of buying a house in California: property ta
 <section class="panel panel--explore">
   <h2>What if you wait?</h2>
   <p class="panel__sub">
-    Decades of prices in your county, and the rate that went with them. Price on top, monthly payment below:
-    not the same shape, and that is the argument.
+    Decades of prices in your county, and the rate that went with them. Price on top, payment below: not the
+    same shape, which is the argument.
   </p>
   <p class="scope-note" data-county-scope></p>
 
@@ -295,8 +294,8 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <h3 class="sub-head">Is there a tell?</h3>
   <p class="panel__sub">
-    Each reading against your county's own bubble peak and the bottom after. A few declines is not a sample you can
-    forecast from: this describes conditions, it does not predict.
+    Each reading against your county's own peak and the bottom after. A few declines is not a sample you can
+    forecast from: this describes conditions, it doesn't predict.
   </p>
   <div id="signals" class="signals"></div>
   <p id="signalSummary" class="verdict"></p>
@@ -308,10 +307,9 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <h3 class="sub-head">We trained a forecaster. It doesn't work.</h3>
   <p class="panel__sub">
-    Three model families, 20 metros, validated walk-forward. Trained on FHFA's quarterly
-    metro index, it produces a number for San Diego only, so it does not follow the county selector. It uses a
-    different FHFA series than the charts above, so it will not line up with them either. The number sits
-    <em>below</em> its own track record, because that record is the point.
+    Three model families, 20 metros, validated walk-forward on FHFA's quarterly index. It scores San Diego
+    only, so it ignores the county selector and won't line up with the charts above. The number sits
+    <em>below</em> its own track record, because the record is the point.
   </p>
   <div id="forecastVerdict"></div>
   <div id="forecastCurrent" class="stats"></div>
@@ -329,7 +327,7 @@ description: "The real monthly cost of buying a house in California: property ta
   <h3 class="sub-head">Model your own crash</h3>
   <p class="panel__sub">
     The first two presets are your county's own declines; the default is the shallower, because averaging a mild
-    crash with a severe one invents a "typical" one that never happened. The rest are scenarios, not history.
+    crash with a severe one invents a "typical" that never happened. The rest are scenarios, not history.
   </p>
   <div id="presets" class="presets"></div>
   <p id="presetBasis" class="field-note"></p>
@@ -381,16 +379,16 @@ description: "The real monthly cost of buying a house in California: property ta
 <section class="panel panel--thesis panel--explore">
   <h2>Why this is so hard</h2>
   <p class="panel__sub">
-    The three blueberries, finally. A price on its own proves nothing: everything else rose too. What matters is
-    what the <em>same job</em> buys. Below, the same house in your county against what a median CALIFORNIA income
-    could carry. Statewide income, local prices; the next panel uses local income instead.
+    The three blueberries, finally. A price alone proves nothing: everything else rose too. What matters is what
+    the <em>same job</em> buys. Below: the same house against what a median CALIFORNIA income could carry.
+    Statewide income, local prices; the next panel flips to local income.
   </p>
   <p class="scope-note" data-county-scope></p>
   <label class="check">
     <input id="realDollars" type="checkbox" checked />
     Show every year in today's money
     <span class="hint">
-      Old dollars were worth more. Nominal prices make everything look like it exploded; the ratio between the two
+      Old dollars were worth more. Nominal prices make everything look like it exploded; the ratio between the
       lines is the same either way.
     </span>
   </label>
@@ -404,8 +402,8 @@ description: "The real monthly cost of buying a house in California: property ta
 
   <h3 class="sub-head">So where does the arithmetic still work?</h3>
   <p class="panel__sub">
-    Measured county by county against what people <em>there</em> actually earn, not a statewide figure. This is a
-    snapshot of where things stand, not which way they are moving.
+    Measured county by county against what people <em>there</em> actually earn, not a statewide figure. A
+    snapshot of where things stand, not which way they're moving.
   </p>
   <p id="payTrapHeadline" class="verdict"></p>
   <div id="payTrap" class="stats"></div>

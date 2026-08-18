@@ -210,14 +210,13 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
       powerLost > 0
         ? `In ${first.month.slice(0, 4)} the median California household could afford ` +
           `${first.purchasingRatio.toFixed(2)}x a typical ${place} house. Today it is ` +
-          `${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone, not ` +
-          `because prices rose, but because they rose ` +
-          `${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`
+          `${latest.purchasingRatio.toFixed(2)}x. That is ${pct(powerLost)} of housing buying power gone. Prices ` +
+          `rose ${(latest.yearsOfIncome / first.yearsOfIncome).toFixed(1)} times faster than incomes did.`
         : `In ${first.month.slice(0, 4)} the median California household could afford ` +
           `${first.purchasingRatio.toFixed(2)}x a typical ${place} house. Today it is ` +
           `${latest.purchasingRatio.toFixed(2)}x, which is ${pct(-powerLost)} MORE. This is the part of ` +
-          `California a typical statewide income can still reach. Whether the people who actually live here earn ` +
-          `that, and whether you would want to, are the next two questions, and they are below.`,
+          `California a typical statewide income can still reach. Whether the people who live here earn that, and ` +
+          `whether you would want to, are the next two questions, below.`,
     blueberries:
       powerLost > 0
         ? `That house costs ${latest.yearsOfIncome.toFixed(1)} years of STATEWIDE median household income today. In ` +
@@ -226,8 +225,8 @@ export function buyingPowerVerdict(county: CaCounty = DEFAULT_COUNTY, anchorPric
           `of ${money(latest.income)}.`
         : `That house costs ${latest.yearsOfIncome.toFixed(1)} years of STATEWIDE median household income today, ` +
           `against ${first.yearsOfIncome.toFixed(1)} years in ${first.month.slice(0, 4)}. A typical California ` +
-          `income goes further here now than it did then, which is the opposite of the national story. What the ` +
-          `people who live here earn is a different number, and the panel below uses it.`,
+          `income goes further here now than then, the opposite of the national story. What the people who live ` +
+          `here earn is a different number, and the panel below uses it.`,
   };
 }
 
@@ -267,10 +266,10 @@ export function buyingPowerCaveat(county: CaCounty = DEFAULT_COUNTY): string {
     `buy here", not "can the people who live here afford it": the panel below answers that, using each county's own ` +
     `income. The price line is the FHFA index anchored to Zillow's current typical value, so it reads in dollars. ` +
     `Only that line is anchored, so the anchor moves the GAP and every dollar figure with it; the percentage change ` +
-    `does not. The record starts in ${startYear}. Income ends in ${SIGNALS_INCOME_LAST_YEAR} and is held flat after ` +
-    `that, which OVERSTATES the gap, since incomes kept rising. The affordable line is the most generous possible ` +
-    `reading: ${AFFORDABILITY_EFFORT * 100}% of income, ${ASSUMED_DOWN_PAYMENT * 100}% down, and it excludes tax, ` +
-    `insurance and everything else.`
+    `does not. The record starts in ${startYear}. Income ends in ${SIGNALS_INCOME_LAST_YEAR}, held flat after that, ` +
+    `which OVERSTATES the gap since incomes kept rising. The affordable line is the most generous reading possible: ` +
+    `${AFFORDABILITY_EFFORT * 100}% of income, ${ASSUMED_DOWN_PAYMENT * 100}% down, excluding tax, insurance and ` +
+    `everything else.`
   );
 }
 

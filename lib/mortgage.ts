@@ -592,7 +592,7 @@ function buildWarnings(input: ScenarioInput, loan: LoanFacts, qualification: Qua
   if (loan.exceedsConformingLimit && input.loanType !== "va" && input.loanType !== "fha") {
     warnings.push(
       `At ${money(loan.baseLoanAmount)}, this loan is above the ${money(loan.conformingLimit)} conforming limit for ${input.county} County, ` +
-        `which makes it a jumbo. Expect stricter underwriting, a larger down payment requirement, cash reserves, and a rate that no longer ` +
+        `which makes it a jumbo. Expect stricter underwriting, a bigger down payment, cash reserves, and a rate that no longer ` +
         `tracks the conforming market. Putting ${money(loan.baseLoanAmount - loan.conformingLimit)} more down would bring it back under.`
     );
   }

@@ -342,7 +342,7 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
   let verdict: string;
   if (monthlySaving <= 0) {
     verdict =
-      "Waiting loses. The rate you're assuming at the bottom cancels out the price drop, you'd pay the same or more per month for the same house, having paid rent the whole time. This is the trap: prices and rates usually move in opposite directions, because the thing that crashes prices is also the thing that makes the Fed cut rates.";
+      "Waiting loses. The rate you're assuming at the bottom cancels the price drop: you'd pay the same or more per month for the same house, after paying rent the whole time. That's the trap. Prices and rates usually move in opposite directions, because what crashes prices is what makes the Fed cut rates.";
   } else {
     // Count from NOW, not from the purchase, so this matches the chart's "waiting
     // has paid off" marker. That marker sits at the wait plus the rent-repayment,
@@ -351,11 +351,10 @@ export function evaluateWaiting(input: WaitScenarioInput): WaitScenarioResult {
     verdict =
       totalYears > 10
         ? `Waiting saves ${money(monthlySaving)}/month, but between the wait and earning back the ${money(rentPaid)} ` +
-          `of rent you burn getting there, you are not actually ahead for about ${totalYears.toFixed(0)} years from ` +
+          `of rent you burn getting there, you are not ahead for about ${totalYears.toFixed(0)} years from ` +
           `now. A long time to be right about timing.`
         : `Waiting saves ${money(monthlySaving)}/month and comes out ahead about ${totalYears.toFixed(1)} years from ` +
-          `now. Worth it on these assumptions, if the crash arrives on your schedule and you still have your job ` +
-          `when it does.`;
+          `now. Worth it, if the crash arrives on your schedule and you still have your job when it does.`;
   }
 
   return {
@@ -499,7 +498,7 @@ export function crashPresets(county: CaCounty = DEFAULT_COUNTY): CrashPreset[] {
             depthPercent: Math.round(worstDepth),
             monthsToBottom: mild.monthsPeakToTrough,
             rateAtBottom: rateAtTroughOf(mild),
-            basis: `The only decline over 10% in ${place}'s record: ${worstDepth.toFixed(1)}% over ${mild.monthsPeakToTrough} months, ${bottomPhrase(mild)}. Rates ${mild.inProgress ? "there" : "at that trough"} averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%. One event is not a distribution, so treat this as an anecdote with a date on it.`,
+            basis: `The only decline over 10% in ${place}'s record: ${worstDepth.toFixed(1)}% over ${mild.monthsPeakToTrough} months, ${bottomPhrase(mild)}. Rates ${mild.inProgress ? "there" : "at that trough"} averaged ${(rateAtTroughOf(mild) * 100).toFixed(2)}%. One event is not a distribution: an anecdote with a date on it.`,
           },
         ]
       : [

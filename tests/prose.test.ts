@@ -448,7 +448,7 @@ test("the browser layer hardcodes nothing that varies by county", () => {
       because: "the forecaster is trained on FHFA's metro index and genuinely produces only a San Diego number",
     },
     {
-      phrase: /produces a number for San Diego only, so it does not follow the county selector/,
+      phrase: /San Diego\s+only, so it ignores the county selector/,
       because: "the same fact, disclosed to the reader in the panel's own copy",
     },
   ];

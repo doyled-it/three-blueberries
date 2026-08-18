@@ -129,11 +129,11 @@ async function loadRate(): Promise<void> {
     }
 
     note.innerHTML = data.stale
-      ? `Could not reach the rate feed, showing the last known value from ${data.asOf}. Enter your own quote.`
-      : `Freddie Mac weekly average as of ${data.asOf}. <a href="${data.source.url}" target="_blank" rel="noopener">Source</a>. This is a national average for a well-qualified borrower. Your quote will differ.`;
+      ? `Rate feed unreachable; showing the last value from ${data.asOf}. Enter your own quote.`
+      : `Freddie Mac weekly average as of ${data.asOf}. <a href="${data.source.url}" target="_blank" rel="noopener">Source</a>. National average for a well-qualified borrower. Your quote will differ.`;
     render();
   } catch {
-    note.textContent = "Rate feed unavailable. The default below is a placeholder, enter your own quote.";
+    note.textContent = "Rate feed unavailable. The default below is a placeholder; enter your own quote.";
   }
 }
 
@@ -334,7 +334,7 @@ function render(): void {
       <span class="stat__value">${money(q.incomeRequiredAnnual)}<span class="stat__unit">/year</span></span>
       <span class="stat__note">${
         q.dtiIsGuideline
-          ? `To clear VA's residual income test, which is what VA actually underwrites. The ${pct(q.dtiCeiling, 0)} DTI figure is a guideline with no cap behind it.`
+          ? `To clear VA's residual income test, what VA actually underwrites. The ${pct(q.dtiCeiling, 0)} DTI figure is a guideline with no cap behind it.`
           : `To stay at or under a ${pct(q.dtiCeiling, 0)} debt-to-income ratio.`
       }</span>
     </div>
@@ -345,25 +345,25 @@ function render(): void {
         afford.maxPurchasePrice > 0
           ? `On ${money(haveIncome)}/year, ${
               afford.bindingConstraint === "none"
-                ? "and nothing here binds: this is the top of the search range, not a limit you hit"
+                ? "nothing here binds: this is the top of the search range, not a limit you hit"
                 : `limited by ${
                     afford.bindingConstraint === "residual-income"
                       ? "VA residual income"
                       : afford.bindingConstraint === "fha-limit"
-                        ? `FHA's loan limit for this county, not by your income`
+                        ? `FHA's loan limit for this county, not your income`
                         : "debt-to-income"
                   }`
             }. Needs ${money(afford.cashRequired)} cash` +
             (afford.downPercent < 0.2 && input.loanType === "conventional"
               ? `, and at that price your deposit is only ${pct(afford.downPercent, 1)} down, so the answer carries PMI.`
               : ".")
-          : "This household does not clear the ceiling at any price with these inputs."
+          : "This household clears the ceiling at no price with these inputs."
       }</span>
     </div>
     <div class="stat">
       <span class="stat__label">Cash to close</span>
       <span class="stat__value">${money(result.cashToClose.total)}</span>
-      <span class="stat__note">${money(result.cashToClose.downPayment)} down, plus closing costs and impound seeding.</span>
+      <span class="stat__note">${money(result.cashToClose.downPayment)} down, plus closing costs and impounds.</span>
     </div>
     <div class="stat ${q.dtiIsGuideline ? "" : q.passesDti ? "stat--pass" : "stat--fail"}">
       <span class="stat__label">Your debt-to-income</span>
@@ -563,7 +563,7 @@ function renderCohort(input: ScenarioInput): void {
       <span class="stat__value">${money(c.totalAdvantage)}<span class="stat__unit">/month cheaper for them</span></span>
       <span class="stat__note">
         They paid ${money(c.priceThen)} in ${year}${refiNote}.
-        You'd pay ${money(c.yourPayment.total)}/mo for principal, interest and tax. They pay ${money(c.theirPayment.total)}/mo.
+        You'd pay ${money(c.yourPayment.total)}/mo for principal, interest and tax. They pay ${money(c.theirPayment.total)}.
       </span>
     </div>
     <div class="stat">
@@ -575,7 +575,7 @@ function renderCohort(input: ScenarioInput): void {
       <span class="stat__label">From owing less</span>
       <span class="stat__value">${money(c.priceAdvantage)}<span class="stat__unit">/mo</span></span>
       <span class="stat__note">
-        The house cost ${money(c.equityGained)} less, and they've spent ${c.yearsHeld.toFixed(0)} years paying the balance down.
+        The house cost ${money(c.equityGained)} less, and they've spent ${c.yearsHeld.toFixed(0)} years paying it down.
       </span>
     </div>
     <div class="stat">
@@ -589,8 +589,8 @@ function renderCohort(input: ScenarioInput): void {
 
   $("cohortNotes").innerHTML = [
     `After ${c.yearsHeld.toFixed(0)} years they've captured ${money(c.equityGained)} in appreciation, which becomes the down payment on the next house. This is how repeat buyers outbid you. The median repeat buyer is 62 and arrives with equity, not salary.`,
-    `A second income moves this more than anything you can control. Most buyers have one: 61% of buyers are married couples.`,
-    `Prop 13 is why the gap is permanent rather than temporary. Their assessed value can rise at most 2% a year no matter what the house is worth; yours resets to what you pay, on the day you pay it.`,
+    `A second income moves this more than anything you can control. Most buyers have one: 61% are married couples.`,
+    `Prop 13 is why the gap is permanent. Their assessed value can rise at most 2% a year whatever the house is worth; yours resets to what you pay, the day you pay it.`,
   ]
     .map((n) => `<li>${n}</li>`)
     .join("");
@@ -677,7 +677,7 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
           { month: ctx.extremes.cheapest.month, label: `cheapest to own` },
           { month: ctx.extremes.priciest.month, label: `dearest to own` },
         ],
-        description: `Monthly principal and interest on the same ${ctx.place} home, at each month's prevailing rate.`,
+        description: `Monthly principal and interest on the same ${ctx.place} home, at each month's rate.`,
       })}
     </div>
     <div class="stats">
@@ -694,7 +694,7 @@ function renderHistory(county: CaCounty, anchorPrice: number): void {
         <span class="stat__note">
           Took ${(worst.monthsPeakToTrough / 12).toFixed(1)} years to bottom out${
             worst.monthsUnderwater
-              ? `, and ${(worst.monthsUnderwater / 12).toFixed(1)} years to get back to even if you bought the peak`
+              ? `, and ${(worst.monthsUnderwater / 12).toFixed(1)} years back to even if you bought the peak`
               : ""
           }.
         </span>
@@ -813,12 +813,12 @@ function renderRentVsBuy(input: ScenarioInput): void {
         ${money(input.purchasePrice)} against ${money(rent)}/month.
         ${
           disagrees
-            ? `That is a rule of thumb and it disagrees with the full comparison below, which ${
+            ? `That is a rule of thumb, and it disagrees with the full comparison below, which ${
                 modelSaysBuy
                   ? `has buying ahead at year ${readerHoldYears}`
                   : `has renting ahead at year ${readerHoldYears}`
-              }. Believe the itemised one: the ratio ignores your rate, your deposit, mortgage insurance and the tax relief.`
-            : `The full comparison below agrees, and it is the one that counts the rate, the deposit and the tax relief.`
+              }. Believe the itemised one: the ratio ignores your rate, deposit, mortgage insurance and tax relief.`
+            : `The full comparison below agrees, and it counts the rate, the deposit and the tax relief.`
         }
       </span>
     </div>`;
@@ -837,12 +837,12 @@ function renderRentVsBuy(input: ScenarioInput): void {
     <div class="stat">
       <span class="stat__label">Renting, money that buys nothing</span>
       <span class="stat__value">${money(f.rentPaid)}</span>
-      <span class="stat__note">All of it. That is the honest comparison, and it is ${money(Math.abs(f.burnedMoreThanRent))} ${f.burnedMoreThanRent > 0 ? "less" : "more"} than owning burns.</span>
+      <span class="stat__note">All of it. The honest comparison: ${money(Math.abs(f.burnedMoreThanRent))} ${f.burnedMoreThanRent > 0 ? "less" : "more"} than owning burns.</span>
     </div>
     <div class="stat stat--pass">
       <span class="stat__label">Owning, actual saving</span>
       <span class="stat__value">${money(f.principalPaid)}</span>
-      <span class="stat__note">The principal portion in year one. This is the only part of a mortgage payment that is not spent.</span>
+      <span class="stat__note">The principal portion in year one. The only part of a mortgage payment that is not spent.</span>
     </div>`;
 
   $("rentBuyChart").innerHTML = renderMultiLine({
@@ -1089,7 +1089,7 @@ function renderRentVsBuy(input: ScenarioInput): void {
     (ceilingHere ? `At today's rate your ceiling is ${money(ceilingHere)}. ` : "") +
     `The curve is convex, so a single per-point figure misleads: the next half point down is worth about ` +
     `${money(Math.abs(sensitivity.perQuarterPoint))}, but getting all the way to 4.5% is worth ` +
-    `${at45 && ceilingHere ? money(at45 - ceilingHere) : "considerably more"}. Rates are also the only input here you can change after you buy.`;
+    `${at45 && ceilingHere ? money(at45 - ceilingHere) : "considerably more"}. Rates are the only input here you can change after you buy.`;
 
   // --- the decision ---
   const decision = decide({
@@ -1359,9 +1359,9 @@ function renderWhereItWorks(county: CaCounty): void {
       <span class="stat__label">${county} County, on its own income</span>
       <span class="stat__value">${here.yearsOfIncome.toFixed(1)}x<span class="stat__unit"> years of local pay</span></span>
       <span class="stat__note">
-        A typical single-family home here is ${money(here.homeValue)}. The households who already live and work here
+        A typical single-family home here is ${money(here.homeValue)}. The people who live and work here
         earn a median of ${money(here.income)}. That makes it the ${rank}${ordinal(rank)} least affordable of the 58
-        counties, measured against what people there actually earn.
+        counties, measured against local pay.
       </span>
     </div>
     <div class="stat stat--fail">
@@ -1684,7 +1684,7 @@ function renderWaiting(input: ScenarioInput): void {
       <span class="stat__label">Prop 13, permanently</span>
       <span class="stat__value">${money(r.propTaxSavingAnnual)}<span class="stat__unit">/year</span></span>
       <span class="stat__note">
-        A lower purchase price locks a lower assessed value for as long as you own it. This is the part of waiting
+        A lower purchase price locks a lower assessed value for as long as you own it. The part of waiting
         that keeps paying after the market recovers.
       </span>
     </div>

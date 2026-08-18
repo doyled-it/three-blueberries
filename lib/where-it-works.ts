@@ -130,7 +130,6 @@ export function payTrap(sampleSize = 10): PayTrap {
 
 export const WHERE_IT_WORKS_CAVEAT =
   `Home values are Zillow's typical single-family value today; incomes are each county's own Census median from ` +
-  `${COUNTY_INCOME_YEAR}, the most recent SAIPE year, not a statewide figure. Because the values are current and the ` +
-  `incomes a year or two old, every multiple runs slightly HIGH. It is a snapshot, not a trend: it cannot see jobs ` +
-  `arriving or leaving, and it says nothing about whether you would want to live in any of these places, which is ` +
-  `the question it most obviously invites and the one arithmetic is worst at.`;
+  `${COUNTY_INCOME_YEAR}, the most recent SAIPE year, not a statewide figure. Current values against year-old ` +
+  `incomes run every multiple slightly HIGH. A snapshot, not a trend: it cannot see jobs arriving or leaving, and ` +
+  `it says nothing about whether you would want to live in these places, which is what arithmetic is worst at.`;

@@ -155,7 +155,7 @@ test("a metro county gets quarterly data and a rural one gets annual", () => {
   const rural = countyScope("Sierra");
   assert.equal(rural.stepMonths, 12);
   assert.match(rural.note, /annual/);
-  assert.match(rural.note, /not inside a metropolitan area/);
+  assert.match(rural.note, /not in a metro/);
 });
 
 test("REGRESSION: the buying-power verdict knows which way the number went", () => {

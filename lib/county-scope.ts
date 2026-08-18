@@ -42,9 +42,8 @@ export function countyScope(county: CaCounty): CountyScope {
     stepMonths === 3
       ? `The price history below is the FHFA index for ${place}, quarterly, from ${from}. ${county} County sits in ` +
         `that metro, so this is your market, not somebody else's.`
-      : `The price history below is the FHFA index for ${county} County itself, annual, from ${from}. It is not ` +
-        `inside a metropolitan area, and FHFA publishes quarterly data only for metros, so this is the finest ` +
-        `resolution there is.`;
+      : `The price history below is the FHFA index for ${county} County itself, annual, from ${from}. It is not in ` +
+        `a metro, and FHFA publishes quarterly data only for metros, so this is the finest resolution there is.`;
 
   // A series that stops years ago is presented as current everywhere else on the
   // page. Say it here, where the resolution caveat already lives.
@@ -57,7 +56,7 @@ export function countyScope(county: CaCounty): CountyScope {
 
   const seam = spliceMonth
     ? ` Readings before ${spliceMonth} are chain-linked from FHFA's older, coarser index, so treat the earliest ` +
-      `stretch as the shape of what happened rather than a precise measurement.`
+      `stretch as the shape of what happened, not a precise measurement.`
     : "";
 
   return { county, place, stepMonths, spliceMonth, note: resolution + staleness + seam };

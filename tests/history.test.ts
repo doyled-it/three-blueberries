@@ -441,8 +441,8 @@ test("the thesis copy states the relative claim, not just 'houses are expensive'
 });
 
 test("the buying-power caveat discloses the generous assumptions", () => {
-  assert.match(BUYING_POWER_CAVEAT, /excludes tax, insurance/i);
-  assert.match(BUYING_POWER_CAVEAT, /most generous possible reading/i);
+  assert.match(BUYING_POWER_CAVEAT, /exclud(?:es|ing) tax, insurance/i);
+  assert.match(BUYING_POWER_CAVEAT, /most generous (?:possible reading|reading possible)/i);
 });
 
 test("REGRESSION: stating old dollars in today's money leaves the ratio untouched", () => {

@@ -88,7 +88,7 @@ export function recommend(
     );
     if (q.residualIncome && !q.residualIncome.passes) {
       because.push(
-        `VA's residual income test is the one that decides, and this misses it by ` +
+        `VA's residual income test decides, and this misses it by ` +
           `${money(q.residualIncome.required - q.residualIncome.available)}/month.`
       );
     }
@@ -131,7 +131,7 @@ export function recommend(
     const rentNote =
       savings.rentGrowth > 0
         ? ` And this counts your ${money(savings.currentRent)} rent rising ${pct(savings.rentGrowth)} a year, which eats into ` +
-          `what you can put aside.`
+          `your savings.`
         : "";
     conditions.push(
       race.yearsToAfford === null
@@ -147,8 +147,7 @@ export function recommend(
       answer: race.yearsToAfford === null ? "no" : "not-yet",
       headline:
         race.yearsToAfford === null
-          ? `Not this house. You qualify for the loan, but the deposit is moving away from you faster than you are ` +
-            `saving.`
+          ? `Not this house. You qualify for the loan, but the deposit is pulling away faster than you save.`
           : `Not yet, and the gap is ${money(cashShort)}. On your current saving that is about ` +
             `${race.yearsToAfford} year${race.yearsToAfford === 1 ? "" : "s"} away.`,
       because,
@@ -173,8 +172,7 @@ export function recommend(
   if (start === null) {
     // Owning never leads.
     because.push(
-      `Against renting it never catches up. Over thirty years, on these assumptions, renting and investing the ` +
-        `difference stays ahead.`
+      `Against renting it never catches up. Over thirty years, renting and investing the difference stays ahead.`
     );
     conditions.push(
       decision.priceNeeded !== null
@@ -184,8 +182,7 @@ export function recommend(
     return {
       answer: "conditional",
       headline:
-        `You can buy it, but on these assumptions you should not: renting and investing the difference stays ahead ` +
-        `for the whole thirty years.`,
+        `You can buy it, but you should not: renting and investing the difference stays ahead the whole thirty years.`,
       because,
       conditions,
       caveats: caveatsFor(input, result),
@@ -199,8 +196,8 @@ export function recommend(
     if (pastWindow) {
       because.push(
         `Against renting it is ahead only between year ${start} and year ${end - 1}. You plan to stay ${holdYears}, ` +
-          `past the point renting pulls back ahead, because the money you did not sink into the house compounds faster ` +
-          `than the house appreciates.`
+          `past the point renting pulls back ahead, because the money you didn't sink into the house compounds faster ` +
+          `than it appreciates.`
       );
       conditions.push(`Selling between year ${start} and year ${end - 1}, not holding to ${holdYears}.`);
       return {
@@ -215,7 +212,7 @@ export function recommend(
     }
     // Too short to reach the window.
     because.push(
-      `Against renting it does not pull ahead until year ${start}, and you said you expect to stay ${holdYears}.`
+      `Against renting it does not pull ahead until year ${start}, and you expect to stay ${holdYears}.`
     );
     conditions.push(
       end === null

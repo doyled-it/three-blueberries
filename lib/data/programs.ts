@@ -245,7 +245,7 @@ export const DTI_CEILINGS: Record<
     // so its Selling Guide has nothing to say about their ratios. This entry
     // used to cite it anyway.
     sourceIds: ["jumbo-lender-overlays"],
-    note: "Jumbo loans are held on the lender's own books, so they set their own rules. 43% is a common ceiling because it is Regulation Z's Qualified Mortgage threshold, and reserves of 6-12 months are typical. There is no published agency number here.",
+    note: "Jumbo loans stay on the lender's own books, so they set their own rules. 43% is a common ceiling, Regulation Z's Qualified Mortgage threshold, with 6-12 months of reserves typical. No published agency number here.",
   },
   fha: {
     typical: 0.45,
@@ -259,7 +259,7 @@ export const DTI_CEILINGS: Record<
     typical: 0.41,
     max: 0.6,
     sourceIds: ["va-residual-income"],
-    note: "41% is a guideline, not a cap. VA has no hard DTI limit. It cares about residual income instead, and will approve well past 41% if enough money is left over each month.",
+    note: "41% is a guideline, not a cap. VA has no hard DTI limit; it underwrites on residual income, and will approve well past 41% if enough is left over each month.",
   },
 };
 

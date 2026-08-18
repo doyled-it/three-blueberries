@@ -302,7 +302,7 @@ export function crashSignals(
               ? `${(gap * 100).toFixed(0)}% MORE than it cost at the ${peakYear} peak`
               : `${(-gap * 100).toFixed(0)}% less than it cost at the ${peakYear} peak`;
         return (
-          `${versus}, relative to income. This stretched has preceded ${declinePhrase}, and also persisted for years ` +
+          `${versus}, relative to income. Being this stretched preceded ${declinePhrase}, and persisted for years ` +
           `before ${declineCount === 1 ? "it" : "any of them"} broke.`
         );
       })(),
@@ -375,7 +375,7 @@ export function crashSignals(
         );
       })(),
       caveat:
-        "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply. The market you actually shop, is around 4.6 months.",
+        "NEW CONSTRUCTION ONLY. Builders carry far more spec inventory than in the 1990s, so eras aren't directly comparable. Existing-home supply, the market you actually shop, runs around 4.6 months.",
     },
     {
       key: "delinquency",

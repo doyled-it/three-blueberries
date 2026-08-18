@@ -155,22 +155,22 @@ function withSearchCaveats(scenario: ScenarioResult): readonly string[] {
   if (scenario.input.loanType === "fha" && scenario.loan.baseLoanAmount >= scenario.loan.fhaLimit - 1000) {
     out.push(
       `This answer is capped by FHA's ${money(scenario.loan.fhaLimit)} limit for ${scenario.input.county} County, not by what ` +
-        `you earn. A conventional loan would let you go higher on the same income, at the cost of a bigger deposit.`
+        `you earn. A conventional loan would go higher on the same income, at the cost of a bigger deposit.`
     );
   }
 
   if (scenario.loan.exceedsConformingLimit) {
     out.push(
       `This answer is above ${scenario.input.county} County's ${money(scenario.loan.conformingLimit)} conforming limit, and the search ` +
-        `priced every step at the conforming rate. A real jumbo quote runs higher, so treat this number as an upper bound rather than ` +
-        `a target. The honest max is somewhere at or below it.`
+        `priced every step at the conforming rate. A real jumbo quote runs higher, so treat this as an upper bound. The honest max ` +
+        `is at or below it.`
     );
   }
 
   if (scenario.input.loanType === "conventional" && down < 0.2 && down > 0) {
     out.push(
-      `At this price your ${money(downPayment)} deposit is ${(down * 100).toFixed(1)}% down, not 20%. The search raises the price and ` +
-        `leaves the cash where it is, so the answer carries PMI that a 20%-down purchase would not.`
+      `At this price your ${money(downPayment)} deposit is ${(down * 100).toFixed(1)}% down, not 20%. The search raises the price ` +
+        `but not the cash, so the answer carries PMI that a 20%-down purchase would not.`
     );
   }
 
