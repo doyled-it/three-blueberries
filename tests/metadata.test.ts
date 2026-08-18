@@ -412,3 +412,22 @@ test("the print report is wired: container, button, and a print-only stylesheet"
   assert.ok(/window\.print\(\)/.test(app), "Save as PDF must call window.print()");
   assert.ok(/renderPrintReport/.test(app), "the report summary must be rebuilt on render");
 });
+
+test("the print report escapes the form-derived county before it hits innerHTML", () => {
+  // The report interpolates the county name into markup. A <select> already
+  // coerces a crafted URL value to "", but two defenses keep it safe regardless:
+  // the value is escaped, and the permalink only applies an option that exists.
+  const app = fs.readFileSync("src/client/app.ts", "utf8");
+  assert.ok(/const escapeHtml\s*=/.test(app), "escapeHtml helper must exist");
+  assert.ok(/const county = escapeHtml\(input\.county\)/.test(app), "county must be escaped in the report");
+  // The report's innerHTML must interpolate the escaped `county`, never the raw
+  // `input.county`. (Other panels use input.county with textContent, which is
+  // safe and out of scope here.)
+  assert.ok(/print-report__meta">\$\{money\(price\)\} home in \$\{county\} County/.test(app), "the report meta must use the escaped county");
+
+  const permalink = fs.readFileSync("src/client/permalink.ts", "utf8");
+  assert.ok(
+    /select\.options[\s\S]*?some\(\(o\) => o\.value === raw\)/.test(permalink),
+    "the permalink must validate a select value against the offered options"
+  );
+});

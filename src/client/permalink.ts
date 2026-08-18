@@ -91,6 +91,14 @@ export function applyScenarioFromUrl(): boolean {
     } else if (f.kind === "money") {
       const n = Number(digits(raw));
       if (Number.isFinite(n)) node.value = n.toLocaleString("en-US");
+    } else if (f.kind === "select") {
+      // Only accept a value the select actually offers. A <select> already
+      // coerces an unknown value to "", but validating against the real options
+      // keeps a crafted URL from ever putting an off-list string in play (the
+      // county then flows into the print report's markup).
+      const select = node as HTMLSelectElement;
+      if (![...select.options].some((o) => o.value === raw)) continue;
+      select.value = raw;
     } else {
       node.value = raw;
     }

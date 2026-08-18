@@ -85,6 +85,15 @@ import type { Confidence, LineItem, LoanType, ScenarioInput, ScenarioResult } fr
 const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 const pct = (n: number, places = 2) => (n * 100).toFixed(places) + "%";
 
+/**
+ * Escape a string before it goes into innerHTML. The county select coerces any
+ * crafted URL value back to "" (a <select> only returns a real option), so the
+ * report is not actually injectable today, but interpolating a form-derived
+ * string into markup should never depend on that coercion holding.
+ */
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const CONFIDENCE_LABEL: Record<Confidence, string> = {
@@ -240,14 +249,17 @@ function renderPrintReport(input: ScenarioInput, result: ScenarioResult): void {
   const downAmount = input.downPayment.kind === "amount" ? input.downPayment.value : input.downPayment.value * price;
   const downPct = price > 0 ? downAmount / price : 0;
   const income = input.household.grossAnnualIncomes.reduce((a, b) => a + b, 0);
-  const loan = LOAN_LABEL[input.loanType] ?? input.loanType;
-  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  // Everything below goes into innerHTML. Numbers are formatted by money()/pct()
+  // and safe; the form-derived strings are escaped.
+  const loan = escapeHtml(LOAN_LABEL[input.loanType] ?? input.loanType);
+  const county = escapeHtml(input.county);
+  const today = escapeHtml(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }));
 
   const facts: [string, string][] = [
     ["Purchase price", money(price)],
     ["Down payment", `${money(downAmount)} · ${pct(downPct, 1)}`],
     ["Loan", `${loan} · ${input.termYears} years · ${pct(input.interestRate, 2)}`],
-    ["County", `${input.county}`],
+    ["County", county],
     ["Household income", `${money(income)}/yr`],
   ];
   if (input.hoaMonthly > 0) facts.push(["HOA dues", `${money(input.hoaMonthly)}/mo`]);
@@ -257,7 +269,7 @@ function renderPrintReport(input: ScenarioInput, result: ScenarioResult): void {
     <div class="print-report__head">
       <p class="print-report__kicker">Three Blueberries · cost report</p>
       <h2 class="print-report__title">What this house actually costs</h2>
-      <p class="print-report__meta">${money(price)} home in ${input.county} County · generated ${today}</p>
+      <p class="print-report__meta">${money(price)} home in ${county} County · generated ${today}</p>
     </div>
     <dl class="print-report__facts">
       ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}
