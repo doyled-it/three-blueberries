@@ -1665,7 +1665,7 @@ input[type="range"] {
   }
 }
 
-/* "Copy a link to this scenario" — the permalink affordance under the form. */
+/* "Copy a link to this scenario", the permalink affordance under the form. */
 .form-share {
   display: flex;
   align-items: baseline;
@@ -1921,7 +1921,7 @@ input[type="range"] {
   }
 }
 
-/* "see the formula →" — links a payment line to its section on /how-its-calculated. */
+/* "see the formula →" links a payment line to its section on /how-its-calculated. */
 .line__formula {
   border: 0;
   color: var(--berry);
